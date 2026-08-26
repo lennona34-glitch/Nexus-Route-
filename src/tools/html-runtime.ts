@@ -282,7 +282,7 @@ export async function testHtmlRuntime(options: HtmlRuntimeTestOptions): Promise<
             canvasCount: canvases.length,
             visibleCanvasCount: canvases.filter(visible).length,
             startControlVisible: starts.length > 0,
-            bodyText: String(document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 500)
+            bodyText: String(document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 500)
           };
         })()`,
       });

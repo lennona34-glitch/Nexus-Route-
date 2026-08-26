@@ -1510,7 +1510,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         };
         let currentResponse = await runTurn(currentMessages, currentTools);
         let turnCount = 0;
-        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 4));
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 8));
         let generatedImagesMarkdown = '';
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
@@ -1689,6 +1689,24 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
 
         const response = currentResponse;
         if (accumulatedUsage) response.usage = accumulatedUsage;
+        if (turnCount >= maxTurns && response.choices?.[0]?.message) {
+          // Ran out of turns rather than finishing - mark it rather than
+          // presenting a truncated result as a complete answer.
+          this.agentEventLog.record({
+            requestId,
+            sessionId: req.session_id,
+            stage: 'route_failed',
+            requestedModel: req.model,
+            provider,
+            model,
+            connectionLabel: connection?.label,
+            success: false,
+            durationMs: Date.now() - attemptStart,
+            error: `agent loop hit the ${maxTurns}-turn limit before finishing`,
+          });
+          response.choices[0].message.content =
+            `${response.choices[0].message.content || ''}\n\n⚠️ Stopped after ${maxTurns} agent turns with the task unfinished. Raise NEXUS_MAX_AGENT_TURNS or ask me to continue.`;
+        }
         if (response.choices?.[0]?.message) {
           if (!response.choices[0].message.content && toolsExecuted.length > 0) {
             response.choices[0].message.content = `Completed execution of tools: ${toolsExecuted.join(', ')}.`;
@@ -2053,7 +2071,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let currentMessages = [...effectiveReq.messages];
         let currentTools = effectiveReq.tools;
         let turnCount = 0;
-        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 4));
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 8));
         let accumulatedUsage: UniversalResponse['usage'] | undefined = undefined;
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
@@ -2487,6 +2505,36 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             break;
           }
         }
+
+        // Reaching here means the loop ran out of turns rather than finishing:
+        // every successful path returns from inside it. Say so, instead of
+        // ending the stream silently in the middle of a task.
+        this.agentEventLog.record({
+          requestId,
+          sessionId: req.session_id,
+          stage: 'route_failed',
+          requestedModel: req.model,
+          provider,
+          model,
+          connectionLabel: connection?.label,
+          success: false,
+          durationMs: Date.now() - attemptStart,
+          error: `agent loop hit the ${maxTurns}-turn limit before finishing`,
+        });
+        const turnLimitNotice: UniversalStreamChunk = {
+          id: `chatcmpl-${Date.now()}`,
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model,
+          choices: [{
+            index: 0,
+            delta: { content: `\n\n⚠️ Stopped after ${maxTurns} agent turns with the task unfinished. Raise NEXUS_MAX_AGENT_TURNS or ask me to continue.` },
+            finish_reason: 'length',
+          }],
+        };
+        markStreamStarted();
+        recordedChunks.push(turnLimitNotice);
+        yield turnLimitNotice;
 
         // Cache the stream chunks
         if (recordedChunks.length > 0) {
