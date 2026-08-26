@@ -40,6 +40,8 @@ venv/
 
 # Logs and OS files
 *.log
+logs/
+workspace/screenshots/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
