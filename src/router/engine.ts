@@ -2093,13 +2093,11 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           let turnContent = '';
           let turnUsage: UniversalResponse['usage'] | undefined;
           const deferredChunks: UniversalStreamChunk[] = [];
-          // A file-write turn must stay buffered to the end so an unverified
-          // "I created the file" claim can still be suppressed. Everything else
-          // only buffers long enough to rule out a textual tool call.
-          const bufferUntilTurnEnds = fileWriteExpected;
-          let bufferingTurn =
-            (!!currentTools && (provider === 'local' || provider === 'ollama')) ||
-            bufferUntilTurnEnds;
+          // Nothing is held to the end of the turn any more. Holding file-write
+          // turns meant a minute or more of total silence, and when the write
+          // could not be verified the whole response was discarded unseen.
+          // Content streams as it arrives; an unverified write is flagged after.
+          let bufferingTurn = !!currentTools && (provider === 'local' || provider === 'ollama');
 
           for await (const chunk of stream) {
             if (chunk.usage && chunk.usage.total_tokens) {
@@ -2109,7 +2107,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             const delta = chunk.choices?.[0]?.delta?.content;
             if (delta) {
               turnContent += delta;
-              if (bufferingTurn && !bufferUntilTurnEnds && !mayStillBeTextualToolCall(turnContent)) {
+              if (bufferingTurn && !mayStillBeTextualToolCall(turnContent)) {
                 bufferingTurn = false;
                 for (const heldChunk of deferredChunks) {
                   markStreamStarted();
@@ -2376,12 +2374,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               dependencyIssues.length > 0 ||
               (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success)
             );
-            if (!suppressUnverifiedFileClaim) {
-              for (const deferredChunk of deferredChunks) {
-                markStreamStarted();
-                recordedChunks.push(deferredChunk);
-                yield deferredChunk;
-              }
+            // Always release what the model produced. Withholding it destroyed
+            // work the user could still use - often the full file contents in a
+            // code block - and left only a warning on screen.
+            for (const deferredChunk of deferredChunks) {
+              markStreamStarted();
+              recordedChunks.push(deferredChunk);
+              yield deferredChunk;
             }
 
             if (suppressUnverifiedFileClaim) {
@@ -2394,7 +2393,9 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
                       ? `the post-click HTML runtime test has not passed (${htmlRuntimeVerification.detail})`
                     : rejectedWrites.at(-1)
                   ? `the file-tool result was incomplete (${rejectedWrites.at(-1)!.reason})`
-                  : 'no successful write_file or patch_file result matched the requested target path'
+                  : toolsExecuted.some(name => name === 'write_file' || name === 'patch_file')
+                    ? 'a file tool ran but no successful result matched the requested target path'
+                    : 'the model never called write_file or patch_file, so nothing was saved to disk'
                 : 'workspace tools were disabled for this request';
               const warningChunk: UniversalStreamChunk = {
                 id: `chatcmpl-${Date.now()}`,
@@ -2506,9 +2507,9 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           }
         }
 
-        // Reaching here means the loop ran out of turns rather than finishing:
-        // every successful path returns from inside it. Say so, instead of
-        // ending the stream silently in the middle of a task.
+        // The success path also leaves the loop and falls through here, so this
+        // must test the turn counter rather than assume exhaustion.
+        if (turnCount >= maxTurns) {
         this.agentEventLog.record({
           requestId,
           sessionId: req.session_id,
@@ -2535,6 +2536,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         markStreamStarted();
         recordedChunks.push(turnLimitNotice);
         yield turnLimitNotice;
+        }
 
         // Cache the stream chunks
         if (recordedChunks.length > 0) {
