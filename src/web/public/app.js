@@ -2541,7 +2541,12 @@ if (chatForm) {
       if (err.name === 'AbortError') {
         bodyEl.innerHTML += `<div style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">⏹️ Generation stopped.</div>`;
       } else if (err.partialText) {
-        bodyEl.innerHTML = `${formatMarkdown(err.partialText)}<div style="color: var(--accent-red); font-size: 12px; margin-top: 10px;">⚠️ Connection ended after automatic recovery attempts: ${escapeHtml(err.message)}</div>`;
+        // Only claim recovery attempts that actually took place - the old text
+        // said this unconditionally, including when nothing was retried.
+        const recovery = err.retriesUsed > 0
+          ? `after ${err.retriesUsed} recovery attempt${err.retriesUsed === 1 ? '' : 's'}`
+          : 'and could not be recovered';
+        bodyEl.innerHTML = `${formatMarkdown(err.partialText)}<div style="color: var(--accent-red); font-size: 12px; margin-top: 10px;">⚠️ Connection ended ${recovery}: ${escapeHtml(err.message)}</div>`;
       } else {
         bodyEl.innerHTML = `<span style="color: var(--accent-red); font-family: var(--font-mono);">Error: ${escapeHtml(err.message)}</span>`;
       }
@@ -2632,6 +2637,7 @@ async function handleStreamRequest(payload, bodyEl) {
   let finalUsage = null;
   const maxAttempts = 3;
   let completed = false;
+  let retriesUsed = 0;
 
   for (let attempt = 0; attempt < maxAttempts && !completed; attempt++) {
     const retryingAfterPartial = attempt > 0 && fullText.length > 0;
@@ -2753,13 +2759,22 @@ async function handleStreamRequest(payload, bodyEl) {
         throw err;
       }
 
-      const canRetry = err.retryable !== false && attempt < maxAttempts - 1;
+      // Previously this defaulted to retrying (retryable !== false), so any
+      // error that carried no explicit verdict - including ones no amount of
+      // retrying could fix - re-ran the whole request, and each re-run drove a
+      // fresh server-side cascade at full prompt cost. Retry is now opt-in.
+      // A fetch-level TypeError is the one case we classify here: it means the
+      // transport dropped, which a retry genuinely can recover.
+      if (err.retryable === undefined && err instanceof TypeError) err.retryable = true;
+      const canRetry = err.retryable === true && attempt < maxAttempts - 1;
       if (!canRetry) {
         err.partialText = fullText;
+        err.retriesUsed = retriesUsed;
         if (fullText) conversationHistory.push({ role: 'assistant', content: fullText });
         throw err;
       }
 
+      retriesUsed = attempt + 1;
       if (bodyEl) {
         bodyEl.innerHTML = `${formatMarkdown(fullText)}<div style="color: var(--accent-cyan); font-size: 12px; margin-top: 8px;">↻ Connection interrupted—reconnecting (${attempt + 1}/${maxAttempts - 1})…</div>`;
       }
