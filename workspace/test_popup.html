@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Glow Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .neon-header {
+            font-size: 5rem;
+            font-weight: 800;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: #00fff0;
+            text-shadow:
+                0 0 5px #00fff0,
+                0 0 10px #00fff0,
+                0 0 20px #00fff0,
+                0 0 40px #00e0ff,
+                0 0 80px #00b3ff,
+                0 0 120px #0080ff;
+            animation: flicker 3s infinite alternate;
+        }
+        @keyframes flicker {
+            0%, 100% {
+                opacity: 1;
+                text-shadow:
+                    0 0 5px #00fff0,
+                    0 0 10px #00fff0,
+                    0 0 20px #00fff0,
+                    0 0 40px #00e0ff,
+                    0 0 80px #00b3ff,
+                    0 0 120px #0080ff;
+            }
+            50% {
+                opacity: 0.85;
+                text-shadow:
+                    0 0 3px #00fff0,
+                    0 0 6px #00fff0,
+                    0 0 15px #00fff0,
+                    0 0 30px #00e0ff,
+                    0 0 60px #00b3ff;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="neon-header">Neon Glow</h1>
+</body>
+</html>

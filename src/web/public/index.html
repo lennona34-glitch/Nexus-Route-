@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NexusRoute | Unified AI Gateway & Inspector</title>
+  <link rel="stylesheet" href="style.css?v=2.3.1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Navigation Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <div class="brand-title">NexusRoute</div>
+          <div class="brand-subtitle">Zero-Bloat AI Routing Gateway</div>
+        </div>
+      </div>
+      <div class="nav-metrics">
+        <div id="gpuMetricPill" class="metric-pill gpu-pill" title="Local GPU VRAM & Active Models">
+          <span class="status-dot active" id="gpuLedDot"></span>
+          <span class="pill-label" id="gpuMetricLabel">GPU: RTX 4060 · Loading...</span>
+          <button id="quickUnloadGpuBtn" class="gpu-unload-btn" title="Unload all offline models from GPU VRAM">⚡ Unload</button>
+        </div>
+
+        <div id="providerBadges" class="provider-badges">
+          <!-- Dynamically populated with provider status pills -->
+        </div>
+
+        <button id="openKeysModalBtn" class="keys-btn" title="Configure Live API Keys">
+          <span class="btn-key-icon">🔑</span>
+          <span>Provider Keys</span>
+          <span id="keysAlertBadge" class="keys-alert-dot hidden">!</span>
+        </button>
+
+        <button id="openCapacityModalBtn" class="nav-action-btn" title="Manage provider key pools, free quotas, and cooldowns">
+          <span>⚡</span> Free Capacity <span id="capacityReadyBadge" class="history-count-badge">0</span>
+        </button>
+
+        <button id="toggleHistoryBtn" class="nav-action-btn" title="View past chat conversations">
+          <span>📜</span> History <span id="historyCountBadge" class="history-count-badge">0</span>
+        </button>
+
+        <button id="openWorkspaceModalBtn" class="nav-action-btn" title="View files created by AI on your computer">
+          <span>📁</span> Workspace
+        </button>
+
+        <button id="openConnectModalBtn" class="nav-action-btn" title="Connect Cursor, VS Code, or Python SDK">
+          <span>🔌</span> Connect
+        </button>
+
+        <button id="openVirtualKeysBtn" class="nav-action-btn" title="Manage Client Keys & Spend Limits">
+          <span>🛡️</span> Keys & Limits
+        </button>
+
+        <button id="exportChatBtn" class="nav-action-btn" title="Export conversation to Markdown">
+          <span>💾</span> Export
+        </button>
+
+        <button id="toggleCurrencyBtn" class="nav-action-btn" title="Toggle Currency (GBP £ / USD $)">
+          <span id="currencyIcon">💷</span> <span id="currencyLabel">GBP (£)</span>
+        </button>
+
+        <button id="toggleFullscreenBtn" class="nav-action-btn" title="Toggle Fullscreen Zen Mode (F11 or click)">
+          <span id="fullscreenIcon">⛶</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Chat History Sidebar -->
+    <aside id="chatSidebar" class="chat-sidebar hidden">
+      <div class="sidebar-header">
+        <div class="sidebar-title">
+          <span>📜</span>
+          <h3>Chat History</h3>
+        </div>
+        <button id="sidebarNewChatBtn" class="sidebar-new-btn" title="Start a fresh chat">+ New Chat</button>
+      </div>
+
+      <div class="sidebar-search">
+        <input type="text" id="searchChatsInput" placeholder="🔍 Search conversations..." autocomplete="off" />
+      </div>
+
+      <div class="sidebar-sessions-list" id="chatSessionsList">
+        <!-- Dynamically rendered chat session cards -->
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="clearAllHistoryBtn" class="sidebar-clear-btn" title="Delete all saved conversations">🗑️ Clear All</button>
+        <button id="closeSidebarBtn" class="sidebar-close-btn" title="Close history panel">✕ Close</button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Grid -->
+    <main class="grid-layout">
+      <!-- Left Column: Interactive Chat Playground -->
+      <section class="card playground-card">
+        <div class="card-header">
+          <div class="section-title">
+            <span class="icon">💬</span>
+            <h2>Live Playground</h2>
+          </div>
+          <div class="controls-row">
+            <div class="select-group">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="modelSelect">Target / Alias</label>
+                <a href="#" id="quickKeysLink" style="font-size: 11px; color: var(--accent-cyan); text-decoration: none; font-weight: 600;" title="Configure Live Provider API Keys">🔑 Keys</a>
+              </div>
+              <select id="modelSelect">
+                <optgroup label="Virtual Smart Routes (Pareto Auto-Dispatch)">
+                  <option value="auto" selected>✨ auto (Adaptive Pareto Dispatch)</option>
+                  <option value="fast">⚡ fast (Lowest Latency Tier)</option>
+                  <option value="reasoning">🧠 reasoning (Deep Logic Tier)</option>
+                  <option value="coding">💻 coding (Code Synthesis Tier)</option>
+                </optgroup>
+                <optgroup label="Featured Free Coding & Reasoning">
+                  <option value="openrouter::stealth/ox-alpha">🧪 Ox Alpha · Free Preview · 1M ctx · tools</option>
+                </optgroup>
+                <optgroup id="providerModelsAnchor" label="Cloud Models (checking configured providers…)">
+                  <option disabled>Loading live provider catalogues…</option>
+                </optgroup>
+                <optgroup id="localModelsOptgroup" label="Offline / Local Free GPU Tier (Ollama)">
+                  <option value="free">🟢 Free Tier (Auto-Route to Local GPU)</option>
+                  <option value="local/dolphin-roaster">🔥 Local Dolphin Roaster (Brutally Cynical Drill Sergeant)</option>
+                  <option value="local/dolphin-maverick">🐬 Local Dolphin Maverick (Unfiltered Creative / Analyst)</option>
+                  <option value="local/wizard-coder">🧙 Local Wizard Coder (Unrestricted Systems Architect)</option>
+                </optgroup>
+                <optgroup label="Direct Mock Endpoints (Zero-Cost Testing)">
+                  <option value="mock-gpt-4o">mock-gpt-4o</option>
+                  <option value="mock-claude-3-5-sonnet">mock-claude-3-5-sonnet</option>
+                  <option value="mock-gemini-1-5-flash">mock-gemini-1-5-flash</option>
+                  <option value="mock-o3-mini">mock-o3-mini</option>
+                  <option value="mock-fail-429">⚠️ mock-fail-429 (Simulate Rate Limit)</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="select-group">
+              <label for="openRouterRoutingSelect">OpenRouter Route</label>
+              <select id="openRouterRoutingSelect" title="Applies whenever a request is dispatched through OpenRouter">
+                <option value="balanced" selected>⚖ Balanced</option>
+                <option value="cheapest">💷 Cheapest</option>
+                <option value="fastest">⚡ Fastest</option>
+                <option value="tools">🛠 Best Tools</option>
+              </select>
+            </div>
+            <div class="select-group">
+              <label for="artEngineSelect">🎨 Art Engine</label>
+              <select id="artEngineSelect" title="Art Generation Engine">
+                <option value="promptforge" selected>🎨 PromptForge RTX Studio (Animagine-XL / SDXL Local)</option>
+                <option value="gpu">⚡ RTX 4060 GPU Turbo (Local)</option>
+                <option value="together">🚀 Together AI FLUX.1 Pro (Cloud)</option>
+                <option value="huggingface">🤗 Hugging Face FLUX.1 (Cloud)</option>
+                <option value="openai">🌟 OpenAI DALL-E 3 HD (Cloud)</option>
+                <option value="imagen">🎨 Google Cloud Imagen 3 (Cloud)</option>
+                <option value="cloud">☁️ Cloud Auto Dispatch (Fastest)</option>
+              </select>
+            </div>
+
+            <div class="toggle-group">
+              <label class="switch-label" title="Required for real workspace file access, app actions, shell commands and calculator tools">
+                <input type="checkbox" id="toolsToggle" checked>
+                <span class="switch-custom green"></span>
+                <span>🛠️ Tools &amp; Files</span>
+              </label>
+            </div>
+
+            <div class="toggle-group">
+              <label class="switch-label">
+                <input type="checkbox" id="streamToggle" checked>
+                <span class="switch-custom"></span>
+                <span>Stream</span>
+              </label>
+            </div>
+
+            <button id="toggleFullscreenChatBtn" class="action-tag-btn" title="Toggle Fullscreen Chat (Hide/Show Telemetry Sidebar)">⤢ Fullscreen</button>
+            <button id="newChatBtn" class="action-tag-btn" title="Start fresh conversation">🧹 New Chat</button>
+          </div>
+        </div>
+
+        <!-- Chat Transcript Area -->
+        <div class="chat-messages" id="chatMessages">
+          <div class="message assistant">
+            <div class="message-meta">
+              <span class="sender-tag">NexusRoute Gateway</span>
+              <span class="time-tag">Ready</span>
+            </div>
+            <div class="message-body">
+              Welcome to <strong>NexusRoute</strong>! Send a prompt below to see Pareto auto-dispatch, sub-2ms response caching, live tool calling, and telemetry in action.
+            </div>
+          </div>
+        </div>
+
+        <!-- Endless Forge Art Director Controls Strip & Dropdown -->
+        <div class="endless-forge-strip" id="endlessForgeStrip">
+          <div class="endless-forge-header">
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+              <span class="endless-forge-badge" title="Endless Forge Art Director Controls">🔥 Endless Forge</span>
+              <div class="endless-forge-dropdown-wrap">
+                <select id="endlessForgeSelect" class="endless-forge-select" title="Endless Forge Action Selector">
+                  <option value="" disabled selected>⚡ Action...</option>
+                  <option value="Start Endless Forge">▶️ Start Endless Forge</option>
+                  <option value="Pause Endless Forge">⏸️ Pause Endless Forge</option>
+                  <option value="Stop Endless Forge">⏹️ Stop Endless Forge</option>
+                  <option value="Skip">⏭️ Skip concept</option>
+                  <option value="Evolve this">🧬 Evolve this</option>
+                  <option value="Hard pivot">🔀 Hard pivot</option>
+                </select>
+              </div>
+            </div>
+            <div class="ef-theme-container">
+              <input type="text" id="efThemeInput" class="ef-theme-input" placeholder="🎨 Inject Theme (e.g. Cyberpunk Atlantis, Gothic Ghibli, 70s Cosmic Retro)..." title="Inject an optional custom theme or creative direction for Endless Forge" />
+            </div>
+          </div>
+          <div class="endless-forge-btn-group" id="endlessForgeBtnGroup">
+            <button type="button" class="ef-btn ef-start" data-ef-action="Start Endless Forge" title="Begins the continuous generation loop (default max 25 artworks)">
+              <span class="ef-icon">▶️</span> Start
+            </button>
+            <button type="button" class="ef-btn ef-pause" data-ef-action="Pause Endless Forge" title="Completes current render, then pauses">
+              <span class="ef-icon">⏸️</span> Pause
+            </button>
+            <button type="button" class="ef-btn ef-stop" data-ef-action="Stop Endless Forge" title="Immediately halts the session">
+              <span class="ef-icon">⏹️</span> Stop
+            </button>
+            <button type="button" class="ef-btn ef-skip" data-ef-action="Skip" title="Discards current concept and invents a fresh one">
+              <span class="ef-icon">⏭️</span> Skip
+            </button>
+            <button type="button" class="ef-btn ef-evolve" data-ef-action="Evolve this" title="Preserves core narrative idea with a new stylistic twist">
+              <span class="ef-icon">🧬</span> Evolve this
+            </button>
+            <button type="button" class="ef-btn ef-pivot" data-ef-action="Hard pivot" title="Complete creative departure into a new visual realm">
+              <span class="ef-icon">🔀</span> Hard pivot
+            </button>
+            <button type="button" class="ef-btn ef-slideshow" id="efSlideshowBtn" title="Open Live Fullscreen Slideshow Mode (Displays newest artwork full-screen)">
+              <span class="ef-icon">📽️</span> Slideshow
+            </button>
+          </div>
+        </div>
+
+        <!-- Dynamic Contextual Preset Buttons Strip -->
+        <div class="preset-strip" id="presetStrip">
+          <div class="preset-header-strip">
+            <span class="preset-label">💡 Ideas:</span>
+            <button type="button" id="shufflePresetsBtn" class="shuffle-presets-btn" title="Shuffle prompt ideas (get random coherent questions)">🎲 Shuffle</button>
+          </div>
+          <div class="preset-buttons-container" id="presetButtonsContainer">
+            <button class="preset-btn" data-prompt="Generate a stunning cyberpunk Dalek synthwave album cover in retro 80s neon style using generate_image.">🎨 Synthwave Art</button>
+            <button class="preset-btn" data-prompt="Create a complete playable Brick Breaker arcade game in brick_breaker.html with paddle physics, particle explosions, and sound effects.">🎮 Brick Breaker</button>
+            <button class="preset-btn" data-prompt="Solve this logic puzzle step-by-step: Three boxes are labeled Apples, Oranges, and Mixed. Every label is incorrect. You can pick 1 fruit from 1 box. How do you deduce the correct labels?">🧠 Logic Puzzle</button>
+            <button class="preset-btn" data-prompt="Search the web for the latest major open-source AI models and release highlights from this month and summarize top 3.">🌐 Web Search AI</button>
+            <button class="preset-btn" data-prompt="Calculate standard deviation of [12, 18, 45, 92, 105, 114, 210] using calculator tool.">🧮 Math Calc</button>
+          </div>
+        </div>
+
+        <!-- Input Bar with Multimodal Attachment & Icon Action Buttons -->
+        <div id="imagePreviewContainer" class="image-preview-container hidden">
+          <div class="image-preview-card">
+            <img id="imagePreviewImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="Preview" />
+            <button type="button" id="removeImageBtn" class="remove-img-btn" title="Remove image">&times;</button>
+          </div>
+          <div class="preview-info-box">
+            <span class="preview-filename" id="previewFilename">screenshot.png</span>
+            <div class="face-lock-controls" id="faceLockControls">
+              <label class="face-lock-badge" title="Enable Face Lock for PromptForge RTX image generation">
+                <input type="checkbox" id="faceLockToggle">
+                <span class="face-lock-text">🎭 Face Lock (PromptForge)</span>
+              </label>
+              <div class="face-strength-wrapper hidden" id="faceStrengthWrapper">
+                <span class="strength-label">Likeness:</span>
+                <input type="range" id="faceStrengthSlider" min="0.50" max="0.80" step="0.05" value="0.65">
+                <span class="strength-val" id="faceStrengthVal">0.65</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Chat Input Form -->
+        <form class="chat-input-bar" id="chatForm">
+          <button type="button" id="voiceInputBtn" class="chat-icon-btn voice" title="Voice Input: Dictate prompt with your microphone (Click to Speak)">
+            <span id="voiceIcon">🎤</span>
+          </button>
+          <button type="button" id="attachImageBtn" class="chat-icon-btn attach" title="Attach Image, Screenshot, or Code/Text File (Click to browse or Ctrl+V to paste)">
+            <span>➕</span>
+          </button>
+          <button type="button" id="faceLockPickBtn" class="chat-icon-btn face-lock" title="🎭 1-Click Face Lock: Pick a reference photo for PromptForge RTX character likeness">
+            <span>🎭</span>
+          </button>
+          <input type="file" id="imageFileInput" accept="image/*,text/*,.js,.ts,.py,.html,.css,.json,.md,.java,.cpp,.c,.cs,.go,.rs,.sql,.txt" style="display: none;">
+          <input type="file" id="faceLockFileInput" accept="image/jpeg,image/png,image/webp,image/jpg" style="display: none;">
+
+          <textarea
+            id="promptInput"
+            rows="1"
+            placeholder="Type your prompt here... (Press Enter to send, Shift+Enter for newline, Ctrl+V to paste screenshot)"
+            autocomplete="off"
+            autofocus
+          ></textarea>
+
+          <button type="button" id="ttsToggleBtn" class="chat-icon-btn tts" title="Auto Read-Aloud: OFF (Click to enable)">
+            <span id="ttsIcon">🔈</span>
+          </button>
+
+          <button type="button" id="stopBtn" class="chat-icon-btn stop hidden" title="Stop Generation">
+            <span>⏹️</span>
+          </button>
+
+          <button type="submit" id="sendBtn" class="primary-btn">
+            <span>Send</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Right Column: Real-time Telemetry & Route Inspector -->
+      <section class="card inspector-card" id="inspectorCard">
+        <div class="card-header">
+          <div class="section-title">
+            <span class="icon">🔍</span>
+            <h2>Route Inspector & Telemetry</h2>
+          </div>
+          <div class="header-actions">
+            <button id="clearCacheBtn" class="action-tag-btn" title="Clear Response Cache">⚡ Clear Cache</button>
+            <button id="clearTraceBtn" class="icon-btn" title="Clear Trace">🧹</button>
+            <button id="collapseInspectorBtn" class="icon-btn collapse-btn" title="Hide Route Inspector for Full Screen Chat">▶</button>
+          </div>
+        </div>
+
+        <!-- Intent & Pareto Classifier Banner -->
+        <div id="classifierBanner" class="classifier-banner">
+          <div class="classifier-left">
+            <span class="intent-badge" id="intentCategory">🎯 AUTO DISPATCH</span>
+            <span class="complexity-pill" id="complexityPill">Complexity: --</span>
+          </div>
+          <div class="classifier-desc" id="classifierDesc">Pareto engine will classify prompt intent on dispatch.</div>
+        </div>
+
+        <!-- Telemetry KPIs -->
+        <div class="telemetry-grid">
+          <div class="kpi-box" id="kpiModelBox">
+            <div class="kpi-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Dispatched Model</span>
+              <span class="activity-led idle" id="kpiModelLed" title="Model Status: Standby"></span>
+            </div>
+            <div class="kpi-value" id="kpiModel">-</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-title">Provider</div>
+            <div class="kpi-value" id="kpiProvider">-</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-title">Total Latency</div>
+            <div class="kpi-value" id="kpiLatency">-</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-title">Request Cost</div>
+            <div class="kpi-value highlight" id="kpiCost">$0.000000</div>
+            <div class="kpi-subtext" id="kpiCostDetails">Estimated</div>
+          </div>
+          <div class="kpi-box token-meter-box">
+            <div class="kpi-title">Token Meter</div>
+            <div class="kpi-value highlight-cyan" id="kpiTokens">0 tok</div>
+            <div class="kpi-subtext" id="kpiTokenBreakdown">P: 0 | C: 0 (⚡ 0 tok/s)</div>
+          </div>
+          <div class="kpi-box session-usage-box">
+            <div class="kpi-title">Session Usage</div>
+            <div class="kpi-value highlight-purple" id="kpiSessionTokens">0 tok</div>
+            <div class="kpi-subtext" id="kpiSessionCost">Total Cost: $0.000000</div>
+          </div>
+        </div>
+
+        <!-- Waterfall / Cascade Execution Trace -->
+        <div class="inspector-section">
+          <div class="section-subtitle">
+            <span>Routing Waterfall & Fallback Log</span>
+            <span class="badge" id="attemptsBadge">0 Attempts</span>
+          </div>
+          <div class="waterfall-list" id="waterfallList">
+            <div class="waterfall-empty">Send a prompt in the playground to view step-by-step dispatch traces.</div>
+          </div>
+        </div>
+
+        <!-- Cache Telemetry & Stats -->
+        <div class="inspector-section">
+          <div class="section-subtitle" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>⚡ Exact & Prompt Cache</span>
+              <span class="badge purple" id="cacheHitRateBadge">Disabled</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button id="clearCacheBtn" class="action-tag-btn" style="padding: 2px 8px; font-size: 11px;" title="Clear all cached responses">🧹 Clear Cache</button>
+              <label class="switch-label" style="font-size: 11px; margin: 0;" title="Toggle caching for repeated commands">
+                <input type="checkbox" id="cacheToggle">
+                <span class="switch-custom purple" style="width: 28px; height: 16px;"></span>
+                <span style="font-size: 11px;">Active</span>
+              </label>
+            </div>
+          </div>
+          <div class="cache-stat-grid">
+            <div class="cache-stat-item">
+              <div class="cache-stat-label">Cache Status</div>
+              <div class="cache-stat-val" id="cacheStatusVal" style="color: var(--text-muted);">Disabled (Fresh)</div>
+            </div>
+            <div class="cache-stat-item">
+              <div class="cache-stat-label">Cache Hits</div>
+              <div class="cache-stat-val" id="cacheHitsVal">0</div>
+            </div>
+            <div class="cache-stat-item">
+              <div class="cache-stat-label">Saved Latency</div>
+              <div class="cache-stat-val" id="cacheSavedLatencyVal">0ms</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Persistent Route History -->
+        <div class="inspector-section">
+          <div class="section-subtitle" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>🧭 Routing History</span>
+            <button id="refreshRouteHistoryBtn" class="action-tag-btn">Refresh</button>
+          </div>
+          <div class="route-summary-grid">
+            <div><span>Success</span><strong id="historySuccessRate">--</strong></div>
+            <div><span>p50</span><strong id="historyP50">--</strong></div>
+            <div><span>p95</span><strong id="historyP95">--</strong></div>
+            <div><span>Routes</span><strong id="historyRouteCount">0</strong></div>
+          </div>
+          <div id="routeHistoryList" class="route-history-list">
+            <div class="waterfall-empty">No persisted route decisions yet.</div>
+          </div>
+        </div>
+
+        <!-- Chaos & Resilience Simulator -->
+        <div class="inspector-section">
+          <div class="section-subtitle">
+            <span>Chaos Simulator (Test Auto-Failover)</span>
+          </div>
+          <div class="chaos-box">
+            <p class="chaos-desc">Force 429 Rate Limit error on primary model to watch the gateway automatically fallback without dropping the user's request:</p>
+            <div class="chaos-controls">
+              <label class="chaos-toggle">
+                <input type="checkbox" id="chaosMockGpt4o">
+                <span class="switch-custom red"></span>
+                <span>Break Primary (<code>mock-gpt-4o</code>)</span>
+              </label>
+              <div id="chaosStatus" class="chaos-status">Status: Normal</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <button type="button" id="openInspectorTabBtn" class="inspector-open-tab hidden" title="Show Route Inspector & Telemetry">
+        <span>🔍 Telemetry</span>
+        <span class="tab-arrow">◀</span>
+      </button>
+    </main>
+  </div>
+
+  <!-- Provider API Keys Management Modal -->
+  <div id="keysModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🔑</span> Manage Upstream Provider API Keys
+        </div>
+        <button id="closeKeysModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Get your keys directly from each provider below. Keys are stored locally in your <code>.env</code> file and applied immediately without restarting.
+        </p>
+
+        <!-- OpenAI Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>OpenAI</strong>
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
+            </div>
+            <span id="badge-openai" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-openai" placeholder="Paste sk-proj-... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="openai">Save</button>
+          </div>
+        </div>
+
+        <!-- Anthropic Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>Anthropic</strong>
+              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
+            </div>
+            <span id="badge-anthropic" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-anthropic" placeholder="Paste sk-ant-api... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="anthropic">Save</button>
+          </div>
+        </div>
+
+        <!-- Google Gemini Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>Google Gemini</strong>
+              <span class="free-tier-tag">Free Tier</span>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="get-key-link">Get Free Key ↗</a>
+            </div>
+            <span id="badge-gemini" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-gemini" placeholder="Paste AIzaSy... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="gemini">Save</button>
+          </div>
+        </div>
+
+        <!-- Groq Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>Groq (Ultra-Fast)</strong>
+              <span class="free-tier-tag">Free Tier</span>
+              <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="get-key-link">Get Free Key ↗</a>
+            </div>
+            <span id="badge-groq" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-groq" placeholder="Paste gsk_... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="groq">Save</button>
+          </div>
+        </div>
+
+        <!-- xAI Grok Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>xAI Grok</strong>
+              <span class="free-tier-tag">Direct API</span>
+              <a href="https://console.x.ai/" target="_blank" rel="noopener" class="get-key-link">Open xAI Console ↗</a>
+            </div>
+            <span id="badge-xai" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-xai" placeholder="Paste xAI API key here" autocomplete="off">
+            <button class="save-key-btn" data-provider="xai">Save</button>
+          </div>
+        </div>
+
+        <!-- DeepSeek Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>DeepSeek</strong>
+              <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
+            </div>
+            <span id="badge-deepseek" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-deepseek" placeholder="Paste sk-... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="deepseek">Save</button>
+          </div>
+        </div>
+
+        <!-- GitHub Models Row (Cheeky Free AI Tier) -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>Mistral AI</strong>
+              <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
+            </div>
+            <span id="badge-mistral" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-mistral" placeholder="Paste Mistral API key here" autocomplete="off">
+            <button class="save-key-btn" data-provider="mistral">Save</button>
+          </div>
+        </div>
+
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>OpenRouter</strong>
+              <span class="free-tier-tag">Free Models Router</span>
+              <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
+            </div>
+            <span id="badge-openrouter" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-openrouter" placeholder="Paste sk-or-... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="openrouter">Save</button>
+          </div>
+        </div>
+
+        <!-- GitHub Models Row (Cheeky Free AI Tier) -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>GitHub Models</strong>
+              <span class="free-tier-tag">Free Tier (GPT-4o, o3-mini, DeepSeek-R1)</span>
+              <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" class="get-key-link">Get Free Token ↗</a>
+            </div>
+            <span id="badge-github" class="provider-pill unconfigured">⚠️ Needs Token</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-github" placeholder="Paste ghp_... / github_pat_... here" autocomplete="off">
+            <button class="save-key-btn" data-provider="github">Save</button>
+          </div>
+        </div>
+
+        <!-- Together AI Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>Together AI (FLUX.1 Pro Art)</strong>
+              <a href="https://api.together.ai/settings/api-keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
+            </div>
+            <span id="badge-together" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-together" placeholder="Paste Together AI key here" autocomplete="off">
+            <button class="save-key-btn" data-provider="together">Save</button>
+          </div>
+        </div>
+
+        <!-- Hugging Face Row -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>Hugging Face (FLUX.1 Serverless)</strong>
+              <span class="free-tier-tag">Free Token</span>
+              <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener" class="get-key-link">Get Free Token ↗</a>
+            </div>
+            <span id="badge-huggingface" class="provider-pill unconfigured">⚠️ Needs Token</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-huggingface" placeholder="Paste hf_... token here" autocomplete="off">
+            <button class="save-key-btn" data-provider="huggingface">Save</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div id="modalToast" class="modal-toast"></div>
+        <button id="modalDoneBtn" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upstream Connection Pools & Free Capacity Modal -->
+  <div id="capacityModal" class="modal-overlay hidden">
+    <div class="modal-card wide capacity-modal-card">
+      <div class="modal-header">
+        <div class="modal-title"><span>⚡</span> Free Capacity & Provider Connections</div>
+        <button id="closeCapacityModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Add more than one account or API key per provider. NexusRoute rotates healthy keys, cools down rate-limited ones, skips exhausted allowances, and records the quota you enter here.
+        </p>
+
+        <div class="capacity-summary-grid">
+          <div><span>Ready keys</span><strong id="capacityReadyCount">0</strong></div>
+          <div><span>Cooling down</span><strong id="capacityCooldownCount">0</strong></div>
+          <div><span>Exhausted</span><strong id="capacityExhaustedCount">0</strong></div>
+          <div><span>Total keys</span><strong id="capacityTotalCount">0</strong></div>
+        </div>
+
+        <div class="connection-form-grid">
+          <select id="capacityProvider">
+            <option value="gemini">Google Gemini</option>
+            <option value="groq">Groq</option>
+            <option value="xai">xAI Grok</option>
+            <option value="github">GitHub Models</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="huggingface">Hugging Face</option>
+            <option value="mistral">Mistral</option>
+            <option value="together">Together AI</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+          <input id="capacityLabel" type="text" placeholder="Label (e.g. Gemini spare account)" />
+          <input id="capacityApiKey" type="password" placeholder="API key / token" autocomplete="off" />
+          <input id="capacityQuotaLimit" type="number" min="0" step="1" placeholder="Optional allowance" />
+          <select id="capacityQuotaUnit">
+            <option value="requests">Requests</option>
+            <option value="tokens">Tokens</option>
+            <option value="usd">USD credit</option>
+          </select>
+          <select id="capacityResetInterval">
+            <option value="daily">Reset daily</option>
+            <option value="monthly">Reset monthly</option>
+            <option value="manual" selected>Manual reset</option>
+          </select>
+          <button id="addProviderConnectionBtn" class="primary-btn">+ Add connection</button>
+        </div>
+        <div id="capacityToast" class="modal-toast"></div>
+
+        <div class="keys-table-container capacity-table-wrap">
+          <table class="keys-table capacity-table">
+            <thead><tr><th>Provider / Label</th><th>Key</th><th>Status</th><th>Capacity</th><th>Last used</th><th>Actions</th></tr></thead>
+            <tbody id="capacityConnectionsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="section-subtitle capacity-catalog-title"><span>🎁 Free-tier shortcuts</span></div>
+        <div id="freeTierCatalog" class="free-tier-catalog"></div>
+      </div>
+      <div class="modal-footer"><button id="capacityDoneBtn" class="primary-btn">Done</button></div>
+    </div>
+  </div>
+
+  <!-- Virtual Client Keys & Multi-Tenancy Modal -->
+  <div id="virtualKeysModal" class="modal-overlay hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🛡️</span> Virtual Client Keys & Multi-Tenant Spend Quotas
+        </div>
+        <button id="closeVirtualKeysModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Generate custom API keys for your applications, tools, or teammates. Set rate limits and daily spend limits to prevent runaway costs.
+        </p>
+
+        <!-- Key Creator Box -->
+        <div class="create-key-box">
+          <div class="create-key-inputs">
+            <input type="text" id="newKeyName" placeholder="Key Name (e.g. Cursor IDE, Research Bot)" />
+            <input type="number" id="newKeyBudget" placeholder="Daily Budget ($ USD)" value="10.00" step="1.00" min="0.10" />
+            <input type="number" id="newKeyRpm" placeholder="RPM Limit" value="60" min="5" />
+            <button id="generateKeyBtn" class="primary-btn">+ Create Key</button>
+          </div>
+        </div>
+
+        <!-- Keys Table -->
+        <div class="keys-table-container">
+          <table class="keys-table">
+            <thead>
+              <tr>
+                <th>Name / App</th>
+                <th>Virtual Key Token</th>
+                <th>Daily Spend</th>
+                <th>Total Spend</th>
+                <th>RPM</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="virtualKeysTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="virtualKeysDoneBtn" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connect External Apps Modal -->
+  <div id="connectModal" class="modal-overlay hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🔌</span> Connect External Apps & MCP Tools
+        </div>
+        <button id="closeConnectModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          NexusRoute is a drop-in OpenAI-compatible proxy. Copy any snippet below to connect your everyday tools in seconds!
+        </p>
+
+        <div class="snippet-tabs">
+          <button class="snippet-tab active" data-tab="tab-cursor">Cursor IDE</button>
+          <button class="snippet-tab" data-tab="tab-python">Python SDK</button>
+          <button class="snippet-tab" data-tab="tab-node">Node / TypeScript</button>
+          <button class="snippet-tab" data-tab="tab-curl">cURL</button>
+          <button class="snippet-tab" data-tab="tab-mcp">MCP Tools</button>
+        </div>
+
+        <div id="tab-cursor" class="snippet-content active">
+          <p class="snippet-intro">In Cursor Settings &gt; Models &gt; OpenAI API Key, set:</p>
+          <pre><code>Base URL: http://localhost:3000/v1
+API Key:  nr-live-xxxx (or any string)
+Models:   auto, fast, reasoning, coding, gpt-4o</code></pre>
+        </div>
+
+        <div id="tab-python" class="snippet-content">
+          <pre><code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:3000/v1",
+    api_key="nr-live-xxxx"  # Or your virtual key
+)
+
+response = client.chat.completions.create(
+    model="auto",
+    messages=[{"role": "user", "content": "Explain quantum computing."}],
+    stream=True
+)
+
+for chunk in response:
+    print(chunk.choices[0].delta.content or "", end="")</code></pre>
+        </div>
+
+        <div id="tab-node" class="snippet-content">
+          <pre><code>import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  baseURL: 'http://localhost:3000/v1',
+  apiKey: 'nr-live-xxxx',
+});
+
+const res = await openai.chat.completions.create({
+  model: 'auto',
+  messages: [{ role: 'user', content: 'Hello NexusRoute!' }],
+});
+console.log(res.choices[0].message.content);</code></pre>
+        </div>
+
+        <div id="tab-curl" class="snippet-content">
+          <pre><code>curl -X POST http://localhost:3000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer nr-live-xxxx" \
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "Ping!"}]
+  }'</code></pre>
+        </div>
+
+        <div id="tab-mcp" class="snippet-content">
+          <div class="mcp-learning-grid">
+            <div class="mcp-concept"><strong>1. MCP client</strong><span>Your coding agent or desktop AI asks what tools exist.</span></div>
+            <div class="mcp-arrow">→</div>
+            <div class="mcp-concept"><strong>2. NexusRoute server</strong><span><code>/mcp</code> publishes workspace, web, memory, Android and art tools.</span></div>
+            <div class="mcp-arrow">→</div>
+            <div class="mcp-concept"><strong>3. Tool result</strong><span>NexusRoute executes locally and returns a standard result to the agent.</span></div>
+          </div>
+          <p class="snippet-intro"><strong>MCP</strong> is a standard way for an AI application to discover and call tools. Add this Streamable HTTP server to an MCP-capable client:</p>
+          <pre><code>{
+  "mcpServers": {
+    "nexusroute": {
+      "type": "http",
+      "url": "http://127.0.0.1:3000/mcp"
+    }
+  }
+}</code></pre>
+          <p class="snippet-intro">Endpoint: <code>http://127.0.0.1:3000/mcp</code> · Transport: stateless Streamable HTTP · The server remains local and workspace-scoped.</p>
+          <div id="mcpStatusLine" class="mcp-status-line">Checking MCP server…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="connectDoneBtn" class="primary-btn">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workspace Files Modal -->
+  <div id="workspaceModal" class="modal-overlay hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📁</span> Workspace Files Created on Your Computer
+        </div>
+        <button id="closeWorkspaceModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Files written by AI tools (like <code>write_file</code>) are saved directly on your disk inside:
+          <br><code id="workspacePathLabel">workspace/</code>
+        </p>
+
+        <div class="keys-table-container">
+          <table class="keys-table">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Size</th>
+                <th>Last Modified</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="workspaceFilesTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="filePreviewContainer" class="snippet-content" style="display: none; margin-top: 12px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <strong id="previewFileName">File Preview</strong>
+            <button id="closePreviewBtn" class="action-tag-btn">Close Preview</button>
+          </div>
+          <pre><code id="previewFileCode"></code></pre>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button id="openWorkspaceFolderBtn" class="primary-btn" style="background: rgba(56,189,248,0.15); border: 1px solid var(--accent-cyan); color: var(--accent-cyan);">📂 Open Workspace Folder in Explorer</button>
+        <button id="workspaceDoneBtn" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Endless Forge Live Fullscreen Slideshow Theater -->
+  <div id="efSlideshowModal" class="ef-slideshow-modal hidden">
+    <div class="ef-slideshow-backdrop" id="efSlideshowBackdrop"></div>
+    <div class="ef-slideshow-container">
+      <div class="ef-slideshow-img-wrap">
+        <img id="efSlideshowImg" src="" alt="Endless Forge Slideshow" class="ef-slideshow-img" />
+        <div id="efSlideshowSpinner" class="ef-slideshow-spinner hidden">
+          <div class="ef-spinner-circle"></div>
+          <span class="ef-spinnerText">Synthesizing next artwork on RTX 4060...</span>
+        </div>
+      </div>
+      <div class="ef-slideshow-topbar" id="efSlideshowTopBar">
+        <button type="button" id="efSsInfoToggleBtn" class="ef-ss-top-pill" title="Toggle Artwork Info (I)">ℹ️ Info</button>
+        <button type="button" id="efSsExitTopBtn" class="ef-ss-top-pill" title="Exit Slideshow (Esc)">✕ Exit</button>
+      </div>
+      <div class="ef-slideshow-card minimized" id="efSlideshowCard">
+        <div class="ef-slideshow-card-header">
+          <div class="ef-slideshow-tags">
+            <span class="ef-slideshow-badge" id="efSlideshowProgress">Piece 1 / 25</span>
+            <span class="ef-slideshow-live-badge" id="efSlideshowLiveBadge">● LIVE FORGE</span>
+          </div>
+          <div class="ef-slideshow-header-btns">
+            <button type="button" id="efSlideshowToggleCardBtn" class="ef-ss-icon-btn" title="Toggle Info Card (I)">ℹ️</button>
+            <button type="button" id="efSlideshowCloseBtn" class="ef-ss-icon-btn" title="Exit Slideshow (Esc)">✕</button>
+          </div>
+        </div>
+        <div class="ef-slideshow-card-body" id="efSlideshowCardBody">
+          <h2 id="efSlideshowTitle" class="ef-slideshow-title">The Art Director Forge</h2>
+          <p id="efSlideshowIntent" class="ef-slideshow-intent">Creative concept will appear here as images render...</p>
+          <div class="ef-slideshow-meta">
+            <span id="efSlideshowSeed">Seed: -</span>
+            <span id="efSlideshowSize">Size: 1024x1024</span>
+          </div>
+        </div>
+        <div class="ef-slideshow-card-footer">
+          <button type="button" class="ef-ss-action-btn ef-ss-btn-start" id="efSsStartBtn" title="Resume/Start loop">▶️ Start</button>
+          <button type="button" class="ef-ss-action-btn ef-ss-btn-pause" id="efSsPauseBtn" title="Pause session">⏸️ Pause</button>
+          <button type="button" class="ef-ss-action-btn ef-ss-btn-skip" id="efSsSkipBtn" title="Skip current concept">⏭️ Skip</button>
+          <button type="button" class="ef-ss-action-btn ef-ss-btn-evolve" id="efSsEvolveBtn" title="Evolve current style">🧬 Evolve</button>
+          <button type="button" class="ef-ss-action-btn ef-ss-btn-pivot" id="efSsPivotBtn" title="Hard pivot into new realm">🔀 Pivot</button>
+          <a id="efSsDownloadBtn" href="#" download class="ef-ss-action-btn ef-ss-btn-download" title="Download Full Resolution PNG">⬇️ Save</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.4.2"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RETRO WIREFRAME LUNAR LANDER 3D</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0a0014; overflow:hidden; font-family:'Courier New', monospace; color:#0ff; }
+  canvas { display:block; }
+  #hud { position:fixed; top:0; left:0; right:0; padding:12px 20px; display:flex; justify-content:space-between; font-size:14px; letter-spacing:2px; text-shadow:0 0 8px #0ff,0 0 16px #f0f; pointer-events:none; z-index:5; }
+  #hud .stat { color:#0ff; }
+  #hud .stat b { color:#f0f; }
+  #overlay { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(5,0,15,0.72); z-index:10; text-align:center; backdrop-filter:blur(3px); }
+  #overlay h1 { font-size:44px; color:#f0f; letter-spacing:8px; text-shadow:0 0 12px #f0f,0 0 30px #0ff,3px 3px 0 #0ff; margin-bottom:6px; }
+  #overlay .sub { color:#0ff; letter-spacing:4px; font-size:14px; margin-bottom:30px; text-shadow:0 0 8px #0ff; }
+  #overlay .controls { color:#e0f0ff; font-size:13px; line-height:2; margin-bottom:30px; opacity:0.9; }
+  #overlay .controls b { color:#f0f; }
+  #overlay button { background:transparent; border:2px solid #0ff; color:#0ff; font-family:inherit; font-size:18px; letter-spacing:4px; padding:14px 38px; cursor:pointer; text-shadow:0 0 8px #0ff; box-shadow:0 0 20px rgba(0,255,255,0.3),inset 0 0 20px rgba(0,255,255,0.2); transition:all .15s; }
+  #overlay button:hover { background:#0ff; color:#0a0014; box-shadow:0 0 40px #0ff; }
+  .hidden { display:none !important; }
+  #gameover-msg { color:#f0f; font-size:22px; letter-spacing:3px; text-shadow:0 0 15px #f0f; margin-bottom:20px; }
+  #score-final { color:#0ff; font-size:16px; margin-bottom:30px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <div class="stat">FUEL <b id="fuelfill">100%</b></div>
+  <div class="stat">HEIGHT <b id="htfill">0000</b></div>
+  <div class="stat">VSPD <b id="vfill">0.0</b></div>
+  <div class="stat">SCORE <b id="scfill">000000</b></div>
+</div>
+<div id="overlay">
+  <h1>LUNAR LANDER</h1>
+  <div class="sub">— WIREFRAME · SYNTHWAVE · 3D —</div>
+  <div class="controls">
+    <b>&#8592;&#8594;</b>/<b>AD</b> rotate &nbsp;·&nbsp; <b>&#8593;</b>/<b>W</b> thrust<br>
+    <b>SPACE</b> LASER &nbsp;·&nbsp; <b>X</b> BOMB &nbsp;·&nbsp; <b>SHIFT</b> brake &nbsp;·&nbsp; <b>P</b> pause<br>
+    Land on a pad. Lasers ricochet &amp; shatter cover.<br>
+    <span style="color:#f0f">DESTROY COVER FOR BONUS · DON'T CRASH</span>
+  </div>
+  <div id="gameover-msg"></div>
+  <div id="score-final"></div>
+  <button id="startbtn">&#9654; LAUNCH</button>
+</div>
+<script>
+"use strict";
+(function(){
+// RETRO WIREFRAME LUNAR LANDER 3D
+// Ricocheting lasers, destructible cover, particle sparks,
+// synthwave magenta/cyan wireframe + stars,
+// procedural FM arpeggiator bassline + retro drum machine.
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+let W=window.innerWidth,H=window.innerHeight;
+canvas.width=W;canvas.height=H;
+window.addEventListener('resize',()=>{W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;});

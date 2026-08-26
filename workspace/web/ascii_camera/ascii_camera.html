@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS-9 COGNITIVE DECRYPTOR & ASCII CAMERA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glow-color: #33ff33;
+            --bg-color: #050a05;
+            --panel-bg: rgba(5, 15, 5, 0.85);
+            --border-color: #118811;
+            --text-color: #33ff33;
+            --highlight-color: #ff3333;
+            --amber-glow: #ffb000;
+            --cyber-glow: #ff00ff;
+            --cyan-glow: #00ffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Share Tech Mono', 'Courier New', Courier, monospace;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            text-shadow: 0 0 4px rgba(51, 255, 51, 0.5);
+        }
+
+        /* CRT Scanline Overlay */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 9999;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Vignette and flicker */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+            z-index: 9998;
+            pointer-events: none;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.98; }
+            50% { opacity: 1; }
+            100% { opacity: 0.99; }
+        }
+
+        .crt-flicker {
+            animation: flicker 0.15s infinite;
+        }
+
+        header {
+            background-color: rgba(0, 10, 0, 0.9);
+            border-bottom: 2px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--border-color);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 2px var(--border-color); }
+            50% { box-shadow: 0 0 12px var(--border-color); }
+            100% { box-shadow: 0 0 2px var(--border-color); }
+        }
+
+        .title-group h1 {
+            font-size: 1.4rem;
+            letter-spacing: 2px;
+        }
+
+        .title-group p {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            color: #88ff88;
+        }
+
+        .system-status {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-color);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--text-color);
+        }
+
+        .status-dot.active {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Sidebar Control Panel */
+        .sidebar {
+            width: 340px;
+            background-color: var(--panel-bg);
+            border-right: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 5;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background-color: var(--border-color);
+        }
+
+        .panel-section {
+            border-bottom: 1px solid rgba(17, 136, 17, 0.4);
+            padding: 15px 20px;
+        }
+
+        .panel-section h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 1.5px;
+            color: #88ff88;
+            border-left: 3px solid var(--border-color);
+            padding-left: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            opacity: 0.9;
+        }
+
+        /* Custom Retro Inputs */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: #020802;
+            height: 8px;
+            border: 1px solid var(--border-color);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--text-color);
+            border: 1px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--text-color);
+        }
+
+        .slider-val-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slider-val {
+            font-size: 0.8rem;
+            color: #88ff88;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            background-color: #020802;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select:focus, input[type="text"]:focus {
+            border-color: #88ff88;
+            box-shadow: 0 0 8px rgba(51, 255, 51, 0.3);
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        button {
+            background-color: rgba(5, 30, 5, 0.6);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.15s ease;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        button:hover {
+            background-color: var(--border-color);
+            color: #000;
+            box-shadow: 0 0 10px var(--border-color);
+            text-shadow: none;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        button.active {
+            background-color: rgba(51, 255, 51, 0.3);
+            border-color: #88ff88;
+        }
+
+        button.danger {
+            border-color: var(--highlight-color);
+            color: var(--highlight-color);
+        }
+
+        button.danger:hover {
+            background-color: var(--highlight-color);
+            color: #000;
+            box-shadow: 0 0 10px var(--highlight-color);
+        }
+
+        /* Preset Manager Interface */
+        .preset-list {
+            max-height: 100px;
+            border: 1px solid rgba(17, 136, 17, 0.4);
+            overflow-y: auto;
+            margin-bottom: 8px;
+            background: #020502;
+        }
+
+        .preset-item {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preset-item:hover {
+            background-color: rgba(17, 136, 17, 0.2);
+        }
+
+        .preset-item.selected {
+            background-color: rgba(17, 136, 17, 0.4);
+            font-weight: bold;
+        }
+
+        .preset-item .delete-preset {
+            color: var(--highlight-color);
+            cursor: pointer;
+            padding: 0 4px;
+        }
+
+        .preset-item .delete-preset:hover {
+            background: rgba(255, 51, 51, 0.2);
+        }
+
+        /* Viewport Frame */
+        .viewport-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #000;
+            position: relative;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        .drag-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 20, 0, 0.85);
+            border: 4px dashed var(--border-color);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .drag-overlay.active {
+            display: flex;
+        }
+
+        .drag-overlay-text {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            text-align: center;
+            animation: textPulse 1s infinite alternate;
+        }
+
+        @keyframes textPulse {
+            0% { opacity: 0.6; transform: scale(0.98); }
+            100% { opacity: 1; transform: scale(1.02); }
+        }
+
+        /* CRT monitor bezel and screen wrapper */
+        .crt-monitor {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            box-shadow: inset 0 0 80px rgba(0,0,0,1), 0 0 20px rgba(0, 255, 0, 0.15);
+        }
+
+        canvas#asciiCanvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Invisible source elements */
+        #hiddenVideo, #hiddenImage {
+            display: none;
+        }
+
+        /* Fullscreen state */
+        .viewport-container:fullscreen {
+            padding: 0;
+            background: #000;
+        }
+        .viewport-container:fullscreen .crt-monitor {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+        }
+
+        /* Conspiracy HUD Overlay */
+        .hud-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            z-index: 4;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .hud-overlay.active {
+            opacity: 0.85;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .hud-box {
+            background: rgba(0, 10, 0, 0.8);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            max-width: 280px;
+        }
+
+        .hud-danger-box {
+            border-color: var(--highlight-color);
+            color: var(--highlight-color);
+            text-shadow: 0 0 4px rgba(255, 51, 51, 0.5);
+            animation: pulse-border 1.5s infinite;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(255, 51, 51, 0.4); }
+            50% { border-color: rgba(255, 51, 51, 1); }
+        }
+
+        .hud-list {
+            list-style-type: none;
+            font-size: 0.7rem;
+            line-height: 1.3;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 20, 0, 0.9);
+            border: 2px solid var(--border-color);
+            padding: 10px 20px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 0 15px rgba(51, 255, 51, 0.4);
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        /* Color Theme Classes */
+        .theme-green {
+            --glow-color: #33ff33;
+            --border-color: #118811;
+            --text-color: #33ff33;
+        }
+        .theme-amber {
+            --glow-color: #ffb000;
+            --border-color: #aa7000;
+            --text-color: #ffb000;
+            --bg-color: #0a0500;
+            --panel-bg: rgba(15, 8, 0, 0.85);
+        }
+        .theme-cyber {
+            --glow-color: #ff00ff;
+            --border-color: #ff00ff;
+            --text-color: #ff00ff;
+            --bg-color: #0a000a;
+            --panel-bg: rgba(15, 0, 15, 0.85);
+        }
+        .theme-cyan {
+            --glow-color: #00ffff;
+            --border-color: #008888;
+            --text-color: #00ffff;
+            --bg-color: #000a0a;
+            --panel-bg: rgba(0, 15, 15, 0.85);
+        }
+        .theme-bw {
+            --glow-color: #ffffff;
+            --border-color: #666666;
+            --text-color: #ffffff;
+            --bg-color: #050505;
+            --panel-bg: rgba(15, 15, 15, 0.85);
+        }
+
+        /* Audio controls custom styling */
+        .audio-wave {
+            display: inline-flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 12px;
+        }
+        .wave-bar {
+            width: 2px;
+            height: 100%;
+            background-color: var(--text-color);
+            animation: wave 0.8s ease-out infinite alternate;
+        }
+        .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+
+        @keyframes wave {
+            0% { height: 20%; }
+            100% { height: 100%; }
+        }
+
+        /* Custom toggle switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 20px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #020802;
+            border: 1px solid var(--border-color);
+            transition: .3s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-color);
+            transition: .3s;
+            box-shadow: 0 0 4px var(--text-color);
+        }
+        input:checked + .slider {
+            background-color: rgba(51, 255, 51, 0.2);
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Layout modifications for responsive screen sizes */
+        @media (max-width: 900px) {
+            .main-container {
+                flex-direction: column-reverse;
+            }
+            .sidebar {
+                width: 100%;
+                height: 250px;
+                border-right: none;
+                border-top: 2px solid var(--border-color);
+            }
+        }
+    </style>
+</head>
+<body class="crt-flicker theme-green">
+
+    <!-- Header Section -->
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">N9</div>
+            <div class="title-group">
+                <h1>NEXUS-9 COGNITIVE DECRYPTOR</h1>
+                <p>REAL-TIME ASCII SIGNAL TRACE & VIDEO DECRYPTOR V9.42</p>
+            </div>
+        </div>
+        <div class="system-status">
+            <div class="status-item">
+                <span class="status-dot active"></span>
+                <span>SYSTEM: <span id="sysStatusText" style="color: #88ff88;">ONLINE</span></span>
+            </div>
+            <div class="status-item">
+                <span>FPS: <span id="fpsCounter" style="color: #ff3333; font-weight: bold;">00</span></span>
+            </div>
+            <div class="status-item">
+                <span>GRID: <span id="gridDim" style="color: #88ff88;">120x60</span></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="main-container">
+
+        <!-- Left Sidebar Controls -->
+        <aside class="sidebar">
+
+            <!-- Source Input Controls -->
+            <div class="panel-section">
+                <h3><span class="sect-title">[01] SIGNAL SOURCE</span></h3>
+                <div class="control-group">
+                    <label for="videoSource">INPUT INTERFACE</label>
+                    <select id="videoSource">
+                        <option value="camera">INTEGRATED WEB CAMERA</option>
+                        <option value="file">DRAG & DROP IMPORT FILE</option>
+                    </select>
+                </div>
+                <div class="btn-grid">
+                    <button id="btnToggleCamera" class="active">START FEED</button>
+                    <button id="btnFlipCamera">MIRROR</button>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.7rem; opacity: 0.7; text-align: center;">
+                    * DRAG & DROP ANY IMAGE OR MP4 VIDEO ANYWHERE ON MONITOR TO RENDER *
+                </div>
+            </div>
+
+            <!-- ASCII Rendering Controls -->
+            <div class="panel-section">
+                <h3><span>[02] DECRYPTION ENGINE</span></h3>
+                
+                <div class="control-group">
+                    <div class="slider-val-container">
+                        <label for="rangeResolution">GRID RESOLUTION (COLS)</label>
+                        <span class="slider-val" id="valResolution">120</span>
+                    </div>
+                    <input type="range" id="rangeResolution" min="40" max="240" step="5" value="120">
+                </div>
+
+                <div class="control-group">
+                    <label for="charSetSelect">CHARACTER MATRIX PROFILE</label>
+                    <select id="charSetSelect">
+                        <option value="standard">STANDARD ( .:-=+*#%@)</option>
+                        <option value="blocks">BLOCKS ( ░▒▓█)</option>
+                        <option value="binary">BINARY (01)</option>
+                        <option value="matrix">MATRIX DECRYPT (ｦｧｨｩｪｫｬｭｮ...)</option>
+                        <option value="custom">CUSTOM PATTERN</option>
+                    </select>
+                </div>
+
+                <div class="control-group" id="customCharGroup" style="display: none;">
+                    <label for="customChars">CUSTOM CHARACTERS (DARK TO LIGHT)</label>
+                    <input type="text" id="customChars" value=" .:-=+*#%@">
+                </div>
+
+                <div class="control-group">
+                    <div class="slider-val-container">
+                        <label for="rangeFontSize">DISPLAY FONT SCALE</label>
+                        <span class="slider-val" id="valFontSize">1.0x</span>
+                    </div>
+                    <input type="range" id="rangeFontSize" min="0.5" max="2.0" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <!-- Image Adjustment Controls -->
+            <div class="panel-section">
+                <h3><span>[03] SIGNAL CONDITIONING</span></h3>
+                
+                <div class="control-group">
+                    <div class="slider-val-container">
+                        <label for="rangeBrightness">SIGNAL GAIN (BRIGHTNESS)</label>
+                        <span class="slider-val" id="valBrightness">1.0</span>
+                    </div>
+                    <input type="range" id="rangeBrightness" min="0.5" max="2.0" step="0.05" value="1.0">
+                </div>
+
+                <div class="control-group">
+                    <div class="slider-val-container">
+                        <label for="rangeContrast">CONTRAST COMPRESSION</label>
+                        <span class="slider-val" id="valContrast">1.0</span>
+                    </div>
+                    <input type="range" id="rangeContrast" min="0.5" max="2.5" step="0.05" value="1.0">
+                </div>
+
+                <div class="control-group">
+                    <div class="slider-val-container">
+                        <label for="rangeSaturation">COLOR SATURATION</label>
+                        <span class="slider-val" id="valSaturation">1.0</span>
+                    </div>
+                    <input type="range" id="rangeSaturation" min="0.0" max="2.0" step="0.1" value="1.0">
+                </div>
+
+                <div class="toggle-container">
+                    <label for="checkInvert">INVERT CHROMINANCE</label>
+                    <label class="switch">
+                        <input type="checkbox" id="checkInvert">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Output / Aesthetic Controls -->
+            <div class="panel-section">
+                <h3><span>[04] TERMINAL INTERFACE</span></h3>
+                
+                <div class="control-group">
+                    <label for="themeSelect">COLOR SCHEME PROFILE</label>
+                    <select id="themeSelect">
+                        <option value="green">PHOSPHOR GREEN (P1)</option>
+                        <option value="amber">AMBER GLOW (P4)</option>
+                        <option value="cyber">CYBERPUNK NEON</option>
+                        <option value="cyan">COBALT CYAN</option>
+                        <option value="bw">MONOCHROME WHITE</option>
+                        <option value="color">RETRO MATRIX COLOR</option>
+                    </select>
+                </div>
+
+                <div class="toggle-container">
+                    <label for="checkHum">
+                        TERMINAL AUDIOPHONIC HUM 
+                        <div class="audio-wave" id="humWave" style="display: none;">
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                        </div>
+                    </label>
+                    <label class="switch">
+                        <input type="checkbox" id="checkHum">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-container">
+                    <label for="checkDecryptor" style="color: var(--highlight-color); font-weight: bold;">
+                        MATRIX DECRYPTOR HUD
+                    </label>
+                    <label class="switch">
+                        <input type="checkbox" id="checkDecryptor">
+                        <span class="slider" style="border-color: var(--highlight-color);"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Preset Manager Section -->
+            <div class="panel-section">
+                <h3><span>[05] PRESET BANK</span></h3>
+                
+                <div class="preset-list" id="presetListContainer">
+                    <!-- Dynamic presets loaded here -->
+                </div>
+
+                <div class="control-group">
+                    <input type="text" id="txtPresetName" placeholder="ENTER NEW PRESET NAME..." maxlength="20">
+                </div>
+
+                <div class="btn-grid">
+                    <button id="btnSavePreset">SAVE BANK</button>
+                    <button id="btnDeletePreset" class="danger">WIPE BANK</button>
+                </div>
+            </div>
+
+            <!-- Export / Capture Controls -->
+            <div class="panel-section" style="border-bottom: none;">
+                <h3><span>[06] SIGNAL EXPORT</span></h3>
+                <div class="btn-grid">
+                    <button id="btnCapturePng">EXPORT PNG</button>
+                    <button id="btnCopyText">COPY TEXT</button>
+                </div>
+                <button id="btnFullscreen" style="width: 100%; margin-top: 8px;">FULLSCREEN HUD (F)</button>
+            </div>
+
+        </aside>
+
+        <!-- Main Viewport Monitor -->
+        <main class="viewport-container" id="viewportContainer">
+            
+            <!-- Drag and Drop Active Overlay -->
+            <div class="drag-overlay" id="dragOverlay">
+                <div class="drag-overlay-text">IMPORTING EXTERNAL TELEMETRY...</div>
+                <p>RELEASE FILE TO INJECT INTO SIGNAL STREAM</p>
+            </div>
+
+            <!-- Matrix Decryptor HUD Overlay -->
+            <div class="hud-overlay" id="hudOverlay">
+                <div class="hud-top">
+                    <div class="hud-box">
+                        <div>NEXUS STATUS: RUNNING</div>
+                        <div>SIGNAL STRENGTH: 98.4% (STABLE)</div>
+                        <div>DECRYPTION LEVEL: CRITICAL</div>
+                        <div id="hudCoordinates">COORD: 34.0522° N, 118.2437° W</div>
+                    </div>
+                    <div class="hud-box hud-danger-box">
+                        <div>[!] WARNING [!]</div>
+                        <div>COGNITIVE FILTER ACTIVE</div>
+                        <div id="hudWarningText">COINCIDENCE DETECTED: 11:11</div>
+                    </div>
+                </div>
+                <div class="hud-bottom">
+                    <div class="hud-box">
+                        <div>SIMULATION INTERCEPT LOGS:</div>
+                        <ul class="hud-list" id="hudLogList">
+                            <li>> SCANNING FOR TELEMETRY...</li>
+                            <li>> BYPASSING BIG TECH TELEMETRY...</li>
+                            <li>> DECRYPTING COGNITIVE SIGNALS...</li>
+                        </ul>
+                    </div>
+                    <div class="hud-box">
+                        <div>MATRIX TRACE ACTIVE</div>
+                        <div>REPTILIAN THERMAL: 0.00%</div>
+                        <div>ARCHITECT LINK: INTERCEPTED</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- The Vintage CRT Monitor Frame -->
+            <div class="crt-monitor">
+                <canvas id="asciiCanvas"></canvas>
+            </div>
+
+        </main>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toastNotification">PRESET SAVED TO LOCAL MEMORY</div>
+
+    <!-- Hidden source elements for canvas processor -->
+    <video id="hiddenVideo" autoplay loop muted playsinline></video>
+    <img id="hiddenImage" alt="Dropped Source">
+
+    <script>
+        // --- CONSTANTS & CONFIGS ---
+        const CHARACTER_SETS = {
+            standard: " .:-=+*#%@".split(""),
+            blocks: " ░▒▓█".split(""),
+            binary: "01".split(""),
+            matrix: " ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ".split(""),
+            custom: []
+        };
+
+        const CONSPIRACY_PHRASES = [
+            "WARNING: 5G micro-vibrations detected in frame layout",
+            "Mundane coincidence detected: Clock synchronization",
+            "Big Tech telemetry bypass operational",
+            "Warning: Simulated reality matrix packet drop detected",
+            "Architect surveillance link temporarily blind",
+            "Subliminal marketing waveform neutralized",
+            "Synchronicity level: Critical. Trust nothing.",
+            "Reptilian thermal signature: Negative",
+            "Glitches in the simulation flagged at edge coordinates",
+            "Cognitive hazard pattern isolated and purged",
+            "Changelog update detected: Unknown matrix patch installed",
+            "Quantum entanglement detected in camera sensor"
+        ];
+
+        // --- DOM ELEMENTS ---
+        const videoElement = document.getElementById('hiddenVideo');
+        const imageElement = document.getElementById('hiddenImage');
+        const mainCanvas = document.getElementById('asciiCanvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        const videoSourceSelect = document.getElementById('videoSource');
+        const btnToggleCamera = document.getElementById('btnToggleCamera');
+        const btnFlipCamera = document.getElementById('btnFlipCamera');
+        const rangeResolution = document.getElementById('rangeResolution');
+        const valResolution = document.getElementById('valResolution');
+        const charSetSelect = document.getElementById('charSetSelect');
+        const customCharGroup = document.getElementById('customCharGroup');
+        const customCharsInput = document.getElementById('customChars');
+        const rangeFontSize = document.getElementById('rangeFontSize');
+        const valFontSize = document.getElementById('valFontSize');
+        const rangeBrightness = document.getElementById('rangeBrightness');
+        const valBrightness = document.getElementById('valBrightness');
+        const rangeContrast = document.getElementById('rangeContrast');
+        const valContrast = document.getElementById('valContrast');
+        const rangeSaturation = document.getElementById('rangeSaturation');
+        const valSaturation = document.getElementById('valSaturation');
+        const checkInvert = document.getElementById('checkInvert');
+        const themeSelect = document.getElementById('themeSelect');
+        const checkHum = document.getElementById('checkHum');
+        const humWave = document.getElementById('humWave');
+        const checkDecryptor = document.getElementById('checkDecryptor');
+        const hudOverlay = document.getElementById('hudOverlay');
+        const hudCoordinates = document.getElementById('hudCoordinates');
+        const hudWarningText = document.getElementById('hudWarningText');
+        const hudLogList = document.getElementById('hudLogList');
+        const fpsCounter = document.getElementById('fpsCounter');
+        const gridDim = document.getElementById('gridDim');
+        const sysStatusText = document.getElementById('sysStatusText');
+        const viewportContainer = document.getElementById('viewportContainer');
+        const dragOverlay = document.getElementById('dragOverlay');
+        const toastNotification = document.getElementById('toastNotification');
+        const txtPresetName = document.getElementById('txtPresetName');
+        const btnSavePreset = document.getElementById('btnSavePreset');
+        const btnDeletePreset = document.getElementById('btnDeletePreset');
+        const presetListContainer = document.getElementById('presetListContainer');
+        const btnCapturePng = document.getElementById('btnCapturePng');
+        const btnCopyText = document.getElementById('btnCopyText');
+        const btnFullscreen = document.getElementById('btnFullscreen');
+
+        // --- STATE VARIABLES ---
+        let currentStream = null;
+        let activeSource = 'camera'; // 'camera', 'videoFile', or 'imageFile'
+        let isCameraRunning = false;
+        let mirrorCamera = true;
+        let lastFrameTime = 0;
+        let frameCount = 0;
+        let fps = 0;
+        let currentPreset = null;
+        let renderLoopId = null;
+
+        // Offscreen canvas for downsampling
+        const offscreenCanvas = document.createElement('canvas');
+        const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Web Audio Variables
+        let audioCtx = null;
+        let humOsc1 = null;
+        let humOsc2 = null;
+        let noiseNode = null;
+        let masterGain = null;
+
+        // --- AUDIO SYNTHESIS ENGINE ---
+        function initAudio() {
+            if (audioCtx) return;
+            
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Master volume node
+            masterGain = audioCtx.createGain();
+            masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            masterGain.connect(audioCtx.destination);
+
+            // Deep 60Hz transformer hum
+            humOsc1 = audioCtx.createOscillator();
+            humOsc1.type = 'sine';
+            humOsc1.frequency.setValueAtTime(60, audioCtx.currentTime);
+            
+            const humGain1 = audioCtx.createGain();
+            humGain1.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            humOsc1.connect(humGain1);
+            humGain1.connect(masterGain);
+
+            // 120Hz harmonic buzz
+            humOsc2 = audioCtx.createOscillator();
+            humOsc2.type = 'triangle';
+            humOsc2.frequency.setValueAtTime(120, audioCtx.currentTime);
+            
+            const humGain2 = audioCtx.createGain();
+            humGain2.gain.setValueAtTime(0.04, audioCtx.currentTime);
+            humOsc2.connect(humGain2);
+            humGain2.connect(masterGain);
+
+            // Vintage tube monitor white noise/hiss
+            const bufferSize = 2 * audioCtx.sampleRate;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            
+            noiseNode = audioCtx.createBufferSource();
+            noiseNode.buffer = noiseBuffer;
+            noiseNode.loop = true;
+
+            // Lowpass filter to make noise subtle and warm
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.setValueAtTime(1000, audioCtx.currentTime);
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+
+            noiseNode.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+
+            // Start sources
+            humOsc1.start();
+            humOsc2.start();
+            noiseNode.start();
+        }
+
+        function playClick() {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const clickOsc = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+            
+            clickOsc.type = 'sine';
+            clickOsc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            clickOsc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+            
+            clickGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            
+            clickOsc.connect(clickGain);
+            clickGain.connect(audioCtx.destination);
+            
+            clickOsc.start();
+            clickOsc.stop(audioCtx.currentTime + 0.06);
+        }
+
+        function toggleHum(enable) {
+            if (enable) {
+                initAudio();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                masterGain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.5);
+                humWave.style.display = 'inline-flex';
+            } else {
+                if (masterGain) {
+                    masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+                }
+                humWave.style.display = 'none';
+            }
+        }
+
+        // --- CAMERA CONTROLS ---
+        async function startCamera() {
+            try {
+                sysStatusText.textContent = "ACQUIRING INTERFACE...";
+                sysStatusText.style.color = "var(--glow-color)";
+                
+                if (currentStream) {
+                    stopCamera();
+                }
+
+                const constraints = {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    },
+                    audio: false
+                };
+
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = currentStream;
+                await videoElement.play();
+                
+                isCameraRunning = true;
+                activeSource = 'camera';
+                btnToggleCamera.textContent = "STOP FEED";
+                btnToggleCamera.classList.add('active');
+                sysStatusText.textContent = "FEED STABLE";
+                sysStatusText.style.color = "#88ff88";
+                
+                // Start render loop if not running
+                if (!renderLoopId) {
+                    renderLoop();
+                }
+                showToast("INTEGRATED WEB CAMERA FEED LINKED");
+            } catch (err) {
+                console.error("Camera access denied or failed:", err);
+                sysStatusText.textContent = "LINK ERROR";
+                sysStatusText.style.color = "var(--highlight-color)";
+                isCameraRunning = false;
+                btnToggleCamera.textContent = "START FEED";
+                btnToggleCamera.classList.remove('active');
+                showToast("CAMERA LINK FAILED. TRY DRAG-AND-DROP FILE.");
+            }
+        }
+
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            videoElement.srcObject = null;
+            isCameraRunning = false;
+            btnToggleCamera.textContent = "START FEED";
+            btnToggleCamera.classList.remove('active');
+            sysStatusText.textContent = "OFFLINE";
+            sysStatusText.style.color = "var(--highlight-color)";
+        }
+
+        // --- CONSPIRACY HUD CONTROLS ---
+        function updateHud() {
+            if (!checkDecryptor.checked) return;
+
+            // Update random coordinates
+            const lat = (34.05 + (Math.random() - 0.5) * 0.1).toFixed(4);
+            const lng = (-118.24 + (Math.random() - 0.5) * 0.1).toFixed(4);
+            hudCoordinates.textContent = `COORD: ${lat}° N, ${lng}° W`;
+
+            // Randomly update warning text
+            if (Math.random() < 0.05) {
+                const phrase = CONSPIRACY_PHRASES[Math.floor(Math.random() * CONSPIRACY_PHRASES.length)];
+                hudWarningText.textContent = phrase;
+
+                // Add to intercept logs
+                const li = document.createElement('li');
+                li.textContent = `> ${phrase}`;
+                hudLogList.appendChild(li);
+                if (hudLogList.children.length > 5) {
+                    hudLogList.removeChild(hudLogList.firstChild);
+                }
+            }
+        }
+
+        // --- CORE ASCII RENDERING ENGINE ---
+        function renderLoop(timestamp) {
+            renderLoopId = requestAnimationFrame(renderLoop);
+
+            // Compute FPS
+            if (!lastFrameTime) {
+                lastFrameTime = timestamp;
+            }
+            const delta = timestamp - lastFrameTime;
+            frameCount++;
+            if (delta >= 1000) {
+                fps = Math.round((frameCount * 1000) / delta);
+                fpsCounter.textContent = fps.toString().padStart(2, '0');
+                frameCount = 0;
+                lastFrameTime = timestamp;
+                
+                // Update HUD telemetry periodically
+                updateHud();
+            }
+
+            // Get source dimensions
+            let srcWidth = 0;
+            let srcHeight = 0;
+
+            if (activeSource === 'camera' && isCameraRunning) {
+                srcWidth = videoElement.videoWidth;
+                srcHeight = videoElement.videoHeight;
+            } else if (activeSource === 'videoFile') {
+                srcWidth = videoElement.videoWidth;
+                srcHeight = videoElement.videoHeight;
+            } else if (activeSource === 'imageFile') {
+                srcWidth = imageElement.naturalWidth;
+                srcHeight = imageElement.naturalHeight;
+            }
+
+            if (!srcWidth || !srcHeight) {
+                // Draw a retro signal searching fallback
+                drawSignalSearching();
+                return;
+            }
+
+            // Downsample dimensions
+            const cols = parseInt(rangeResolution.value);
+            const aspect = srcHeight / srcWidth;
+            // Adjust character height stretch (ASCII is usually taller than wide, e.g., aspect ratio 0.55)
+            const charStretch = 0.55; 
+            const rows = Math.round(cols * aspect * charStretch);
+            gridDim.textContent = `${cols}x${rows}`;
+
+            if (offscreenCanvas.width !== cols || offscreenCanvas.height !== rows) {
+                offscreenCanvas.width = cols;
+                offscreenCanvas.height = rows;
+            }
+
+            // Clear and draw source to offscreen canvas
+            offscreenCtx.clearRect(0, 0, cols, rows);
+            
+            // Handle mirroring
+            if (activeSource === 'camera' && mirrorCamera) {
+                offscreenCtx.translate(cols, 0);
+                offscreenCtx.scale(-1, 1);
+            }
+            
+            if (activeSource === 'camera' || activeSource === 'videoFile') {
+                offscreenCtx.drawImage(videoElement, 0, 0, cols, rows);
+            } else {
+                offscreenCtx.drawImage(imageElement, 0, 0, cols, rows);
+            }
+
+            // Undo mirror scale/translate
+            if (activeSource === 'camera' && mirrorCamera) {
+                offscreenCtx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+
+            // Extract pixel data
+            const imgData = offscreenCtx.getImageData(0, 0, cols, rows);
+            const pixels = imgData.data;
+
+            // Get render character set
+            let charSet = CHARACTER_SETS[charSetSelect.value];
+            if (charSetSelect.value === 'custom') {
+                charSet = customCharsInput.value.split("");
+                if (charSet.length === 0) charSet = [" "];
+            }
+
+            // Prepare main drawing canvas
+            const scale = parseFloat(rangeFontSize.value);
+            // Character dimensions on screen
+            const fontWidth = Math.ceil(mainCanvas.clientWidth / cols) * scale;
+            const fontHeight = fontWidth / charStretch;
+
+            const renderWidth = cols * fontWidth;
+            const renderHeight = rows * fontHeight;
+
+            if (mainCanvas.width !== renderWidth || mainCanvas.height !== renderHeight) {
+                mainCanvas.width = renderWidth;
+                mainCanvas.height = renderHeight;
+            }
+
+            // Clear main canvas
+            mainCtx.fillStyle = '#000000';
+            mainCtx.fillRect(0, 0, renderWidth, renderHeight);
+
+            // Setup font rendering
+            mainCtx.font = `bold ${Math.round(fontHeight)}px 'Share Tech Mono', 'Courier New', monospace`;
+            mainCtx.textBaseline = 'top';
+
+            const brightness = parseFloat(rangeBrightness.value);
+            const contrast = parseFloat(rangeContrast.value);
+            const saturation = parseFloat(rangeSaturation.value);
+            const invert = checkInvert.checked;
+            const theme = themeSelect.value;
+
+            // Loop and draw characters
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = (r * cols + c) * 4;
+                    let red = pixels[idx];
+                    let green = pixels[idx + 1];
+                    let blue = pixels[idx + 2];
+
+                    // 1. Color conditioning: Brightness & Contrast
+                    // Contrast formula: factor = (259 * (C + 255)) / (255 * (259 - C))
+                    // Let's use a standard contrast mapping
+                    red = ((red - 128) * contrast) + 128 * brightness;
+                    green = ((green - 128) * contrast) + 128 * brightness;
+                    blue = ((blue - 128) * contrast) + 128 * brightness;
+
+                    // Saturation adjustment
+                    const luma = 0.299 * red + 0.587 * green + 0.114 * blue;
+                    red = luma + saturation * (red - luma);
+                    green = luma + saturation * (green - luma);
+                    blue = luma + saturation * (blue - luma);
+
+                    // Clamp values
+                    red = Math.max(0, Math.min(255, red));
+                    green = Math.max(0, Math.min(255, green));
+                    blue = Math.max(0, Math.min(255, blue));
+
+                    // Invert chrominance
+                    if (invert) {
+                        red = 255 - red;
+                        green = 255 - green;
+                        blue = 255 - blue;
+                    }
+
+                    // Compute final luminance for character selection
+                    const brightnessVal = 0.299 * red + 0.587 * green + 0.114 * blue;
+                    
+                    // Map luminance to character index
+                    const charIdx = Math.floor((brightnessVal / 255) * (charSet.length - 1));
+                    const char = charSet[charIdx] || " ";
+
+                    // Calculate drawing position
+                    const x = c * fontWidth;
+                    const y = r * fontHeight;
+
+                    // Apply Color Theme
+                    if (theme === 'color') {
+                        mainCtx.fillStyle = `rgb(${Math.round(red)}, ${Math.round(green)}, ${Math.round(blue)})`;
+                    } else {
+                        // Mono themes use the global variable colors modulated by pixel brightness
+                        let baseColor = { r: 51, g: 255, b: 51 }; // Green default
+                        if (theme === 'amber') {
+                            baseColor = { r: 255, g: 176, b: 0 };
+                        } else if (theme === 'cyber') {
+                            // Cyan to Pink gradient based on columns / rows
+                            const mix = c / cols;
+                            baseColor = {
+                                r: Math.round(255 * mix),
+                                g: 0,
+                                b: Math.round(255 * (1 - mix) + 100)
+                            };
+                        } else if (theme === 'cyan') {
+                            baseColor = { r: 0, g: 255, b: 255 };
+                        } else if (theme === 'bw') {
+                            baseColor = { r: 255, g: 255, b: 255 };
+                        }
+                        
+                        // Modulate intensity by pixel brightness
+                        const factor = brightnessVal / 255;
+                        const rCol = Math.round(baseColor.r * (0.3 + 0.7 * factor));
+                        const gCol = Math.round(baseColor.g * (0.3 + 0.7 * factor));
+                        const bCol = Math.round(baseColor.b * (0.3 + 0.7 * factor));
+                        mainCtx.fillStyle = `rgb(${rCol}, ${gCol}, ${bCol})`;
+                    }
+
+                    mainCtx.fillText(char, x, y);
+                }
+            }
+
+            // Matrix Decryptor overlay drawings on canvas
+            if (checkDecryptor.checked) {
+                drawMatrixHudOverlay(cols, rows, fontWidth, fontHeight);
+            }
+        }
+
+        function drawSignalSearching() {
+            mainCanvas.width = 640;
+            mainCanvas.height = 480;
+            mainCtx.fillStyle = '#020a02';
+            mainCtx.fillRect(0, 0, 640, 480);
+            
+            mainCtx.fillStyle = 'var(--text-color)';
+            mainCtx.font = "20px 'Share Tech Mono', monospace";
+            mainCtx.textAlign = 'center';
+            mainCtx.fillText("SEARCHING FOR COGNITIVE SIGNAL FEED...", 320, 220);
+            
+            // Draw a spinning cursor
+            const chars = ["|", "/", "-", "\\"];
+            const idx = Math.floor(Date.now() / 150) % 4;
+            mainCtx.font = "32px 'Share Tech Mono', monospace";
+            mainCtx.fillText(chars[idx], 320, 270);
+            
+            mainCtx.font = "12px 'Share Tech Mono', monospace";
+            mainCtx.fillText("DRAG & DROP A VIDEO OR IMAGE TO BYPASS CAMERA INTERFACE", 320, 320);
+        }
+
+        function drawMatrixHudOverlay(cols, rows, fontWidth, fontHeight) {
+            // Draw fake target boxes on high intensity spots or random spots
+            const timeSeed = Math.floor(Date.now() / 2000);
+            
+            // Random targets based on timestamp
+            mainCtx.strokeStyle = 'rgba(255, 51, 51, 0.6)';
+            mainCtx.lineWidth = 2;
+            
+            const count = 2;
+            for (let i = 0; i < count; i++) {
+                // Seeded random positions
+                const seedX = Math.abs(Math.sin(timeSeed + i * 42)) * cols;
+                const seedY = Math.abs(Math.cos(timeSeed + i * 24)) * rows;
+                
+                const gridX = Math.floor(seedX) * fontWidth;
+                const gridY = Math.floor(seedY) * fontHeight;
+                const boxW = 8 * fontWidth;
+                const boxH = 6 * fontHeight;
+                
+                // Draw targeting bracket corners
+                mainCtx.beginPath();
+                // Top Left
+                mainCtx.moveTo(gridX, gridY + 15);
+                mainCtx.lineTo(gridX, gridY);
+                mainCtx.lineTo(gridX + 15, gridY);
+                // Top Right
+                mainCtx.moveTo(gridX + boxW - 15, gridY);
+                mainCtx.lineTo(gridX + boxW, gridY);
+                mainCtx.lineTo(gridX + boxW, gridY + 15);
+                // Bottom Left
+                mainCtx.moveTo(gridX, gridY + boxH - 15);
+                mainCtx.lineTo(gridX, gridY + boxH);
+                mainCtx.lineTo(gridX + 15, gridY + boxH);
+                // Bottom Right
+                mainCtx.moveTo(gridX + boxW - 15, gridY + boxH);
+                mainCtx.lineTo(gridX + boxW, gridY + boxH);
+                mainCtx.lineTo(gridX + boxW, gridY + boxH - 15);
+                mainCtx.stroke();
+                
+                // Text label
+                mainCtx.fillStyle = 'rgba(255, 51, 51, 0.8)';
+                mainCtx.font = "11px 'Share Tech Mono', monospace";
+                mainCtx.fillText(`[ANOMALY_0${i+1}] CONF: ${(80 + Math.sin(Date.now() / 100) * 15).toFixed(1)}%`, gridX + 4, gridY + 4);
+            }
+        }
+
+        // --- DRAG AND DROP HANDLERS ---
+        function setupDragAndDrop() {
+            window.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                dragOverlay.classList.add('active');
+            });
+
+            dragOverlay.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dragOverlay.classList.remove('active');
+            });
+
+            window.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+
+            window.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dragOverlay.classList.remove('active');
+                playClick();
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    processDroppedFile(files[0]);
+                }
+            });
+        }
+
+        function processDroppedFile(file) {
+            const url = URL.createObjectURL(file);
+            
+            if (file.type.startsWith('image/')) {
+                sysStatusText.textContent = "INJECTING IMAGE...";
+                stopCamera();
+                
+                imageElement.onload = () => {
+                    activeSource = 'imageFile';
+                    videoSourceSelect.value = 'file';
+                    sysStatusText.textContent = "STATIC SIGNAL";
+                    sysStatusText.style.color = "#88ff88";
+                    showToast(`IMAGE INJECTED: ${file.name.toUpperCase()}`);
+                };
+                imageElement.src = url;
+            } else if (file.type.startsWith('video/')) {
+                sysStatusText.textContent = "INJECTING VIDEO...";
+                stopCamera();
+
+                videoElement.srcObject = null;
+                videoElement.src = url;
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    activeSource = 'videoFile';
+                    videoSourceSelect.value = 'file';
+                    sysStatusText.textContent = "STREAM STABLE";
+                    sysStatusText.style.color = "#88ff88";
+                    showToast(`VIDEO INJECTED: ${file.name.toUpperCase()}`);
+                };
+            } else {
+                showToast("UNSUPPORTED SIGNAL PACKET INTERFACE");
+            }
+        }
+
+        // --- PRESETS STORAGE & MANAGEMENT ---
+        const DEFAULT_PRESETS = [
+            {
+                name: "PHOSPHOR CLASSIC",
+                resolution: 120,
+                charSet: "standard",
+                fontSize: 1.0,
+                brightness: 1.0,
+                contrast: 1.0,
+                saturation: 1.0,
+                invert: false,
+                theme: "green",
+                decryptor: false
+            },
+            {
+                name: "MATRIX TERMINAL",
+                resolution: 160,
+                charSet: "matrix",
+                fontSize: 0.8,
+                brightness: 1.1,
+                contrast: 1.4,
+                saturation: 1.0,
+                invert: false,
+                theme: "green",
+                decryptor: true
+            },
+            {
+                name: "CYBERPUNK GLITCH",
+                resolution: 100,
+                charSet: "binary",
+                fontSize: 1.2,
+                brightness: 1.2,
+                contrast: 1.6,
+                saturation: 1.8,
+                invert: true,
+                theme: "cyber",
+                decryptor: true
+            },
+            {
+                name: "AMBER VINTAGE",
+                resolution: 80,
+                charSet: "blocks",
+                fontSize: 1.1,
+                brightness: 0.9,
+                contrast: 1.2,
+                saturation: 0.0,
+                invert: false,
+                theme: "amber",
+                decryptor: false
+            }
+        ];
+
+        function loadPresets() {
+            let stored = localStorage.getItem('nexus_ascii_presets');
+            let presets = [];
+            
+            if (stored) {
+                try {
+                    presets = JSON.parse(stored);
+                } catch (e) {
+                    presets = [...DEFAULT_PRESETS];
+                }
+            } else {
+                presets = [...DEFAULT_PRESETS];
+                localStorage.setItem('nexus_ascii_presets', JSON.stringify(presets));
+            }
+
+            renderPresetsList(presets);
+        }
+
+        function renderPresetsList(presets) {
+            presetListContainer.innerHTML = '';
+            presets.forEach((p, idx) => {
+                const item = document.createElement('div');
+                item.className = 'preset-item';
+                if (currentPreset && currentPreset.name === p.name) {
+                    item.className += ' selected';
+                }
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = p.name;
+                nameSpan.addEventListener('click', () => applyPreset(p));
+                
+                const delSpan = document.createElement('span');
+                delSpan.className = 'delete-preset';
+                delSpan.textContent = '[X]';
+                delSpan.title = "Wipe Preset Memory";
+                delSpan.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deletePreset(p.name);
+                });
+
+                item.appendChild(nameSpan);
+                item.appendChild(delSpan);
+                presetListContainer.appendChild(item);
+            });
+        }
+
+        function applyPreset(p) {
+            playClick();
+            currentPreset = p;
+            
+            rangeResolution.value = p.resolution;
+            valResolution.textContent = p.resolution;
+            
+            charSetSelect.value = p.charSet;
+            if (p.charSet === 'custom') {
+                customCharGroup.style.display = 'block';
+            } else {
+                customCharGroup.style.display = 'none';
+            }
+
+            rangeFontSize.value = p.fontSize;
+            valFontSize.textContent = p.fontSize + 'x';
+
+            rangeBrightness.value = p.brightness;
+            valBrightness.textContent = p.brightness;
+
+            rangeContrast.value = p.contrast;
+            valContrast.textContent = p.contrast;
+
+            rangeSaturation.value = p.saturation;
+            valSaturation.textContent = p.saturation;
+
+            checkInvert.checked = p.invert;
+            themeSelect.value = p.theme;
+            updateThemeClass(p.theme);
+
+            checkDecryptor.checked = p.decryptor;
+            if (p.decryptor) {
+                hudOverlay.classList.add('active');
+            } else {
+                hudOverlay.classList.remove('active');
+            }
+
+            // Refresh preset list styling
+            loadPresets();
+            showToast(`LOADED PRESET: ${p.name}`);
+        }
+
+        function savePreset() {
+            const name = txtPresetName.value.trim().toUpperCase();
+            if (!name) {
+                showToast("ENTER VALID PRESET IDENTIFIER");
+                return;
+            }
+
+            const newPreset = {
+                name: name,
+                resolution: parseInt(rangeResolution.value),
+                charSet: charSetSelect.value,
+                fontSize: parseFloat(rangeFontSize.value),
+                brightness: parseFloat(rangeBrightness.value),
+                contrast: parseFloat(rangeContrast.value),
+                saturation: parseFloat(rangeSaturation.value),
+                invert: checkInvert.checked,
+                theme: themeSelect.value,
+                decryptor: checkDecryptor.checked
+            };
+
+            let stored = localStorage.getItem('nexus_ascii_presets');
+            let presets = stored ? JSON.parse(stored) : [];
+
+            // Replace if existing name
+            const idx = presets.findIndex(p => p.name === name);
+            if (idx >= 0) {
+                presets[idx] = newPreset;
+            } else {
+                presets.push(newPreset);
+            }
+
+            localStorage.setItem('nexus_ascii_presets', JSON.stringify(presets));
+            txtPresetName.value = '';
+            currentPreset = newPreset;
+            loadPresets();
+            showToast(`BANK WRITTEN: ${name}`);
+        }
+
+        function deletePreset(name) {
+            playClick();
+            let stored = localStorage.getItem('nexus_ascii_presets');
+            if (!stored) return;
+
+            let presets = JSON.parse(stored);
+            presets = presets.filter(p => p.name !== name);
+            localStorage.setItem('nexus_ascii_presets', JSON.stringify(presets));
+            
+            if (currentPreset && currentPreset.name === name) {
+                currentPreset = null;
+            }
+            loadPresets();
+            showToast(`BANK ERASED: ${name}`);
+        }
+
+        function wipeAllPresets() {
+            playClick();
+            if (confirm("CONFIRM TOTAL MEMORY WIPE OF ALL PRESETS?")) {
+                localStorage.setItem('nexus_ascii_presets', JSON.stringify(DEFAULT_PRESETS));
+                currentPreset = null;
+                loadPresets();
+                showToast("ALL PRESETS RESET TO DEFAULTS");
+            }
+        }
+
+        // --- INTERFACE DECORATIVE CONTROLS ---
+        function updateThemeClass(theme) {
+            document.body.className = 'crt-flicker';
+            if (theme !== 'color') {
+                document.body.classList.add(`theme-${theme}`);
+            } else {
+                document.body.classList.add('theme-green'); // Fallback variables
+            }
+        }
+
+        function showToast(msg) {
+            toastNotification.textContent = msg;
+            toastNotification.style.display = 'block';
+            setTimeout(() => {
+                toastNotification.style.display = 'none';
+            }, 3000);
+        }
+
+        // --- CAPTURE & EXPORT ---
+        function capturePng() {
+            playClick();
+            const link = document.createElement('a');
+            link.download = `N9_DEC_CAPTURE_${Date.now()}.png`;
+            link.href = mainCanvas.toDataURL('image/png');
+            link.click();
+            showToast("SIGNAL CAPTURE EXPORTED (PNG)");
+        }
+
+        function copyAsciiText() {
+            playClick();
+            
+            // Re-render raw text of current frame
+            let srcWidth = 0;
+            let srcHeight = 0;
+
+            if (activeSource === 'camera' && isCameraRunning) {
+                srcWidth = videoElement.videoWidth;
+                srcHeight = videoElement.videoHeight;
+            } else if (activeSource === 'videoFile') {
+                srcWidth = videoElement.videoWidth;
+                srcHeight = videoElement.videoHeight;
+            } else if (activeSource === 'imageFile') {
+                srcWidth = imageElement.naturalWidth;
+                srcHeight = imageElement.naturalHeight;
+            }
+
+            if (!srcWidth || !srcHeight) {
+                showToast("NO SIGNAL TO COPY");
+                return;
+            }
+
+            const cols = parseInt(rangeResolution.value);
+            const aspect = srcHeight / srcWidth;
+            const charStretch = 0.55;
+            const rows = Math.round(cols * aspect * charStretch);
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = cols;
+            tempCanvas.height = rows;
+
+            if (activeSource === 'camera' && mirrorCamera) {
+                tempCtx.translate(cols, 0);
+                tempCtx.scale(-1, 1);
+            }
+            
+            if (activeSource === 'camera' || activeSource === 'videoFile') {
+                tempCtx.drawImage(videoElement, 0, 0, cols, rows);
+            } else {
+                tempCtx.drawImage(imageElement, 0, 0, cols, rows);
+            }
+
+            const pixels = tempCtx.getImageData(0, 0, cols, rows).data;
+            let charSet = CHARACTER_SETS[charSetSelect.value];
+            if (charSetSelect.value === 'custom') {
+                charSet = customCharsInput.value.split("");
+            }
+
+            let outputText = "";
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = (r * cols + c) * 4;
+                    const red = pixels[idx];
+                    const green = pixels[idx + 1];
+                    const blue = pixels[idx + 2];
+                    const luma = 0.299 * red + 0.587 * green + 0.114 * blue;
+                    
+                    const charIdx = Math.floor((luma / 255) * (charSet.length - 1));
+                    outputText += charSet[charIdx] || " ";
+                }
+                outputText += "\n";
+            }
+
+            navigator.clipboard.writeText(outputText).then(() => {
+                showToast("RAW SIGNAL COPIED TO CLIPBOARD");
+            }).catch(err => {
+                showToast("COPY FAILED. SYSTEM RESTRICTED.");
+            });
+        }
+
+        function toggleFullscreen() {
+            playClick();
+            if (!document.fullscreenElement) {
+                viewportContainer.requestFullscreen().catch(err => {
+                    showToast("FULLSCREEN INTERFACE REFUSED");
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // --- EVENT LISTENERS & INITIALIZATION ---
+        function initEvents() {
+            // Video source toggle
+            videoSourceSelect.addEventListener('change', () => {
+                playClick();
+                if (videoSourceSelect.value === 'camera') {
+                    startCamera();
+                } else {
+                    stopCamera();
+                    activeSource = 'imageFile'; // Wait for file drop
+                    sysStatusText.textContent = "AWAITING FILE";
+                    sysStatusText.style.color = "var(--glow-color)";
+                }
+            });
+
+            btnToggleCamera.addEventListener('click', () => {
+                playClick();
+                if (isCameraRunning) {
+                    stopCamera();
+                } else {
+                    videoSourceSelect.value = 'camera';
+                    startCamera();
+                }
+            });
+
+            btnFlipCamera.addEventListener('click', () => {
+                playClick();
+                mirrorCamera = !mirrorCamera;
+                btnFlipCamera.classList.toggle('active', mirrorCamera);
+            });
+
+            // Sliders
+            rangeResolution.addEventListener('input', () => {
+                valResolution.textContent = rangeResolution.value;
+            });
+            rangeResolution.addEventListener('change', playClick);
+
+            charSetSelect.addEventListener('change', () => {
+                playClick();
+                if (charSetSelect.value === 'custom') {
+                    customCharGroup.style.display = 'block';
+                } else {
+                    customCharGroup.style.display = 'none';
+                }
+            });
+
+            rangeFontSize.addEventListener('input', () => {
+                valFontSize.textContent = rangeFontSize.value + 'x';
+            });
+            rangeFontSize.addEventListener('change', playClick);
+
+            rangeBrightness.addEventListener('input', () => {
+                valBrightness.textContent = rangeBrightness.value;
+            });
+            rangeBrightness.addEventListener('change', playClick);
+
+            rangeContrast.addEventListener('input', () => {
+                valContrast.textContent = rangeContrast.value;
+            });
+            rangeContrast.addEventListener('change', playClick);
+
+            rangeSaturation.addEventListener('input', () => {
+                valSaturation.textContent = rangeSaturation.value;
+            });
+            rangeSaturation.addEventListener('change', playClick);
+
+            checkInvert.addEventListener('change', () => {
+                playClick();
+            });
+
+            themeSelect.addEventListener('change', () => {
+                playClick();
+                updateThemeClass(themeSelect.value);
+            });
+
+            // Audio hum toggle
+            checkHum.addEventListener('change', () => {
+                playClick();
+                toggleHum(checkHum.checked);
+            });
+
+            // Decryptor HUD toggle
+            checkDecryptor.addEventListener('change', () => {
+                playClick();
+                if (checkDecryptor.checked) {
+                    hudOverlay.classList.add('active');
+                } else {
+                    hudOverlay.classList.remove('active');
+                }
+            });
+
+            // Presets
+            btnSavePreset.addEventListener('click', savePreset);
+            btnDeletePreset.addEventListener('click', wipeAllPresets);
+
+            // Capture & UI
+            btnCapturePng.addEventListener('click', capturePng);
+            btnCopyText.addEventListener('click', copyAsciiText);
+            btnFullscreen.addEventListener('click', toggleFullscreen);
+
+            // Fullscreen keyboard shortcut
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'f' || e.key === 'F') {
+                    // Check if user is currently typing in the preset input
+                    if (document.activeElement !== txtPresetName && document.activeElement !== customCharsInput) {
+                        toggleFullscreen();
+                    }
+                }
+            });
+        }
+
+        // --- APP ENTRY POINT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            initEvents();
+            setupDragAndDrop();
+            loadPresets();
+            
+            // Default active state for Mirroring
+            btnFlipCamera.classList.add('active');
+
+            // Start camera by default
+            startCamera();
+        });
+    </script>
+</body>
+</html>

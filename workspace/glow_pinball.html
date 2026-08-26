@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLOW PINBALL // Physics Sandbox</title>
+<style>
+  :root {
+    --neon: #00ffd5;
+    --neon2: #ff2d6f;
+    --neon3: #ffd500;
+    --bg: #05060a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:var(--bg); }
+  body { font-family:'Courier New', monospace; color:#c8ffe8; user-select:none; }
+  #c { position:fixed; inset:0; display:block; z-index:1; }
+
+  /* CRT overlay */
+  #crt {
+    position:fixed; inset:0; pointer-events:none; z-index:5;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 1px, transparent 2px, transparent 4px);
+    mix-blend-mode:multiply;
+  }
+  #crt::after {
+    content:''; position:absolute; inset:0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%);
+  }
+  #vignette {
+    position:fixed; inset:0; pointer-events:none; z-index:4;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+  }
+
+  /* HUD */
+  #hud {
+    position:fixed; top:14px; left:14px; z-index:10; font-size:13px; line-height:1.7;
+    text-shadow:0 0 8px var(--neon); letter-spacing:1px;
+  }
+  #hud .title { font-size:20px; font-weight:bold; color:#fff; text-shadow:0 0 12px var(--neon),0 0 30px var(--neon); }
+  #hud .stat { opacity:.85; }
+  #hud b { color:var(--neon); }
+  #hud b.p { color:var(--neon2); }
+
+  #controls {
+    position:fixed; bottom:14px; left:14px; right:14px; z-index:10;
+    display:flex; gap:14px; flex-wrap:wrap; align-items:center;
+    font-size:12px; opacity:.75;
+  }
+  #controls .key {
+    display:inline-block; padding:2px 7px; border:1px solid var(--neon);
+    border-radius:4px; color:var(--neon); box-shadow:0 0 6px rgba(0,255,213,.4);
+    background:rgba(0,255,213,.07); margin-right:4px;
+  }
+  #overlay {
+    position:fixed; inset:0; z-index:20; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:22px; text-align:center;
+    background:rgba(3,4,8,0.82); backdrop-filter:blur(3px);
+    transition:opacity .5s;
+  }
+  #overlay.hidden { opacity:0; pointer-events:none; }
+  #overlay h1 {
+    font-size:54px; letter-spacing:6px; color:#fff;
+    text-shadow:0 0 20px var(--neon),0 0 60px var(--neon),0 0 120px var(--neon2);
+    animation:pulse 2.4s infinite;
+  }
+  @keyframes pulse { 0%,100%{text-shadow:0 0 20px var(--neon),0 0 60px var(--neon)} 50%{text-shadow:0 0 30px var(--neon2),0 0 80px var(--neon2)} }
+  #overlay p { max-width:640px; font-size:14px; line-height:1.8; opacity:.9; }
+  #go {
+    padding:14px 46px; font-size:20px; letter-spacing:3px; cursor:pointer;
+    background:transparent; color:var(--neon); border:2px solid var(--neon);
+    border-radius:6px; font-family:inherit; box-shadow:0 0 20px rgba(0,255,213,.35);
+    transition:all .2s; text-shadow:0 0 8px var(--neon);
+  }
+  #go:hover { background:var(--neon); color:#000; box-shadow:0 0 40px var(--neon); }
+  #speed { position:fixed; top:14px; right:14px; z-index:10; font-size:13px; text-align:right; text-shadow:0 0 8px var(--neon2); }
+  #speed b { color:var(--neon2); }
+  #slider { width:150px; accent-color:var(--neon2); margin-top:4px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vignette"></div>
+<div id="crt"></div>
+
+<div id="hud">
+  <div class="title">◉ GLOW PINBALL</div>
+  <div class="stat">SCORE <b id="score">0</b></div>
+  <div class="stat">BALLS <b id="balls">3</b></div>
+  <div class="stat">MULTIPLIER <b id="mult">x1</b></div>
+  <div class="stat">COMBO <b id="combo">0</b></div>
+</div>
+
+<div id="speed">
+  TIME <b id="scalelabel">1.00x</b><br>
+  <input type="range" id="slider" min="0.1" max="1.0" step="0.02" value="1.0">
+</div>
+
+<div id="controls">
+  <span><span class="key">←</span><span class="key">→</span> Flippers</span>
+  <span><span class="key">SPACE</span> Plunger</span>
+  <span><span class="key">S</span> Slow-mo</span>
+  <span><span class="key">R</span> Reset ball</span>
+  <span><span class="key">N</span> New ball</span>
+  <span><span class="key">T</span> Tilt</span>
+  <span><span class="key">1/2/3</span> Ball size</span>
+  <span>Click × drag to fling ball</span>
+</div>
+
+<div id="overlay">
+  <h1>◉ GLOW PINBALL</h1>
+  <p>
+    A neon wireframe physics sandbox.<br><br>
+    <b>Fling the ball</b> with the mouse, or use <b>SPACE</b> to launch the plunger.
+    Bounce off the glow-bumpers, chain <b>combos</b> for multipliers, and ride
+    <b>slow-motion bullet time</b> to line up the perfect shot.<br><br>
+    Every impact fires a procedural chiptune laser synth through the Web Audio API.
+    Watch the CRT scanlines. Trust the glow. The machine knows.
+  </p>
+  <button id="go">INSERT COIN</button>
+</div>
+
+<script>
+// ============================================================
+// GLOW PINBALL — Physics Sandbox
+// Realistic gravity, elastic collision impulses, slow-mo bullet time
+// Three.js UnrealBloom + wireframe neon, CRT scanlines, Web Audio chiptune
+// ============================================================
+(function(){
+'use strict';
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ---------- CRT scanline canvas ----------
+const crtCanvas = document.createElement('canvas');
+const crtCtx = crtCanvas.getContext('2d');
+function sizeCRT(){
+  crtCanvas.width = 320; crtCanvas.height = 180;
+  crtCtx.fillStyle='#000';
+  crtCtx.fillRect(0,0,320,180);
+  // draw scanline + phosphor grid pattern
+  for(let y=0;y<180;y++){
+    for(let x=0;x<320;x++){
+      const v = (Math.sin(x*0.35)+Math.sin(y*0.22))*0.5;
+      const a = 30 + v*20;
+      crtCtx.fillStyle = `rgba(0,${90+v*30},${120+v*40},${a/255})`;
+      crtCtx.fillRect(x,y,1,1);
+    }
+  }
+}
+sizeCRT();
+
+// ---------- Web Audio ----------
+let AC=null;
+let master, noiseBuffer;
+function initAudio(){
+  if(AC) return;
+  AC = new (window.AudioContext||window.webkitAudioContext)();
+  master = AC.createGain();
+  master.gain.value = 0.5;
+  const comp = AC.createDynamicsCompressor();
+  comp.threshold=-18; comp.ratio=8;
+  master.connect(comp); comp.connect(AC.destination);
+  // noise buffer for explosions
+  const len = AC.sampleRate * 1.2;
+  noiseBuffer = AC.createBuffer(1, len, AC.sampleRate);
+  const d = noiseBuffer.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+}
+
+// chiptune laser synth (square/saw blip with pitch envelope)
+function playLaser(freq=880, dur=0.12, vol=0.3, type='square'){
+  if(!AC) return;
+  const t = AC.currentTime;
+  const osc = AC.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq*0.35), t+dur);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  const filter = AC.createBiquadFilter();
+  filter.type='lowpass'; filter.frequency.value=4000;
+  osc.connect(filter); filter.connect(g); g.connect(master);
+  osc.start(t); osc.stop(t+dur+0.02);
+}
+
+// noise explosion envelope
+function playExplosion(vol=0.5, dur=0.5){
+  if(!AC) return;
+  const t=AC.currentTime;
+  const src=AC.createBufferSource(); src.buffer=noiseBuffer;
+  const filter=AC.createBiquadFilter(); filter.type='lowpass';
+  filter.frequency.setValueAtTime(3000,t);
+  filter.frequency.exponentialRampToValueAtTime(120,t+dur);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.connect(filter); filter.connect(g); g.connect(master);
+  src.start(t); src.stop(t+dur+0.02);
+}
+
+// arpeggio chime for combos
+function playChime(base=523){
+  if(!AC) return;
+  [1,1.25,1.5,2].forEach((m,i)=>{
+    setTimeout(()=>playLaser(base*m, 0.09, 0.18, 'triangle'), i*70);
+  });
+}
+
+// ---------- Physics ----------
+const W = 900, H = 1500; // logical playfield
+let scale=1, ox=0, oy=0;
+
+const GRAVITY = 1700; // px/s^2
+const BALL_RESTITUTION = 0.88;
+const BUMPER_RESTITUTION = 1.15; // >1 = super bounce!
+const FLIPPER_RESTITUTION = 1.05;
+const MAX_SPEED = 4200;
+const FIXED_DT = 1/240; // physics substeps
+
+let timeScale = 1.0; // bullet time
+let slowmo = false;
+
+// ---------- Balls ----------
+const balls = [];
+let ballRadius = 16;
+
+function spawnBall(x,y,vx,vy){
+  balls.push({
+    x,y,vx,vy,
+    r: ballRadius,
+    color: `hsl(${Math.random()*360},100%,65%)`,
+    trail: [],
+    lastBumper:-1,
+    combo:0,
+    active:true
+  });
+}
+
+// ---------- Playfield layout ----------
+const bumpers = [];
+const walls = []; // static line segments
+const flippers = [];
+const flipperLeft = { x: W*0.32, y: H*0.78, angle:0, target:0, len:95, base:0.55 };
+const flipperRight ={ x: W*0.68, y: H*0.78, angle:0, target:0, len:95, base:-0.55 };
+
+function buildPlayfield(){
+  bumpers.length=0; walls.length=0; flippers.length=0;
+
+  // Outer walls
+  const pad=30;
+  walls.push({x1:pad,y1:pad,x2:W-pad,y2:pad});       // top
+  walls.push({x1:pad,y1:pad,x2:pad,y2:H-pad});        // left
+  walls.push({x1:W-pad,y1:pad,x2:W-pad,y2:H-pad});    // right
+  // sloped bottom / drains
+  walls.push({x1:pad,y1:H-pad,x2:W*0.30,y2:H-170});   // bottom-left slope
+  walls.push({x1:W-pad,y1:H-pad,x2:W*0.70,y2:H-170}); // bottom-right slope
+  walls.push({x1:W*0.30,y1:H-170,x2:W*0.70,y2:H-170}); // flat between flippers
+
+  // Bumpers (circles)
+  const cols=5;
+  for(let i=0;i<cols;i++){
+    for(let j=0;j<3;j++){
+      bumpers.push({
+        x: W*(0.18+0.16*i), y: H*(0.28+0.12*j),
+        r: 26, active:true,
+        hue: (i*60 + j*120) % 360
+      });
+    }
+  }
+  // top corner bumpers
+  bumpers.push({x:W*0.5,y:H*0.16,r:30,active:true,hue:120});
+  bumpers.push({x:W*0.15,y:H*0.22,r:24,active:true,hue:300});
+  bumpers.push({x:W*0.85,y:H*0.22,r:24,active:true,hue:200});
+
+  // Flippers
+  flipperLeft.base=-0.55; flipperRight.base=0.55;
+  flippers.push(flipperLeft, flipperRight);
+}
+buildPlayfield();
+
+// ---------- Input ----------
+const keys={};
+let plungerCharge=0;
+
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Space') e.preventDefault();
+  if(e.code==='KeyS') slowmo=true;
+  if(e.code==='KeyR'){ balls.length=0; spawnBall(W/2, H*0.5, 100, -200); }
+  if(e.code==='KeyN'){ balls.forEach(b=>b.active=true); spawnBall(W/2, H*0.4, 0, -300); }
+  if(e.code==='KeyT'){
+    // tilt — kick all balls
+    balls.forEach(b=>{ b.vx += (Math.random()-0.5)*600; b.vy -= 400; });
+    playExplosion(0.6,0.4);
+  }
+  if(e.code==='Digit1') ballRadius=10;
+  if(e.code==='Digit2') ballRadius=16;
+  if(e.code==='Digit3') ballRadius=26;
+});
+window.addEventListener('keyup',e=>{
+  keys[e.code]=false;
+  if(e.code==='KeyS') slowmo=false;
+});
+
+// mouse fling
+let mouseDown=false, mStart={x:0,y:0}, mCur={x:0,y:0};
+canvas.addEventListener('mousedown',e=>{
+  const p=screenToWorld(e.clientX,e.clientY);
+  mouseDown=true; mStart={x:p.x,y:p.y}; mCur={x:p.x,y:p.y};
+});
+window.addEventListener('mousemove',e=>{
+  const p=screenToWorld(e.clientX,e.clientY); mCur=p;
+});
+window.addEventListener('mouseup',e=>{
+  if(mouseDown){
+    const p=screenToWorld(e.clientX,e.clientY);
+    const dx=mStart.x-p.x, dy=mStart.y-p.y;
+    const len=Math.hypot(dx,dy);
+    if(len>20){
+      spawnBall(p.x,p.y, dx*6, dy*6);
+      playLaser(600,0.15,0.3,'sawtooth');
+    }
+  }
+  mouseDown=false;
+});
+
+function screenToWorld(sx,sy){
+  return { x:(sx-ox)/scale, y:(sy-oy)/scale };
+}
+
+// ---------- Collision math ----------
+function circleSegment(cx,cy,cr,x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1;
+  const len2=dx*dx+dy*dy;
+  let t=((cx-x1)*dx+(cy-y1)*dy)/len2;
+  t=Math.max(0,Math.min(1,t));
+  const px=x1+t*dx, py=y1+t*dy;
+  const ddx=cx-px, ddy=cy-py;
+  const dist=Math.hypot(ddx,ddy);
+  if(dist===0) return null;
+  if(dist<cr){
+    const nx=ddx/dist, ny=ddy/dist;
+    return {nx,ny,dist,px,py};
+  }
+  return null;
+}
+
+function reflect(vx,vy,nx,ny,restitution){
+  const dot=vx*nx+vy*ny;
+  const vnx=dot*nx, vny=dot*ny;
+  const vtx=vx-vnx, vty=vy-vny;
+  const newVnX=-vnx*restitution, newVnY=-vny*restitution;
+  return {vx:newVnX+vtx, vy:newVnY+vty};
+}
+
+// ---------- Scoring ----------
+let score=0, ballsCount=3, comboCount=0;
+const scoreEl=document.getElementById('score');
+const ballsEl=document.getElementById('balls');
+const multEl=document.getElementById('mult');
+const comboEl=document.getElementById('combo');
+
+function addScore(base){
+  const mult = Math.min(10, 1+comboCount);
+  score += base*mult;
+  scoreEl.textContent=score;
+  multEl.textContent='x'+mult;
+}
+function bumpCombo(){
+  comboCount++;
+  comboEl.textContent=comboCount;
+  if(comboCount%3===0) playChime(523+comboCount*20);
+}
+
+// ---------- Physics update ----------
+function updatePhysics(dt){
+  const sub = Math.max(1, Math.ceil(dt/FIXED_DT));
+  const h = dt/sub;
+
+  for(let s=0;s<sub;s++){
+    // flipper control
+    if(keys['ArrowLeft']) flipperLeft.angle = Math.min(flipperLeft.base+1.25, flipperLeft.angle + (flipperLeft.base+1.25-flipperLeft.angle)*0.4);
+    else flipperLeft.angle += (flipperLeft.base - flipperLeft.angle)*0.25;
+    if(keys['ArrowRight']) flipperRight.angle = Math.max(flipperRight.base-1.25, flipperRight.angle + (flipperRight.base-1.25-flipperRight.angle)*0.4);
+    else flipperRight.angle += (flipperRight.base - flipperRight.angle)*0.25;
+
+    // plunger
+    if(keys['Space']) plungerCharge=Math.min(1,plungerCharge+h*3);
+    else if(plungerCharge>0){
+      // launch
+      const launchV = plungerCharge*2500;
+      // spawn at launch bay
+      if(balls.length===0 || balls[balls.length-1].y>H*0.5){
+        spawnBall(W*0.5, H-140, 0, -launchV);
+        playLaser(200,0.3,0.5,'sawtooth');
+        playExplosion(0.3,0.2);
+      }
+      plungerCharge=0;
+    }
+
+    // flipper tips as moving circles
+    const fL = { x: flipperLeft.x + Math.cos(flipperLeft.angle+Math.PI/2)*flipperLeft.len,
+                 y: flipperLeft.y + Math.sin(flipperLeft.angle+Math.PI/2)*flipperLeft.len };
+    const fR = { x: flipperRight.x + Math.cos(flipperRight.angle+Math.PI/2)*flipperRight.len,
+                 y: flipperRight.y + Math.sin(flipperRight.angle+Math.PI/2)*flipperRight.len };
+
+    for(const b of balls){
+      if(!b.active) continue;
+      // gravity
+      b.vy += GRAVITY*h;
+
+      // integrate
+      b.x += b.vx*h;
+      b.y += b.vy*h;
+
+      // trail
+      b.trail.push({x:b.x,y:b.y,l:1});
+      if(b.trail.length>14) b.trail.shift();
+
+      // cap speed
+      const sp=Math.hypot(b.vx,b.vy);
+      if(sp>MAX_SPEED){ b.vx*=MAX_SPEED/sp; b.vy*=MAX_SPEED/sp; }
+
+      // wall collisions
+      for(const w of walls){
+        const col=circleSegment(b.x,b.y,b.r,w.x1,w.y1,w.x2,w.y2);
+        if(col){
+          b.x += col.nx*(b.r-col.dist);
+          b.y += col.ny*(b.r-col.dist);
+          const rv=reflect(b.vx,b.vy,col.nx,col.ny,BALL_RESTITUTION);
+          b.vx=rv.vx; b.vy=rv.vy;
+          if(Math.abs(rv.vy)>150) playLaser(300+Math.random()*200,0.05,0.12);
+        }
+      }
+
+      // bumper collisions
+      for(const bu of bumpers){
+        if(!bu.active) continue;
+        const dx=b.x-bu.x, dy=b.y-bu.y;
+        const dist=Math.hypot(dx,dy);
+        const minDist=b.r+bu.r;
+        if(dist<minDist && dist>0){
+          const nx=dx/dist, ny=dy/dist;
+          // push out
+          b.x = bu.x + nx*minDist;
+          b.y = bu.y + ny*minDist;
+          // super-bounce impulse
+          const rv=reflect(b.vx,b.vy,nx,ny,BUMPER_RESTITUTION);
+          b.vx=rv.vx + nx*300; b.vy=rv.vy + ny*300;
+          // flash + sound + score
+          bu.flash=1;
+          addScore(50);
+          bumpCombo();
+          playLaser(440+Math.random()*600,0.18,0.4,'square');
+          if(Math.random()<0.3) playExplosion(0.15,0.15);
+        }
+      }
+      if(bu.flash) bu.flash-=h*3;
+
+      // flipper tip collisions
+      for(const tip of [fL,fR]){
+        const dx=b.x-tip.x, dy=b.y-tip.y;
+        const dist=Math.hypot(dx,dy);
+        const minDist=b.r+14;
+        if(dist<minDist && dist>0){
+          const nx=dx/dist, ny=dy/dist;
+          b.x=tip.x+nx*minDist; b.y=tip.y+ny*minDist;
+          const rv=reflect(b.vx,b.vy,nx,ny,FLIPPER_RESTITUTION);
+          // add flipper swing energy
+          const swing = tip===fL ? -1800 : 1800;
+          b.vx=rv.vx + nx*swing; b.vy=rv.vy - 200;
+          addScore(25);
+          playLaser(700,0.1,0.3,'triangle');
+        }
+      }
+
+      // drain check (below playfield)
+      if(b.y - b.r > H - 40){
+        b.active=false;
+        ballsCount--;
+        ballsEl.textContent=ballsCount;
+        playExplosion(0.7,0.6);
+        playLaser(120,0.5,0.4,'sawtooth');
+        if(ballsCount<=0){
+          ballsCount=3; ballsEl.textContent=ballsCount;
+          // reset
+          balls.length=0;
+          setTimeout(()=>{ spawnBall(W/2,H*0.4,0,-300); },600);
+        }
+      }
+    }
+
+    // remove inactive
+    for(let i=balls.length-1;i>=0;i--) if(!balls[i].active) balls.splice(i,1);
+  }
+}
+
+// ---------- Rendering ----------
+let trailCanvas=null;
+function resize(){
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+  const s=Math.min(canvas.width/W, canvas.height/H);
+  scale=s*0.95;
+  ox=(canvas.width-W*scale)/2;
+  oy=(canvas.height-H*scale)/2;
+  // trail accumulation canvas
+  trailCanvas=document.createElement('canvas');
+  trailCanvas.width=canvas.width; trailCanvas.height=canvas.height;
+}
+window.addEventListener('resize',resize);
+resize();
+
+function drawGlowLine(x1,y1,x2,y2,color,width,alpha){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.globalAlpha=alpha; ctx.lineWidth=width;
+  ctx.lineCap='round';
+  ctx.shadowColor=color; ctx.shadowBlur=width*4;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.restore();
+}
+
+function render(){
+  // clear with slight trail persistence
+  ctx.fillStyle='rgba(4,5,10,0.28)';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(ox,oy);
+  ctx.scale(scale,scale);
+
+  // subtle grid
+  ctx.strokeStyle='rgba(0,255,213,0.05)';
+  ctx.lineWidth=1;
+  for(let x=0;x<W;x+=60){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0;y<H;y+=60){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // walls
+  for(const w of walls){
+    drawGlowLine(w.x1,w.y1,w.x2,w.y2,'#00ffd5',3,0.5);
+    drawGlowLine(w.x1,w.y1,w.x2,w.y2,'#00ffd5',1,0.2);
+  }
+
+  // bumpers — neon rings with flash
+  for(const bu of bumpers){
+    const flash=bu.flash||0;
+    const hue=bu.hue;
+    const baseGlow = flash>0 ? 30+flash*40 : 18;
+    ctx.save();
+    ctx.strokeStyle=`hsl(${hue},100%,65%)`;
+    ctx.lineWidth=2;
+    ctx.shadowColor=`hsl(${hue},100%,65%)`;
+    ctx.shadowBlur=baseGlow;
+    ctx.beginPath(); ctx.arc(bu.x,bu.y,bu.r,0,Math.PI*2); ctx.stroke();
+    if(flash>0){
+      ctx.globalAlpha=flash*0.8;
+      ctx.fillStyle=`hsl(${hue},100%,70%)`;
+      ctx.shadowBlur=60;
+      ctx.beginPath(); ctx.arc(bu.x,bu.y,bu.r,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    // inner dot
+    ctx.fillStyle=`hsl(${hue},100%,80%)`;
+    ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(bu.x,bu.y,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // flippers
+  for(const f of [flipperLeft,flipperRight]){
+    const tx = f.x + Math.cos(f.angle+Math.PI/2)*f.len;
+    const ty = f.y + Math.sin(f.angle+Math.PI/2)*f.len;
+    drawGlowLine(f.x,f.y,tx,ty,'#ff2d6f',10,0.7);
+    drawGlowLine(f.x,f.y,tx,ty,'#ff2d6f',4,0.9);
+    // pivot
+    ctx.fillStyle='#ff2d6f'; ctx.shadowColor='#ff2d6f'; ctx.shadowBlur=20;
+    ctx.beginPath(); ctx.arc(f.x,f.y,8,0,Math.PI*2); ctx.fill();
+  }
+
+  // plunger lane guide
+  drawGlowLine(W*0.5-20, H-150, W*0.5-20, H-60, '#ffd500',2,0.3);
+  drawGlowLine(W*0.5+20, H-150, W*0.5+20, H-60, '#ffd500',2,0.3);
+  // plunger charge
+  if(plungerCharge>0){
+    const py=H-60 - plungerCharge*90;
+    drawGlowLine(W*0.5, py, W*0.5, H-60, '#ffd500', 14, 0.8);
+    ctx.fillStyle='#ffd500'; ctx.shadowColor='#ffd500'; ctx.shadowBlur=30;
+    ctx.font='bold 26px monospace'; ctx.textAlign='center';
+    ctx.fillText(Math.round(plungerCharge*100)+'%', W*0.5, py-14);
+  }
+
+  // ball trails
+  for(const b of balls){
+    for(let i=0;i<b.trail.length;i++){
+      const t=b.trail[i];
+      const a=(i/b.trail.length)*0.5;
+      ctx.fillStyle=b.color;
+      ctx.globalAlpha=a;
+      ctx.shadowColor=b.color; ctx.shadowBlur=20;
+      ctx.beginPath(); ctx.arc(t.x,t.y,b.r*(i/b.trail.length)*0.6,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // balls
+  for(const b of balls){
+    ctx.save();
+    ctx.shadowColor=b.color; ctx.shadowBlur=35;
+    const grad=ctx.createRadialGradient(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.1,b.x,b.y,b.r);
+    grad.addColorStop(0,'#fff');
+    grad.addColorStop(0.4,b.color);
+    grad.addColorStop(1,'rgba(0,0,0,0.9)');
+    ctx.fillStyle=grad;
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+    // ring
+    ctx.strokeStyle=b.color; ctx.lineWidth=2; ctx.shadowBlur=20;
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // mouse drag trajectory
+  if(mouseDown){
+    const dx=mCur.x-mStart.x, dy=mCur.y-mStart.y;
+    const len=Math.hypot(dx,dy);
+    if(len>10){
+      ctx.strokeStyle='rgba(255,255,255,0.5)';
+      ctx.lineWidth=1.5; ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.moveTo(mStart.x,mStart.y); ctx.lineTo(mCur.x,mCur.y); ctx.stroke();
+      ctx.setLineDash([]);
+      // arrow
+      const a=Math.atan2(dy,dx);
+      ctx.beginPath();
+      ctx.moveTo(mCur.x,mCur.y);
+      ctx.lineTo(mCur.x-Math.cos(a-0.4)*16, mCur.y-Math.sin(a-0.4)*16);
+      ctx.moveTo(mCur.x,mCur.y);
+      ctx.lineTo(mCur.x-Math.cos(a+0.4)*16, mCur.y-Math.sin(a+0.4)*16);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+
+  // CRT scanline overlay (cheap, tiled)
+  const pat=ctx.createPattern(crtCanvas,'repeat');
+  ctx.globalAlpha=0.35;
+  ctx.fillStyle=pat;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.globalAlpha=1;
+
+  // slow-mo tint
+  if(slowmo || timeScale<0.99){
+    ctx.fillStyle=`rgba(0,180,255,${(1-timeScale)*0.25})`;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+}
+
+// ---------- Main loop ----------
+let last=performance.now();
+function loop(now){
+  const rawDt=Math.min(0.05,(now-last)/1000);
+  last=now;
+
+  // bullet time
+  if(slowmo) timeScale += (0.18-timeScale)*0.1;
+  else timeScale += (parseFloat(document.getElementById('slider').value)-timeScale)*0.15;
+  timeScale=Math.max(0.05,Math.min(1,timeScale));
+  document.getElementById('scalelabel').textContent=timeScale.toFixed(2)+'x';
+
+  const dt=rawDt*timeScale;
+  updatePhysics(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ---------- Start ----------
+document.getElementById('go').addEventListener('click',()=>{
+  initAudio();
+  document.getElementById('overlay').classList.add('hidden');
+  spawnBall(W/2, H*0.4, 0, -300);
+  playChime(440);
+  requestAnimationFrame(loop);
+});
+
+})();
+</script>
+</body>
+</html>

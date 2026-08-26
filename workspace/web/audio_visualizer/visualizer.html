@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus 3D Audio Visualizer Studio</title>
+  <!-- Three.js + OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Google Fonts & Lucide Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030308;
+      font-family: 'Rajdhani', sans-serif;
+      color: #fff;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Screen Flash Overlay on Bass Drop */
+    #flash-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255,0,128,0.25) 0%, rgba(0,0,0,0) 70%);
+      opacity: 0;
+      transition: opacity 0.05s linear;
+    }
+
+    /* Glassmorphism Control Panel */
+    .ui-layer {
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      box-sizing: border-box;
+      transition: opacity 0.3s ease;
+    }
+
+    .ui-layer.fullscreen-hide {
+      opacity: 0;
+      pointer-events: none !important;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Header Bar */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(10, 10, 20, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 14px 24px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    }
+
+    .title-group h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: 20px;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #f093fb 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .title-group p {
+      font-size: 12px;
+      color: #8a8ca3;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .controls-top {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    /* Buttons */
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: #00f2fe;
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00f2fe, #4facfe);
+      border: none;
+      color: #000;
+      font-weight: 700;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.6);
+      color: #000;
+    }
+
+    .btn-accent {
+      background: linear-gradient(135deg, #ff0844, #ffb199);
+      border: none;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .btn-accent:hover {
+      box-shadow: 0 0 20px rgba(255, 8, 68, 0.6);
+    }
+
+    .btn-active {
+      background: rgba(0, 242, 254, 0.25) !important;
+      border-color: #00f2fe !important;
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.5);
+    }
+
+    /* Fullscreen Floating Button */
+    #fs-floating-btn {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 100;
+      background: rgba(10, 10, 25, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 242, 254, 0.4);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #00f2fe;
+      box-shadow: 0 0 20px rgba(0,0,0,0.6);
+      transition: all 0.2s ease;
+    }
+    #fs-floating-btn:hover {
+      transform: scale(1.15) rotate(90deg);
+      background: #00f2fe;
+      color: #000;
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.8);
+    }
+
+    /* Bottom Control Bar */
+    .bottom-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: rgba(10, 10, 20, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 18px 24px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    .mode-selector {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+    }
+    .mode-selector::-webkit-scrollbar {
+      height: 4px;
+    }
+    .mode-selector::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #a0a5c0;
+      font-weight: 600;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #00f2fe;
+      cursor: pointer;
+      box-shadow: 0 0 8px #00f2fe;
+    }
+
+    /* Track Info / Selector */
+    .track-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 6px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .track-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      color: #00f2fe;
+      letter-spacing: 1px;
+    }
+
+    /* Color Palette Picker */
+    .palette-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.2s ease;
+    }
+    .dot:hover {
+      transform: scale(1.2);
+    }
+    .dot.active {
+      border-color: #fff;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    /* Hidden File Input */
+    #audio-file-input {
+      display: none;
+    }
+
+    /* HUD Audio Stats */
+    .hud-stats {
+      position: absolute;
+      top: 100px;
+      left: 24px;
+      background: rgba(10, 10, 20, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      color: #00f2fe;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .meter-bar {
+      width: 120px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00f2fe, #ff0844);
+      transition: width 0.05s linear;
+    }
+
+    /* On-Screen Instructions Hint */
+    .hint-toast {
+      position: absolute;
+      top: 100px;
+      right: 24px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      font-size: 12px;
+      color: #d1d5db;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+  
+  <!-- Dynamic Audio Flash Background FX -->
+  <div id="flash-overlay"></div>
+
+  <!-- Fullscreen Toggle Floating Button (Always Visible) -->
+  <button id="fs-floating-btn" class="interactive" title="Toggle Fullscreen (F)">
+    <i data-lucide="maximize"></i>
+  </button>
+
+  <!-- UI Overlay Layer -->
+  <div class="ui-layer" id="ui-layer">
+    
+    <!-- Top Bar -->
+    <div class="header interactive">
+      <div class="title-group">
+        <h1><i data-lucide="activity"></i> NEXUS 3D AUDIO ENGINE</h1>
+        <p>Real-Time Web Audio API & Three.js FX Synthesizer</p>
+      </div>
+
+      <div class="controls-top">
+        <button class="btn btn-primary" id="btn-play-synth">
+          <i data-lucide="play" id="play-icon"></i> <span id="play-text">PLAY SYNTH</span>
+        </button>
+        <button class="btn" id="btn-upload">
+          <i data-lucide="upload"></i> UPLOAD MP3
+        </button>
+        <button class="btn" id="btn-mic">
+          <i data-lucide="mic"></i> MIC INPUT
+        </button>
+        <input type="file" id="audio-file-input" accept="audio/*">
+      </div>
+    </div>
+
+    <!-- HUD Stats Bar -->
+    <div class="hud-stats">
+      <div style="display:flex; justify-shadow:space-between; justify-content:space-between; align-items:center;">
+        <span>BASS INTENSITY</span>
+        <span id="bass-val">0%</span>
+      </div>
+      <div class="meter-bar"><div class="meter-fill" id="bass-meter"></div></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span>TREBLE PEAK</span>
+        <span id="treble-val">0%</span>
+      </div>
+      <div class="meter-bar"><div class="meter-fill" id="treble-meter"></div></div>
+    </div>
+
+    <!-- Quick Hint Toast -->
+    <div class="hint-toast">
+      <i data-lucide="info" style="width:14px; color:#00f2fe;"></i> Press <b>[F]</b> for Fullscreen | Drag to Orbit 3D Camera
+    </div>
+
+    <!-- Bottom Control Bar -->
+    <div class="bottom-bar interactive">
+      
+      <!-- Visualizer Mode Buttons (8 FX Modes!) -->
+      <div class="mode-selector">
+        <button class="btn btn-active" data-mode="grid"><i data-lucide="grid"></i> 3D GRID</button>
+        <button class="btn" data-mode="vortex"><i data-lucide="disc"></i> BLACK HOLE</button>
+        <button class="btn" data-mode="hypercube"><i data-lucide="box"></i> HYPERCUBE</button>
+        <button class="btn" data-mode="helix"><i data-lucide="dna"></i> CYBER HELIX</button>
+        <button class="btn" data-mode="supernova"><i data-lucide="sun"></i> SUPERNOVA</button>
+        <button class="btn" data-mode="tunnel"><i data-lucide="orbit"></i> TUNNEL</button>
+        <button class="btn" data-mode="landscape"><i data-lucide="mountain"></i> LANDSCAPE</button>
+        <button class="btn" data-mode="sphere"><i data-lucide="globe"></i> ORBIT SPHERE</button>
+      </div>
+
+      <!-- Controls Row -->
+      <div class="controls-row">
+        
+        <!-- Track Selector & Synth Selector -->
+        <div class="track-info">
+          <i data-lucide="music" style="color: #00f2fe;"></i>
+          <span class="track-name" id="track-name">TRACK: SYNTHWAVE RETRO 128BPM</span>
+          <button class="btn" id="btn-next-track" style="padding: 4px 8px; font-size: 11px;">NEXT TRACK</button>
+        </div>
+
+        <!-- Sliders & Toggles -->
+        <div style="display: flex; gap: 20px; align-items: center;">
+          <!-- Auto Orbit Camera Toggle -->
+          <button class="btn" id="btn-auto-orbit" title="Toggle 3D Auto Camera Flyby">
+            <i data-lucide="eye"></i> CAM ROTATE: ON
+          </button>
+
+          <!-- Crazy Shake FX Toggle -->
+          <button class="btn btn-active" id="btn-fx-shake" title="Toggle Screen Flash & Shake FX on Bass Drops">
+            <i data-lucide="zap"></i> BASS FX: ON
+          </button>
+
+          <!-- Sensitivity Slider -->
+          <div class="slider-group">
+            <i data-lucide="sliders"></i>
+            <span>SENS</span>
+            <input type="range" id="slider-sens" class="slider" min="0.5" max="3.0" step="0.1" value="1.5">
+          </div>
+
+          <!-- Master Vol -->
+          <div class="slider-group">
+            <i data-lucide="volume-2"></i>
+            <span>VOL</span>
+            <input type="range" id="slider-vol" class="slider" min="0" max="1" step="0.05" value="0.8">
+          </div>
+
+          <!-- Color Themes -->
+          <div class="palette-group">
+            <div class="dot active" style="background: #00f2fe;" data-theme="cyber" title="Cyberpunk Cyan"></div>
+            <div class="dot" style="background: #ff0844;" data-theme="synthwave" title="Synthwave Sunset"></div>
+            <div class="dot" style="background: #00ff66;" data-theme="matrix" title="Matrix Emerald"></div>
+            <div class="dot" style="background: #ff9900;" data-theme="fire" title="Solar Gold"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    /* ==========================================
+       1. AUDIO ENGINE (Web Audio API)
+       ========================================== */
+    let audioCtx = null;
+    let analyser = null;
+    let gainNode = null;
+    let dataArray = null;
+    let isPlaying = false;
+    let currentSource = 'synth'; // 'synth', 'file', 'mic'
+    let activeSourceNode = null;
+    let currentTrackIndex = 0;
+
+    // Procedural Synth Sequencer Tracks
+    const synthTracks = [
+      { name: "SYNTHWAVE CYBERPUNK 124BPM", bpm: 124, bassFreq: 55, leadScale: [220, 261.63, 293.66, 329.63, 392.00, 440] },
+      { name: "DARK ACID BASS 135BPM", bpm: 135, bassFreq: 41.2, leadScale: [164.81, 196.00, 220, 246.94, 293.66] },
+      { name: "NEON CHILLWAVE 105BPM", bpm: 105, bassFreq: 65.4, leadScale: [261.63, 329.63, 392.00, 493.88, 523.25] }
+    ];
+
+    let synthInterval = null;
+    let synthStep = 0;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.85;
+
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.8;
+
+        gainNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function startProceduralSynth() {
+      stopAudio();
+      initAudioContext();
+      isPlaying = true;
+      currentSource = 'synth';
+
+      const track = synthTracks[currentTrackIndex];
+      document.getElementById('track-name').innerText = `TRACK: ${track.name}`;
+
+      const stepTime = (60 / track.bpm / 4) * 1000;
+
+      synthInterval = setInterval(() => {
+        if (!isPlaying || currentSource !== 'synth') return;
+        const now = audioCtx.currentTime;
+
+        // Kick drum on steps 0, 4, 8, 12
+        if (synthStep % 4 === 0) {
+          const osc = audioCtx.createOscillator();
+          const kickGain = audioCtx.createGain();
+          osc.frequency.setValueAtTime(120, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+          kickGain.gain.setValueAtTime(1.0, now);
+          kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.connect(kickGain);
+          kickGain.connect(gainNode);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        }
+
+        // Snare on steps 4, 12
+        if (synthStep % 8 === 4) {
+          const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < noiseBuffer.length; i++) {
+            output[i] = Math.random() * 2 - 1;
+          }
+          const whiteNoise = audioCtx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          const snareGain = audioCtx.createGain();
+          snareGain.gain.setValueAtTime(0.5, now);
+          snareGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+          whiteNoise.connect(snareGain);
+          snareGain.connect(gainNode);
+          whiteNoise.start(now);
+        }
+
+        // Sub Bass synth on every 8th note
+        if (synthStep % 2 === 0) {
+          const bassOsc = audioCtx.createOscillator();
+          const bassGain = audioCtx.createGain();
+          bassOsc.type = 'sawtooth';
+          bassOsc.frequency.setValueAtTime(track.bassFreq, now);
+          bassGain.gain.setValueAtTime(0.4, now);
+          bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+          bassOsc.connect(bassGain);
+          bassGain.connect(gainNode);
+          bassOsc.start(now);
+          bassOsc.stop(now + 0.2);
+        }
+
+        // Arpeggiated synth lead
+        if (Math.random() > 0.2) {
+          const leadOsc = audioCtx.createOscillator();
+          const leadGain = audioCtx.createGain();
+          leadOsc.type = 'square';
+          const noteIndex = (synthStep * 3) % track.leadScale.length;
+          leadOsc.frequency.setValueAtTime(track.leadScale[noteIndex], now);
+          leadGain.gain.setValueAtTime(0.15, now);
+          leadGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          leadOsc.connect(leadGain);
+          leadGain.connect(gainNode);
+          leadOsc.start(now);
+          leadOsc.stop(now + 0.15);
+        }
+
+        synthStep = (synthStep + 1) % 16;
+      }, stepTime);
+
+      updatePlayUI(true);
+    }
+
+    function stopAudio() {
+      if (synthInterval) {
+        clearInterval(synthInterval);
+        synthInterval = null;
+      }
+      if (activeSourceNode) {
+        try { activeSourceNode.stop(); } catch(e){}
+        try { activeSourceNode.disconnect(); } catch(e){}
+        activeSourceNode = null;
+      }
+      isPlaying = false;
+      updatePlayUI(false);
+    }
+
+    function updatePlayUI(playing) {
+      const playIcon = document.getElementById('play-icon');
+      const playText = document.getElementById('play-text');
+      if (playing) {
+        playIcon.setAttribute('data-lucide', 'pause');
+        playText.innerText = 'PAUSE';
+      } else {
+        playIcon.setAttribute('data-lucide', 'play');
+        playText.innerText = 'PLAY SYNTH';
+      }
+      lucide.createIcons();
+    }
+
+    // Handle Local File Upload
+    document.getElementById('btn-upload').addEventListener('click', () => {
+      document.getElementById('audio-file-input').click();
+    });
+
+    document.getElementById('audio-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      stopAudio();
+      initAudioContext();
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        audioCtx.decodeAudioData(event.target.result, (buffer) => {
+          const fileSource = audioCtx.createBufferSource();
+          fileSource.buffer = buffer;
+          fileSource.loop = true;
+          fileSource.connect(gainNode);
+          fileSource.start(0);
+
+          activeSourceNode = fileSource;
+          isPlaying = true;
+          currentSource = 'file';
+          document.getElementById('track-name').innerText = `FILE: ${file.name.substring(0, 28)}`;
+          updatePlayUI(true);
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Handle Microphone Input
+    document.getElementById('btn-mic').addEventListener('click', () => {
+      stopAudio();
+      initAudioContext();
+
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        .then((stream) => {
+          const micSource = audioCtx.createMediaStreamSource(stream);
+          micSource.connect(analyser); // Direct to analyser so no feedback loop
+          activeSourceNode = micSource;
+          isPlaying = true;
+          currentSource = 'mic';
+          document.getElementById('track-name').innerText = 'INPUT: LIVE MICROPHONE';
+          updatePlayUI(true);
+        })
+        .catch((err) => {
+          alert("Microphone access denied or unavailable.");
+        });
+    });
+
+    document.getElementById('btn-play-synth').addEventListener('click', () => {
+      if (isPlaying && currentSource === 'synth') {
+        stopAudio();
+      } else {
+        startProceduralSynth();
+      }
+    });
+
+    document.getElementById('btn-next-track').addEventListener('click', () => {
+      currentTrackIndex = (currentTrackIndex + 1) % synthTracks.length;
+      if (isPlaying && currentSource === 'synth') {
+        startProceduralSynth();
+      } else {
+        document.getElementById('track-name').innerText = `TRACK: ${synthTracks[currentTrackIndex].name}`;
+      }
+    });
+
+    document.getElementById('slider-vol').addEventListener('input', (e) => {
+      if (gainNode) gainNode.gain.value = parseFloat(e.target.value);
+    });
+
+
+    /* ==========================================
+       2. FULLSCREEN FUNCTIONALITY
+       ========================================== */
+    const fsBtn = document.getElementById('fs-floating-btn');
+    const uiLayer = document.getElementById('ui-layer');
+    let isFullscreen = false;
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          isFullscreen = true;
+          fsBtn.innerHTML = '<i data-lucide="minimize"></i>';
+          lucide.createIcons();
+        }).catch(err => {
+          console.log(`Error attempting fullscreen: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            isFullscreen = false;
+            fsBtn.innerHTML = '<i data-lucide="maximize"></i>';
+            uiLayer.classList.remove('fullscreen-hide');
+            lucide.createIcons();
+          });
+        }
+      }
+    }
+
+    fsBtn.addEventListener('click', toggleFullscreen);
+
+    // Keyboard shortcut 'F' or Double Click Canvas for Fullscreen
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      } else if (e.key === 'h' || e.key === 'H') {
+        uiLayer.classList.toggle('fullscreen-hide');
+      }
+    });
+
+    document.getElementById('canvas-container').addEventListener('dblclick', toggleFullscreen);
+
+
+    /* ==========================================
+       3. THREE.JS 3D SCENE & EFFECT ENGINES
+       ========================================== */
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030308, 0.012);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 25, 60);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 + 0.1;
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(ambientLight);
+
+    const pointLight = new THREE.PointLight(0x00f2fe, 3, 150);
+    pointLight.position.set(0, 20, 0);
+    scene.add(pointLight);
+
+    const pointLight2 = new THREE.PointLight(0xff0844, 2, 150);
+    pointLight2.position.set(0, -20, 0);
+    scene.add(pointLight2);
+
+    // Color Palettes
+    const colorThemes = {
+      cyber: { primary: 0x00f2fe, secondary: 0x4facfe, accent: 0xf093fb },
+      synthwave: { primary: 0xff0844, secondary: 0xffb199, accent: 0xff00ff },
+      matrix: { primary: 0x00ff66, secondary: 0x003311, accent: 0x66ff99 },
+      fire: { primary: 0xff9900, secondary: 0xff3300, accent: 0xffff00 }
+    };
+    let currentTheme = 'cyber';
+
+    // FX Toggles & Sensitivity
+    let autoOrbitCamera = true;
+    let bassFXEnabled = true;
+
+    document.getElementById('btn-auto-orbit').addEventListener('click', function() {
+      autoOrbitCamera = !autoOrbitCamera;
+      this.classList.toggle('btn-active', autoOrbitCamera);
+      this.innerHTML = `<i data-lucide="eye"></i> CAM ROTATE: ${autoOrbitCamera ? 'ON' : 'OFF'}`;
+      lucide.createIcons();
+    });
+
+    document.getElementById('btn-fx-shake').addEventListener('click', function() {
+      bassFXEnabled = !bassFXEnabled;
+      this.classList.toggle('btn-active', bassFXEnabled);
+      this.innerHTML = `<i data-lucide="zap"></i> BASS FX: ${bassFXEnabled ? 'ON' : 'OFF'}`;
+      lucide.createIcons();
+    });
+
+    // Theme selector click
+    document.querySelectorAll('.dot').forEach(dot => {
+      dot.addEventListener('click', (e) => {
+        document.querySelectorAll('.dot').forEach(d => d.classList.remove('active'));
+        e.target.classList.add('active');
+        currentTheme = e.target.getAttribute('data-theme');
+        applyTheme();
+      });
+    });
+
+    function getThemeColors() {
+      return colorThemes[currentTheme];
+    }
+
+    // Master Visualizer Container Group
+    const visualizerGroup = new THREE.Group();
+    scene.add(visualizerGroup);
+
+    let activeMode = 'grid'; // Mode state
+
+    /* ------------------------------------------
+       MODE 1: 3D FREQUENCY GRID
+       ------------------------------------------ */
+    const gridBars = [];
+    const gridGroup = new THREE.Group();
+    const gridCols = 16;
+    const gridRows = 12;
+    const barSpacing = 2.2;
+
+    const boxGeo = new THREE.BoxGeometry(1.6, 1, 1.6);
+    boxGeo.translate(0, 0.5, 0);
+
+    for (let i = 0; i < gridCols; i++) {
+      for (let j = 0; j < gridRows; j++) {
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x00f2fe,
+          roughness: 0.2,
+          metalness: 0.8,
+          emissive: 0x000000
+        });
+        const mesh = new THREE.Mesh(boxGeo, mat);
+        mesh.position.set((i - gridCols / 2) * barSpacing, 0, (j - gridRows / 2) * barSpacing);
+        gridGroup.add(mesh);
+        gridBars.push(mesh);
+      }
+    }
+    visualizerGroup.add(gridGroup);
+
+    /* ------------------------------------------
+       MODE 2: BLACK HOLE SINGULARITY VORTEX
+       ------------------------------------------ */
+    const vortexGroup = new THREE.Group();
+    const vortexParticleCount = 2500;
+    const vortexGeo = new THREE.BufferGeometry();
+    const vortexPositions = new Float32Array(vortexParticleCount * 3);
+    const vortexColors = new Float32Array(vortexParticleCount * 3);
+    const vortexAngles = new Float32Array(vortexParticleCount);
+    const vortexRadii = new Float32Array(vortexParticleCount);
+
+    for (let i = 0; i < vortexParticleCount; i++) {
+      const radius = 5 + Math.random() * 45;
+      const angle = Math.random() * Math.PI * 2;
+      vortexRadii[i] = radius;
+      vortexAngles[i] = angle;
+      vortexPositions[i * 3] = Math.cos(angle) * radius;
+      vortexPositions[i * 3 + 1] = (Math.random() - 0.5) * (30 / (radius * 0.2 + 1));
+      vortexPositions[i * 3 + 2] = Math.sin(angle) * radius;
+
+      vortexColors[i * 3] = 0.0;
+      vortexColors[i * 3 + 1] = 0.95;
+      vortexColors[i * 3 + 2] = 1.0;
+    }
+    vortexGeo.setAttribute('position', new THREE.BufferAttribute(vortexPositions, 3));
+    vortexGeo.setAttribute('color', new THREE.BufferAttribute(vortexColors, 3));
+
+    const vortexMat = new THREE.PointsMaterial({
+      size: 1.2,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+    const vortexParticles = new THREE.Points(vortexGeo, vortexMat);
+    vortexGroup.add(vortexParticles);
+
+    // Glowing Central Event Horizon Core
+    const horizonGeo = new THREE.SphereGeometry(4, 32, 32);
+    const horizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
+    vortexGroup.add(horizonMesh);
+
+    const horizonRingGeo = new THREE.RingGeometry(4.2, 8, 32);
+    const horizonRingMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+    const horizonRing = new THREE.Mesh(horizonRingGeo, horizonRingMat);
+    horizonRing.rotation.x = Math.PI / 2;
+    vortexGroup.add(horizonRing);
+
+    vortexGroup.visible = false;
+    visualizerGroup.add(vortexGroup);
+
+    /* ------------------------------------------
+       MODE 3: HYPERCUBE TESSERACT MATRIX
+       ------------------------------------------ */
+    const hyperGroup = new THREE.Group();
+    const hyperCubes = [];
+    for (let layer = 0; layer < 4; layer++) {
+      const size = (layer + 1) * 8;
+      const geo = new THREE.BoxGeometry(size, size, size);
+      const wire = new THREE.WireframeGeometry(geo);
+      const mat = new THREE.LineBasicMaterial({ color: 0x00f2fe, linewidth: 2, transparent: true, opacity: 0.8 });
+      const line = new THREE.LineSegments(wire, mat);
+      hyperGroup.add(line);
+      hyperCubes.push(line);
+    }
+    hyperGroup.visible = false;
+    visualizerGroup.add(hyperGroup);
+
+    /* ------------------------------------------
+       MODE 4: CYBER DNA HELIX
+       ------------------------------------------ */
+    const helixGroup = new THREE.Group();
+    const helixNodes = [];
+    const helixCount = 60;
+    const helixGeo = new THREE.SphereGeometry(0.6, 16, 16);
+
+    for (let i = 0; i < helixCount; i++) {
+      const mat1 = new THREE.MeshStandardMaterial({ color: 0x00f2fe, emissive: 0x00f2fe, emissiveIntensity: 0.5 });
+      const mat2 = new THREE.MeshStandardMaterial({ color: 0xff0844, emissive: 0xff0844, emissiveIntensity: 0.5 });
+      
+      const node1 = new THREE.Mesh(helixGeo, mat1);
+      const node2 = new THREE.Mesh(helixGeo, mat2);
+
+      // Connecting bar line between strands
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const connector = new THREE.Line(lineGeo, lineMat);
+
+      helixGroup.add(node1);
+      helixGroup.add(node2);
+      helixGroup.add(connector);
+
+      helixNodes.push({ n1: node1, n2: node2, conn: connector });
+    }
+    helixGroup.visible = false;
+    visualizerGroup.add(helixGroup);
+
+    /* ------------------------------------------
+       MODE 5: SUPERNOVA EXPLODING CORE
+       ------------------------------------------ */
+    const supernovaGroup = new THREE.Group();
+    const novaCubes = [];
+    const novaCount = 300;
+    const novaGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+
+    for (let i = 0; i < novaCount; i++) {
+      const mat = new THREE.MeshStandardMaterial({ color: 0x00f2fe, roughness: 0.3 });
+      const mesh = new THREE.Mesh(novaGeo, mat);
+      
+      // Random direction on sphere surface
+      const phi = Math.acos(-1 + (2 * i) / novaCount);
+      const theta = Math.sqrt(novaCount * Math.PI) * phi;
+      const dir = new THREE.Vector3(
+        Math.cos(theta) * Math.sin(phi),
+        Math.sin(theta) * Math.sin(phi),
+        Math.cos(phi)
+      );
+      
+      mesh.userData = { dir: dir, baseRadius: 10 + Math.random() * 15 };
+      mesh.position.copy(dir).multiplyScalar(mesh.userData.baseRadius);
+      supernovaGroup.add(mesh);
+      novaCubes.push(mesh);
+    }
+    supernovaGroup.visible = false;
+    visualizerGroup.add(supernovaGroup);
+
+    /* ------------------------------------------
+       MODE 6: CYBER TUNNEL
+       ------------------------------------------ */
+    const tunnelGroup = new THREE.Group();
+    const tunnelRings = [];
+    const ringCount = 30;
+
+    for (let i = 0; i < ringCount; i++) {
+      const ringGeo = new THREE.TorusGeometry(12, 0.2, 8, 32);
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0x00f2fe, emissive: 0x000000 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.z = -i * 6;
+      tunnelGroup.add(ring);
+      tunnelRings.push(ring);
+    }
+    tunnelGroup.visible = false;
+    visualizerGroup.add(tunnelGroup);
+
+    /* ------------------------------------------
+       MODE 7: NEON LANDSCAPE (Heightmap)
+       ------------------------------------------ */
+    const landscapeGroup = new THREE.Group();
+    const landWidth = 80;
+    const landDepth = 80;
+    const landGeo = new THREE.PlaneGeometry(80, 80, 32, 32);
+    landGeo.rotateX(-Math.PI / 2);
+
+    const landMat = new THREE.MeshStandardMaterial({
+      color: 0x030308,
+      wireframe: true,
+      emissive: 0x00f2fe,
+      emissiveIntensity: 0.4
+    });
+    const landMesh = new THREE.Mesh(landGeo, landMat);
+    landscapeGroup.add(landMesh);
+    landscapeGroup.visible = false;
+    visualizerGroup.add(landscapeGroup);
+
+    /* ------------------------------------------
+       MODE 8: ORBIT SPHERE
+       ------------------------------------------ */
+    const sphereGroup = new THREE.Group();
+    const particleCount = 600;
+    const sphereParticlesGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const basePositions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = u * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * v - 1.0);
+      const r = 18;
+
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.sin(phi) * Math.sin(theta);
+      const z = r * Math.cos(phi);
+
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+
+      basePositions[i * 3] = x;
+      basePositions[i * 3 + 1] = y;
+      basePositions[i * 3 + 2] = z;
+    }
+    sphereParticlesGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const sphereMat = new THREE.PointsMaterial({ color: 0x00f2fe, size: 0.8, transparent: true, opacity: 0.9 });
+    const sphereMesh = new THREE.Points(sphereParticlesGeo, sphereMat);
+    sphereGroup.add(sphereMesh);
+    sphereGroup.visible = false;
+    visualizerGroup.add(sphereGroup);
+
+
+    // Mode Switcher Handler
+    document.querySelectorAll('.mode-selector .btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.mode-selector .btn').forEach(b => b.classList.remove('btn-active'));
+        const targetBtn = e.currentTarget;
+        targetBtn.classList.add('btn-active');
+        activeMode = targetBtn.getAttribute('data-mode');
+
+        // Hide all groups
+        gridGroup.visible = false;
+        vortexGroup.visible = false;
+        hyperGroup.visible = false;
+        helixGroup.visible = false;
+        supernovaGroup.visible = false;
+        tunnelGroup.visible = false;
+        landscapeGroup.visible = false;
+        sphereGroup.visible = false;
+
+        // Show selected group
+        if (activeMode === 'grid') gridGroup.visible = true;
+        if (activeMode === 'vortex') vortexGroup.visible = true;
+        if (activeMode === 'hypercube') hyperGroup.visible = true;
+        if (activeMode === 'helix') helixGroup.visible = true;
+        if (activeMode === 'supernova') supernovaGroup.visible = true;
+        if (activeMode === 'tunnel') tunnelGroup.visible = true;
+        if (activeMode === 'landscape') landscapeGroup.visible = true;
+        if (activeMode === 'sphere') sphereGroup.visible = true;
+      });
+    });
+
+    function applyTheme() {
+      const theme = getThemeColors();
+      pointLight.color.setHex(theme.primary);
+      pointLight2.color.setHex(theme.secondary);
+
+      // Grid bars
+      gridBars.forEach(bar => bar.material.color.setHex(theme.primary));
+      // Vortex
+      horizonRingMat.color.setHex(theme.primary);
+      // Hypercube
+      hyperCubes.forEach(cube => cube.material.color.setHex(theme.primary));
+      // Tunnel
+      tunnelRings.forEach(ring => ring.material.color.setHex(theme.primary));
+      // Landscape
+      landMat.emissive.setHex(theme.primary);
+      // Sphere
+      sphereMat.color.setHex(theme.primary);
+    }
+
+    /* ==========================================
+       4. ANIMATION LOOP & AUDIO ANALYSIS
+       ========================================== */
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsedTime = clock.getElapsedTime();
+      const sensitivity = parseFloat(document.getElementById('slider-sens').value);
+
+      // Analyze Frequencies
+      let bassAvg = 0;
+      let trebleAvg = 0;
+
+      if (analyser && isPlaying) {
+        analyser.getByteFrequencyData(dataArray);
+
+        // Sub-Bass (0-15)
+        let bassSum = 0;
+        for (let i = 0; i < 15; i++) bassSum += dataArray[i];
+        bassAvg = (bassSum / 15) / 255.0 * sensitivity;
+
+        // Treble (100-200)
+        let trebleSum = 0;
+        for (let i = 100; i < 200; i++) trebleSum += dataArray[i];
+        trebleAvg = (trebleSum / 100) / 255.0 * sensitivity;
+
+        // Update HUD Meters
+        document.getElementById('bass-meter').style.width = `${Math.min(100, bassAvg * 100)}%`;
+        document.getElementById('bass-val').innerText = `${Math.round(bassAvg * 100)}%`;
+        document.getElementById('treble-meter').style.width = `${Math.min(100, trebleAvg * 100)}%`;
+        document.getElementById('treble-val').innerText = `${Math.round(trebleAvg * 100)}%`;
+      }
+
+      // Camera Shake & Screen Flash on Bass Drop
+      const flashOverlay = document.getElementById('flash-overlay');
+      if (bassFXEnabled && bassAvg > 0.65) {
+        flashOverlay.style.opacity = (bassAvg - 0.5) * 1.5;
+        camera.position.x += (Math.random() - 0.5) * bassAvg * 0.8;
+        camera.position.y += (Math.random() - 0.5) * bassAvg * 0.8;
+      } else {
+        flashOverlay.style.opacity = 0;
+      }
+
+      // Auto Camera Flyby
+      if (autoOrbitCamera) {
+        camera.position.x = Math.sin(elapsedTime * 0.2) * 60;
+        camera.position.z = Math.cos(elapsedTime * 0.2) * 60;
+        camera.position.y = 20 + Math.sin(elapsedTime * 0.3) * 10;
+        camera.lookAt(0, 0, 0);
+      }
+
+      // Render Active Mode Animations
+      if (activeMode === 'grid') {
+        gridBars.forEach((bar, idx) => {
+          const freqValue = dataArray ? dataArray[idx % dataArray.length] / 255.0 : 0.1;
+          const targetScale = Math.max(0.2, freqValue * 18 * sensitivity);
+          bar.scale.y += (targetScale - bar.scale.y) * 0.2;
+          bar.material.emissive.setHex(getThemeColors().primary);
+          bar.material.emissiveIntensity = freqValue * sensitivity;
+        });
+      }
+
+      else if (activeMode === 'vortex') {
+        const posArr = vortexGeo.attributes.position.array;
+        const spinSpeed = 0.01 + bassAvg * 0.05;
+        horizonRing.rotation.z += spinSpeed;
+        horizonMesh.scale.setScalar(1.0 + bassAvg * 0.5);
+
+        for (let i = 0; i < vortexParticleCount; i++) {
+          vortexAngles[i] += (1 / vortexRadii[i]) * spinSpeed * 20;
+          const r = vortexRadii[i] + Math.sin(elapsedTime * 2 + i) * bassAvg * 2;
+          posArr[i * 3] = Math.cos(vortexAngles[i]) * r;
+          posArr[i * 3 + 2] = Math.sin(vortexAngles[i]) * r;
+        }
+        vortexGeo.attributes.position.needsUpdate = true;
+      }
+
+      else if (activeMode === 'hypercube') {
+        hyperCubes.forEach((cube, idx) => {
+          const scale = 1.0 + (idx + 1) * bassAvg * 0.4;
+          cube.scale.setScalar(scale);
+          cube.rotation.x = elapsedTime * (0.2 + idx * 0.1);
+          cube.rotation.y = elapsedTime * (0.3 - idx * 0.05);
+          cube.material.opacity = 0.4 + bassAvg * 0.6;
+        });
+      }
+
+      else if (activeMode === 'helix') {
+        helixGroup.rotation.y = elapsedTime * 0.5;
+        helixNodes.forEach((node, idx) => {
+          const y = (idx - helixCount / 2) * 1.2;
+          const angle = idx * 0.3 + elapsedTime * 2.0;
+          const radius = 10 + bassAvg * 5;
+
+          const x1 = Math.cos(angle) * radius;
+          const z1 = Math.sin(angle) * radius;
+          const x2 = -x1;
+          const z2 = -z1;
+
+          node.n1.position.set(x1, y, z1);
+          node.n2.position.set(x2, y, z2);
+
+          const freqVal = dataArray ? dataArray[idx * 4 % dataArray.length] / 255.0 : 0.2;
+          node.n1.scale.setScalar(0.8 + freqVal * sensitivity * 1.5);
+          node.n2.scale.setScalar(0.8 + freqVal * sensitivity * 1.5);
+
+          // Update connecting bar
+          const pos = node.conn.geometry.attributes.position.array;
+          pos[0] = x1; pos[1] = y; pos[2] = z1;
+          pos[3] = x2; pos[4] = y; pos[5] = z2;
+          node.conn.geometry.attributes.position.needsUpdate = true;
+        });
+      }
+
+      else if (activeMode === 'supernova') {
+        supernovaGroup.rotation.y = elapsedTime * 0.2;
+        novaCubes.forEach((cube, idx) => {
+          const freqVal = dataArray ? dataArray[idx % dataArray.length] / 255.0 : 0.1;
+          const radius = cube.userData.baseRadius + freqVal * 25 * sensitivity;
+          cube.position.copy(cube.userData.dir).multiplyScalar(radius);
+          cube.rotation.x += 0.02;
+          cube.rotation.y += 0.03;
+          cube.material.emissive.setHex(getThemeColors().primary);
+          cube.material.emissiveIntensity = freqVal * 2;
+        });
+      }
+
+      else if (activeMode === 'tunnel') {
+        tunnelRings.forEach((ring, idx) => {
+          ring.position.z += 0.4 + bassAvg * 1.2;
+          if (ring.position.z > 20) ring.position.z = - (ringCount - 1) * 6;
+
+          const freqVal = dataArray ? dataArray[idx * 8 % dataArray.length] / 255.0 : 0.1;
+          ring.scale.setScalar(1.0 + freqVal * sensitivity * 0.8);
+          ring.material.emissive.setHex(getThemeColors().primary);
+          ring.material.emissiveIntensity = freqVal * sensitivity * 1.5;
+        });
+      }
+
+      else if (activeMode === 'landscape') {
+        const posAttr = landGeo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          const u = i % 33;
+          const v = Math.floor(i / 33);
+          const freqVal = dataArray ? dataArray[(u + v) * 3 % dataArray.length] / 255.0 : 0;
+          const height = Math.sin(u * 0.5 + elapsedTime * 3) * Math.cos(v * 0.5 + elapsedTime * 3) * 4 + freqVal * 15 * sensitivity;
+          posAttr.setY(i, height);
+        }
+        posAttr.needsUpdate = true;
+      }
+
+      else if (activeMode === 'sphere') {
+        sphereGroup.rotation.y = elapsedTime * 0.3;
+        sphereGroup.rotation.x = elapsedTime * 0.1;
+
+        const posAttr = sphereParticlesGeo.attributes.position;
+        for (let i = 0; i < particleCount; i++) {
+          const freqVal = dataArray ? dataArray[i % dataArray.length] / 255.0 : 0.1;
+          const expansion = 1.0 + freqVal * sensitivity * 0.6 + bassAvg * 0.4;
+
+          posAttr.setXYZ(
+            i,
+            basePositions[i * 3] * expansion,
+            basePositions[i * 3 + 1] * expansion,
+            basePositions[i * 3 + 2] * expansion
+          );
+        }
+        posAttr.needsUpdate = true;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Handle Window Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start 3D Render Loop & Default Audio Track
+    applyTheme();
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "gpu_specs": {
+    "key": "gpu_specs",
+    "fact": "User has an NVIDIA RTX 4060 graphics card with 8GB VRAM.",
+    "category": "hardware",
+    "updatedAt": "2026-08-22T18:06:13.375Z"
+  },
+  "aesthetic_preference": {
+    "key": "aesthetic_preference",
+    "fact": "User loves cyberpunk themes (neon, futuristic, dystopian tech aesthetics).",
+    "category": "preference",
+    "updatedAt": "2026-08-22T18:06:13.379Z"
+  },
+  "open_files_after_build": {
+    "key": "open_files_after_build",
+    "fact": "The user wants every completed file (HTML apps, games, dashboards, etc.) automatically opened in the browser/desktop app via the open_in_browser_or_app tool immediately after finishing building or updating it. Never finish a build without opening the result.",
+    "category": "preference",
+    "updatedAt": "2026-08-23T20:01:02.791Z"
+  },
+  "android_auto_launch_emulator": {
+    "key": "android_auto_launch_emulator",
+    "fact": "Always automatically launch and open built Android APKs in the Android emulator immediately upon compiling so the user can inspect/see it right away.",
+    "category": "user_preferences",
+    "updatedAt": "2026-08-24T10:34:52.393Z"
+  },
+  "auto_open_html_files": {
+    "key": "auto_open_html_files",
+    "fact": "Always automatically launch/open any newly created or modified HTML file in the user's browser using open_in_browser_or_app upon finishing.",
+    "category": "preference",
+    "updatedAt": "2026-08-24T10:41:45.749Z"
+  },
+  "launch_html_protocol": {
+    "key": "launch_html_protocol",
+    "fact": "When building or updating .html files, visual apps, or dashboards, do NOT use explorer.exe or default open. Launch them via powershell Start-Process 'file:///<full-path-to-file.html>' (or cmd /c start '' '<full-path-to-file.html>') and ALWAYS provide a clickable Markdown link in the final response: [Click here to open app](file:///<full-path-to-file.html>)",
+    "category": "preference",
+    "updatedAt": "2026-08-24T10:44:05.592Z"
+  },
+  "auto_launch_apk_emulator": {
+    "key": "auto_launch_apk_emulator",
+    "fact": "Always automatically install and launch any built Android APK in the Android Emulator using test_android_app(action='install_and_launch') and capture a screenshot.",
+    "category": "preference",
+    "updatedAt": "2026-08-24T11:04:15.196Z"
+  }
+}

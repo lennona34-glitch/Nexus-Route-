@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production / Build Output
+dist/
+build/
+
+# Environment and Secrets
+.env
+.env.local
+.env.production
+data/.admin_secret
+config/virtual_keys.json
+config/provider_connections.json
+config/route_history.json
+
+# Local Workspace and Generated Content
+workspace/art/*
+!workspace/art/.gitkeep
+workspace/projects/*
+workspace/chats/*
+workspace/android/*
+workspace/windows/*
+workspace/plugins/*
+workspace/context/raw/*
+!workspace/context/raw/.gitkeep
+
+# Python & AI Models
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+*.pt
+*.safetensors
+*.bin
+
+# Logs and OS files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db

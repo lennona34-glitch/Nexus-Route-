@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SUPERMAN: VECTOR EARTH DEFENSE 3D</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body {
+    background-color: #020510;
+    overflow: hidden;
+    font-family: 'Courier New', Courier, monospace;
+    color: #00ffff;
+    cursor: crosshair;
+  }
+  #webgl-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    z-index: 1;
+  }
+  #ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .hud-panel {
+    position: absolute;
+    background: rgba(3, 10, 24, 0.75);
+    border: 1px solid #00ffff;
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.4), inset 0 0 8px rgba(0, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 10px 16px;
+    letter-spacing: 1.5px;
+  }
+  #top-hud {
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 30px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .hud-stat span { color: #fff; text-shadow: 0 0 6px #00ffff; font-size: 18px; }
+  #hp-bar-outer {
+    width: 140px;
+    height: 12px;
+    border: 1px solid #ff2a55;
+    background: rgba(255, 42, 85, 0.2);
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  #hp-bar-inner {
+    width: 100%;
+    height: 100%;
+    background: #ff2a55;
+    box-shadow: 0 0 8px #ff2a55;
+    transition: width 0.1s ease;
+  }
+  #control-legend {
+    bottom: 15px;
+    left: 15px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #79f7ff;
+  }
+  .key-badge {
+    background: #00ffff;
+    color: #030611;
+    font-weight: bold;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  #crosshair {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+  }
+  #crosshair-svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 4px #ff3344);
+  }
+  #target-lock {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: bold;
+    color: #ff3344;
+    letter-spacing: 1px;
+    display: none;
+    white-space: nowrap;
+  }
+  #start-modal, #gameover-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(3, 8, 20, 0.95);
+    border: 2px solid #00ffff;
+    box-shadow: 0 0 35px rgba(0, 255, 255, 0.6), inset 0 0 20px rgba(0, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 30px 40px;
+    text-align: center;
+    pointer-events: auto;
+    z-index: 100;
+  }
+  #gameover-modal { display: none; border-color: #ff2a55; box-shadow: 0 0 35px rgba(255, 42, 85, 0.6); }
+  h1 {
+    font-size: 26px;
+    letter-spacing: 4px;
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+    margin-bottom: 12px;
+  }
+  p {
+    font-size: 13px;
+    color: #8cefff;
+    line-height: 1.7;
+    margin-bottom: 20px;
+    max-width: 440px;
+  }
+  .btn-action {
+    background: #00ffff;
+    color: #030611;
+    border: none;
+    padding: 12px 28px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    box-shadow: 0 0 16px #00ffff;
+    transition: all 0.2s;
+  }
+  .btn-action:hover {
+    background: #ffffff;
+    box-shadow: 0 0 26px #00ffff;
+    transform: scale(1.05);
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<canvas id="webgl-canvas"></canvas>
+
+<div id="ui-layer">
+  <!-- Crosshair -->
+  <div id="crosshair">
+    <div id="target-lock">TARGET ACQUIRED</div>
+    <svg id="crosshair-svg" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="38" fill="none" stroke="#ff2244" stroke-width="3" stroke-dasharray="8 6"/>
+      <circle cx="50" cy="50" r="12" fill="none" stroke="#00ffff" stroke-width="2"/>
+      <line x1="50" y1="5" x2="50" y2="28" stroke="#ff2244" stroke-width="3"/>
+      <line x1="50" y1="72" x2="50" y2="95" stroke="#ff2244" stroke-width="3"/>
+      <line x1="5" y1="50" x2="28" y2="50" stroke="#ff2244" stroke-width="3"/>
+      <line x1="72" y1="50" x2="95" y2="50" stroke="#ff2244" stroke-width="3"/>
+      <circle cx="50" cy="50" r="3" fill="#ff2244"/>
+    </svg>
+  </div>
+
+  <!-- HUD Status Bar -->
+  <div id="top-hud" class="hud-panel">
+    <div class="hud-stat">DEFENSE SCORE: <span id="score-val">0</span></div>
+    <div class="hud-stat">WAVE: <span id="wave-val">1</span></div>
+    <div class="hud-stat">
+      SHIELD INTEGRITY:
+      <div id="hp-bar-outer"><div id="hp-bar-inner"></div></div>
+    </div>
+    <div class="hud-stat">SPEED: <span id="speed-val">MACH 1.0</span></div>
+  </div>
+
+  <!-- Flight Controls Panel -->
+  <div id="control-legend" class="hud-panel">
+    <div><span class="key-badge">MOUSE MOVE</span> AIM CROSSHAIR & VERTICAL FLIGHT</div>
+    <div><span class="key-badge">LEFT CLICK / HOLD</span> RUBY HEAT VISION EYE BEAMS</div>
+    <div><span class="key-badge">RIGHT CLICK / SPACE</span> MACH 16 HYPERSONIC BOOST</div>
+    <div><span class="key-badge">W / S</span> ALTITUDE CLIMB / DIVE</div>
+  </div>
+
+  <!-- Start Modal -->
+  <div id="start-modal">
+    <h1>SUPERMAN 3D: VECTOR DEFENSE</h1>
+    <p>
+      Imperial TIE fighters are swarming low Earth orbit! Superman flies from <b>Left to Right</b> across the centered globe. Use your mouse to aim twin Ruby Heat Vision eye beams and vaporize incoming hostiles!
+    </p>
+    <button class="btn-action" id="start-btn">ENGAGE ORBIT</button>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="gameover-modal">
+    <h1 style="color:#ff2a55; text-shadow:0 0 10px #ff2a55;">DEFENSE COMPROMISED</h1>
+    <p>Superman took critical orbital damage.<br>Final Score: <span id="final-score" style="color:#00ffff; font-weight:bold; font-size:18px;">0</span></p>
+    <button class="btn-action" id="restart-btn" style="background:#ff2a55; box-shadow:0 0 18px #ff2a55;">RETRY SORTIE</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- AUDIO SYNTHESIZER ---
+  const AudioEngine = {
+    ctx: null,
+    init() {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+      }
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+    },
+    playLaser() {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1400, t);
+      osc.frequency.exponentialRampToValueAtTime(180, t + 0.14);
+      gain.gain.setValueAtTime(0.2, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.15);
+    },
+    playExplosion(isBoss) {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      const dur = isBoss ? 0.7 : 0.35;
+      const bufferSize = this.ctx.sampleRate * dur;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(isBoss ? 450 : 800, t);
+      filter.frequency.exponentialRampToValueAtTime(40, t + dur);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(isBoss ? 0.45 : 0.28, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(t);
+    },
+    playTieLaser() {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(750, t);
+      osc.frequency.exponentialRampToValueAtTime(90, t + 0.12);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.13);
+    }
+  };
+
+  // --- THREE.JS SCENE SETUP ---
+  const canvas = document.getElementById('webgl-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x020510, 1);
+
+  const scene = new THREE.Scene();
+
+  // Camera positioned looking directly at (0, 0, 0)
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 3000);
+  camera.position.set(0, 0, 320);
+  camera.lookAt(0, 0, 0);
+
+  // --- GAME STATE ---
+  const state = {
+    running: false,
+    score: 0,
+    wave: 1,
+    hp: 100,
+    maxHp: 100,
+    boosting: false,
+    firing: false,
+    lastFireTime: 0,
+    mouseX: 0,
+    mouseY: 0,
+    screenMouseX: window.innerWidth / 2,
+    screenMouseY: window.innerHeight / 2,
+    keys: {},
+    enemies: [],
+    playerLasers: [],
+    enemyLasers: [],
+    particles: [],
+    shockwaves: [],
+    enemySpawnTimer: 0,
+    bossSpawnTimer: 0
+  };
+
+  // --- 1. CENTERED 3D VECTOR GLOBE (EARTH) ---
+  const globeGroup = new THREE.Group();
+  globeGroup.position.set(0, 0, -20); // DEAD CENTER of screen
+  scene.add(globeGroup);
+
+  const R = 95; // Radius of Globe
+
+  // Latitude / Longitude Vector Wireframe Sphere
+  const sphereGeo = new THREE.SphereGeometry(R, 32, 18);
+  const sphereWire = new THREE.WireframeGeometry(sphereGeo);
+  const sphereMat = new THREE.LineBasicMaterial({
+    color: 0x0088cc,
+    transparent: true,
+    opacity: 0.4
+  });
+  const globeWireMesh = new THREE.LineSegments(sphereWire, sphereMat);
+  globeGroup.add(globeWireMesh);
+
+  // Equator and Tropical Rings
+  function createGlowingRing(radius, yPos, color, opacity) {
+    const pts = [];
+    const segs = 64;
+    for (let i = 0; i <= segs; i++) {
+      const theta = (i / segs) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(theta) * radius, yPos, Math.sin(theta) * radius));
+    }
+    const geom = new THREE.BufferGeometry().setFromPoints(pts);
+    return new THREE.Line(geom, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  }
+  globeGroup.add(createGlowingRing(R * 1.002, 0, 0x00ffff, 0.8)); // Equator
+  globeGroup.add(createGlowingRing(R * 0.92, R * 0.38, 0x00aaff, 0.45)); // Tropic of Cancer
+  globeGroup.add(createGlowingRing(R * 0.92, -R * 0.38, 0x00aaff, 0.45)); // Tropic of Capricorn
+
+  // Outer Holographic Atmospheric Shell
+  const atmoGeo = new THREE.SphereGeometry(R * 1.08, 22, 12);
+  const atmoWire = new THREE.WireframeGeometry(atmoGeo);
+  const atmoMat = new THREE.LineBasicMaterial({
+    color: 0x00ffff,
+    transparent: true,
+    opacity: 0.15
+  });
+  const atmoMesh = new THREE.LineSegments(atmoWire, atmoMat);
+  globeGroup.add(atmoMesh);
+
+  // Helper for Spherical Vector Coastlines
+  function latLonToVec3(lat, lon, radius) {
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lon + 180) * (Math.PI / 180);
+    return new THREE.Vector3(
+      -(radius * Math.sin(phi) * Math.cos(theta)),
+      radius * Math.cos(phi),
+      radius * Math.sin(phi) * Math.sin(theta)
+    );
+  }
+
+  function addCoastline(coords, color = 0x00ff88) {
+    const pts = coords.map(([lat, lon]) => latLonToVec3(lat, lon, R * 1.005));
+    const geom = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95 }));
+    globeGroup.add(line);
+  }
+
+  // Accurate Vector Continents Polylines
+  addCoastline([[70,-160],[72,-130],[65,-80],[50,-55],[44,-65],[30,-80],[25,-80],[20,-90],[15,-92],[8,-77],[15,-97],[20,-105],[30,-115],[38,-123],[48,-124],[58,-140],[65,-168],[70,-160]]);
+  addCoastline([[10,-75],[5,-52],[-5,-35],[-22,-40],[-35,-55],[-54,-68],[-45,-75],[-20,-70],[-5,-80],[5,-77],[10,-75]]);
+  addCoastline([[36,-6],[44,8],[38,24],[30,32],[40,28],[42,44],[30,50],[25,60],[10,75],[15,80],[22,90],[10,105],[20,110],[30,120],[40,125],[60,140],[70,170],[75,100],[70,60],[70,30],[60,5],[50,2],[44,-2],[36,-6]]);
+  addCoastline([[35,-6],[37,10],[32,30],[12,45],[0,42],[-10,40],[-25,32],[-34,18],[-20,12],[-5,10],[5,2],[5,-10],[15,-17],[25,-15],[35,-6]]);
+  addCoastline([[-12,130],[-15,136],[-12,142],[-24,153],[-37,150],[-38,140],[-32,116],[-22,114],[-15,124],[-12,130]]);
+  addCoastline([[58,-5],[58,-2],[50,0],[50,-5],[54,-4],[58,-5]]);
+  addCoastline([[44,142],[40,140],[35,135],[32,130],[34,132],[38,138],[44,142]]);
+  addCoastline([[-68,-60],[-65,0],[-65,60],[-68,120],[-70,180],[-70,-120],[-68,-60]]);
+
+  // Defense Ground Uplink Beacons (Metropolis, Tokyo, London, Sydney, Fortress)
+  const beaconCities = [
+    { name: "Metropolis", lat: 40.7, lon: -74 },
+    { name: "Fortress", lat: 82.0, lon: -40 },
+    { name: "Tokyo", lat: 35.6, lon: 139.7 },
+    { name: "London", lat: 51.5, lon: -0.1 },
+    { name: "Sydney", lat: -33.8, lon: 151.2 }
+  ];
+  beaconCities.forEach(city => {
+    const base = latLonToVec3(city.lat, city.lon, R);
+    const top = latLonToVec3(city.lat, city.lon, R + 12);
+    const geom = new THREE.BufferGeometry().setFromPoints([base, top]);
+    const beacon = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.95 }));
+    globeGroup.add(beacon);
+
+    const ringPts = [];
+    for(let i=0; i<=12; i++){
+      const th = (i/12) * Math.PI * 2;
+      ringPts.push(new THREE.Vector3(Math.cos(th)*2, 0, Math.sin(th)*2));
+    }
+    const rGeom = new THREE.BufferGeometry().setFromPoints(ringPts);
+    const rMesh = new THREE.Line(rGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.8 }));
+    rMesh.position.copy(top);
+    rMesh.lookAt(top.clone().multiplyScalar(2));
+    globeGroup.add(rMesh);
+  });
+
+  // Orbital Vector Rings around Earth
+  const ring1 = createGlowingRing(R * 1.4, 0, 0x00ffff, 0.25);
+  ring1.rotation.x = Math.PI * 0.15;
+  ring1.rotation.z = Math.PI * 0.1;
+  globeGroup.add(ring1);
+
+  const ring2 = createGlowingRing(R * 1.6, 0, 0xff0055, 0.2);
+  ring2.rotation.x = -Math.PI * 0.2;
+  ring2.rotation.y = Math.PI * 0.25;
+  globeGroup.add(ring2);
+
+  // Background 3D Vector Starfield
+  const starPts = [];
+  for (let i = 0; i < 800; i++) {
+    const sx = (Math.random() - 0.5) * 1600;
+    const sy = (Math.random() - 0.5) * 1000;
+    const sz = -300 + (Math.random() - 0.5) * 1000;
+    starPts.push(new THREE.Vector3(sx, sy, sz));
+  }
+  const starGeo = new THREE.BufferGeometry().setFromPoints(starPts);
+  const starMat = new THREE.PointsMaterial({ color: 0x77ccff, size: 2.2, transparent: true, opacity: 0.8 });
+  scene.add(new THREE.Points(starGeo, starMat));
+
+
+  // --- 2. 3D VECTOR SUPERMAN MODEL (Left to Right Flight) ---
+  const superman = new THREE.Group();
+  superman.position.set(-130, 0, 60);
+  scene.add(superman);
+
+  // Torso - Wireframe (Pointing +X horizontally)
+  const torsoGeo = new THREE.CylinderGeometry(2.4, 1.8, 11, 8, 2);
+  const torsoWire = new THREE.WireframeGeometry(torsoGeo);
+  const blueWireMat = new THREE.LineBasicMaterial({ color: 0x0088ff });
+  const redWireMat = new THREE.LineBasicMaterial({ color: 0xff1144 });
+  const yellowMat = new THREE.LineBasicMaterial({ color: 0xffea00 });
+
+  const torsoMesh = new THREE.LineSegments(torsoWire, blueWireMat);
+  torsoMesh.rotation.z = -Math.PI / 2; // Lie horizontal
+  superman.add(torsoMesh);
+
+  // Head
+  const headGeo = new THREE.SphereGeometry(2.2, 8, 6);
+  const headMesh = new THREE.LineSegments(new THREE.WireframeGeometry(headGeo), new THREE.LineBasicMaterial({ color: 0xffd1a4 }));
+  headMesh.position.set(7.2, 0, 0);
+  superman.add(headMesh);
+
+  // Glowing Vector Eyes
+  const eyeL = new THREE.Vector3(8.5, 0.6, 0.8);
+  const eyeR = new THREE.Vector3(8.5, 0.6, -0.8);
+  const eyeMesh = new THREE.Points(
+    new THREE.BufferGeometry().setFromPoints([eyeL, eyeR]),
+    new THREE.PointsMaterial({ color: 0xff0044, size: 3.5 })
+  );
+  superman.add(eyeMesh);
+
+  // 'S' Chest Shield
+  const shieldPts = [
+    new THREE.Vector3(1.5, 2.2, 0),
+    new THREE.Vector3(4.0, 2.2, 1.2),
+    new THREE.Vector3(4.8, 2.2, 0),
+    new THREE.Vector3(4.0, 2.2, -1.2),
+    new THREE.Vector3(1.5, 2.2, 0)
+  ];
+  superman.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(shieldPts), yellowMat));
+
+  // Extended Arms Outstretched Forward (+X)
+  function createArm(zOffset) {
+    const pts = [
+      new THREE.Vector3(4.0, 0.8, zOffset * 1.8),
+      new THREE.Vector3(8.5, 0.5, zOffset * 1.5),
+      new THREE.Vector3(12.5, 0.3, zOffset * 0.8)
+    ];
+    return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), blueWireMat);
+  }
+  superman.add(createArm(1));
+  superman.add(createArm(-1));
+
+  // Legs & Boots trailing backward (-X)
+  function createLeg(zOffset) {
+    const legPts = [
+      new THREE.Vector3(-5.5, 0, zOffset * 1.0),
+      new THREE.Vector3(-12.0, -0.2, zOffset * 0.8)
+    ];
+    const bootPts = [
+      new THREE.Vector3(-12.0, -0.2, zOffset * 0.8),
+      new THREE.Vector3(-17.0, -0.4, zOffset * 0.5)
+    ];
+    const legLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(legPts), blueWireMat);
+    const bootLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(bootPts), redWireMat);
+    const legGrp = new THREE.Group();
+    legGrp.add(legLine);
+    legGrp.add(bootLine);
+    return legGrp;
+  }
+  superman.add(createLeg(1));
+  superman.add(createLeg(-1));
+
+  // Flowing Vector Cape
+  const capeRows = 4;
+  const capeCols = 6;
+  const capeGeo = new THREE.PlaneGeometry(16, 6, capeCols - 1, capeRows - 1);
+  const capeWire = new THREE.WireframeGeometry(capeGeo);
+  const capeMat = new THREE.LineBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.9 });
+  const capeMesh = new THREE.LineSegments(capeWire, capeMat);
+  capeMesh.position.set(-9.5, 0.8, 0);
+  capeMesh.rotation.y = Math.PI / 2;
+  superman.add(capeMesh);
+
+
+  // --- 3. 3D CONVERGENT MOUSE CROSSHAIR & RAYCASTING ---
+  const raycaster = new THREE.Raycaster();
+  const mouseNdc = new THREE.Vector2();
+  const aimPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -40);
+  const target3D = new THREE.Vector3(120, 0, 40);
+
+  window.addEventListener('mousemove', (e) => {
+    state.screenMouseX = e.clientX;
+    state.screenMouseY = e.clientY;
+    mouseNdc.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNdc.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    const crosshair = document.getElementById('crosshair');
+    crosshair.style.left = e.clientX + 'px';
+    crosshair.style.top = e.clientY + 'px';
+  });
+
+  window.addEventListener('mousedown', (e) => {
+    AudioEngine.init();
+    if (e.button === 0) {
+      state.firing = true;
+      spawnPlayerLaser();
+    } else if (e.button === 2) {
+      state.boosting = true;
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) state.firing = false;
+    if (e.button === 2) state.boosting = false;
+  });
+
+  window.addEventListener('contextmenu', e => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    AudioEngine.init();
+    state.keys[e.code] = true;
+    if (e.code === 'Space') state.boosting = true;
+  });
+
+  window.addEventListener('keyup', (e) => {
+    state.keys[e.code] = false;
+    if (e.code === 'Space') state.boosting = false;
+  });
+
+
+  // --- 4. LASER WEAPONS & COMBAT SYSTEM ---
+  function spawnPlayerLaser() {
+    if (!state.running) return;
+    state.lastFireTime = performance.now();
+    AudioEngine.playLaser();
+
+    const headWorld = new THREE.Vector3();
+    headMesh.getWorldPosition(headWorld);
+
+    const leftEyePos = headWorld.clone().add(new THREE.Vector3(1.2, 0.5, 0.8));
+    const rightEyePos = headWorld.clone().add(new THREE.Vector3(1.2, 0.5, -0.8));
+
+    const dirL = target3D.clone().sub(leftEyePos).normalize();
+    const dirR = target3D.clone().sub(rightEyePos).normalize();
+
+    function createBeam(origin, dir) {
+      const length = 28;
+      const pts = [
+        origin.clone(),
+        origin.clone().add(dir.clone().multiplyScalar(length))
+      ];
+      const geom = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: 0xff0044, linewidth: 2 });
+      const line = new THREE.Line(geom, mat);
+      scene.add(line);
+
+      return {
+        mesh: line,
+        pos: origin.clone(),
+        dir: dir,
+        speed: 360,
+        length: length,
+        life: 1.3
+      };
+    }
+
+    state.playerLasers.push(createBeam(leftEyePos, dirL));
+    state.playerLasers.push(createBeam(rightEyePos, dirR));
+  }
+
+  function spawnEnemyLaser(origin, targetPos) {
+    AudioEngine.playTieLaser();
+    const dir = targetPos.clone().sub(origin).normalize();
+    const length = 18;
+    const pts = [
+      origin.clone(),
+      origin.clone().add(dir.clone().multiplyScalar(length))
+    ];
+    const geom = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: 0x00ff66, linewidth: 2 });
+    const line = new THREE.Line(geom, mat);
+    scene.add(line);
+
+    state.enemyLasers.push({
+      mesh: line,
+      pos: origin.clone(),
+      dir: dir,
+      speed: 210,
+      length: length,
+      life: 2.2
+    });
+  }
+
+
+  // --- 5. ENEMY TIE FIGHTER BUILDERS ---
+  function createTieInterceptor(isBoss = false) {
+    const tieGroup = new THREE.Group();
+    const scale = isBoss ? 2.4 : 1.0;
+    const color = isBoss ? 0xff00ff : 0x00ffff;
+
+    // Cockpit
+    const cockGeo = new THREE.SphereGeometry(2.4 * scale, 8, 6);
+    const cockMesh = new THREE.LineSegments(new THREE.WireframeGeometry(cockGeo), new THREE.LineBasicMaterial({ color }));
+    tieGroup.add(cockMesh);
+
+    // Front viewport
+    const vpGeo = new THREE.CircleGeometry(1.4 * scale, 6);
+    const vpMesh = new THREE.Line(new THREE.WireframeGeometry(vpGeo), new THREE.LineBasicMaterial({ color: 0xff2255 }));
+    vpMesh.position.set(-2.5 * scale, 0, 0);
+    vpMesh.rotation.y = Math.PI / 2;
+    tieGroup.add(vpMesh);
+
+    // Wing Struts
+    const strutGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, -6 * scale),
+      new THREE.Vector3(0, 0, 6 * scale)
+    ]);
+    tieGroup.add(new THREE.Line(strutGeo, new THREE.LineBasicMaterial({ color })));
+
+    // Hexagonal Solar Fins
+    function createWing(zPos) {
+      const wingPts = [
+        new THREE.Vector3(-6 * scale, 5 * scale, zPos),
+        new THREE.Vector3(5 * scale, 7 * scale, zPos),
+        new THREE.Vector3(7 * scale, 0, zPos),
+        new THREE.Vector3(5 * scale, -7 * scale, zPos),
+        new THREE.Vector3(-6 * scale, -5 * scale, zPos),
+        new THREE.Vector3(-2 * scale, 0, zPos),
+        new THREE.Vector3(-6 * scale, 5 * scale, zPos)
+      ];
+      return new THREE.Line(new THREE.BufferGeometry().setFromPoints(wingPts), new THREE.LineBasicMaterial({ color }));
+    }
+    tieGroup.add(createWing(-6 * scale));
+    tieGroup.add(createWing(6 * scale));
+
+    // Spawn from the Right (+X) side of the screen
+    const spawnY = (Math.random() - 0.5) * 160;
+    const spawnZ = 20 + (Math.random() - 0.5) * 100;
+    const spawnX = 220 + Math.random() * 40;
+
+    tieGroup.position.set(spawnX, spawnY, spawnZ);
+    scene.add(tieGroup);
+
+    return {
+      mesh: tieGroup,
+      isBoss: isBoss,
+      hp: isBoss ? 20 : 2,
+      maxHp: isBoss ? 20 : 2,
+      radius: 6 * scale,
+      speed: isBoss ? 35 : (65 + Math.random() * 30),
+      shootCooldown: 1.2 + Math.random() * 1.5,
+      lastShot: performance.now() + Math.random() * 1000,
+      phase: Math.random() * Math.PI * 2
+    };
+  }
+
+  // --- 6. VECTOR PARTICLE & SHOCKWAVE EXPLOSIONS ---
+  function spawnExplosion(pos, isBoss = false) {
+    AudioEngine.playExplosion(isBoss);
+
+    const count = isBoss ? 55 : 24;
+    for (let i = 0; i < count; i++) {
+      const pDir = new THREE.Vector3(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.5) * 2
+      ).normalize();
+      const pSpeed = (isBoss ? 80 : 50) * (0.4 + Math.random() * 0.8);
+      const color = Math.random() > 0.4 ? (isBoss ? 0xff00ff : 0x00ffff) : 0xff3355;
+
+      const pPts = [pos.clone(), pos.clone().add(pDir.clone().multiplyScalar(3.5))];
+      const pGeom = new THREE.BufferGeometry().setFromPoints(pPts);
+      const pLine = new THREE.Line(pGeom, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1 }));
+      scene.add(pLine);
+
+      state.particles.push({
+        mesh: pLine,
+        pos: pos.clone(),
+        vel: pDir.multiplyScalar(pSpeed),
+        life: 0.6 + Math.random() * 0.4,
+        maxLife: 1.0
+      });
+    }
+
+    const ringPts = [];
+    for (let i = 0; i <= 32; i++) {
+      const th = (i / 32) * Math.PI * 2;
+      ringPts.push(new THREE.Vector3(Math.cos(th), Math.sin(th), 0));
+    }
+    const rGeom = new THREE.BufferGeometry().setFromPoints(ringPts);
+    const rMat = new THREE.LineBasicMaterial({ color: isBoss ? 0xff00ff : 0x00ffff, transparent: true, opacity: 1 });
+    const shockwave = new THREE.Line(rGeom, rMat);
+    shockwave.position.copy(pos);
+    shockwave.lookAt(camera.position);
+    scene.add(shockwave);
+
+    state.shockwaves.push({
+      mesh: shockwave,
+      scale: 1,
+      maxScale: isBoss ? 45 : 22,
+      opacity: 1
+    });
+  }
+
+
+  // --- 7. MAIN 60 FPS GAME ANIMATION LOOP ---
+  let lastFrameTime = performance.now();
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+    lastFrameTime = now;
+
+    // A. Center Globe Constant 3D Rotation
+    globeGroup.rotation.y += 0.18 * dt;
+    atmoMesh.rotation.y -= 0.08 * dt;
+    ring1.rotation.y += 0.05 * dt;
+    ring2.rotation.x -= 0.06 * dt;
+
+    if (!state.running) {
+      renderer.render(scene, camera);
+      return;
+    }
+
+    // B. Raycast 3D Target Point from Crosshair
+    raycaster.setFromCamera(mouseNdc, camera);
+    raycaster.ray.intersectPlane(aimPlane, target3D);
+
+    // Target lock indicator
+    let targetLocked = false;
+    for (let enemy of state.enemies) {
+      const screenPos = enemy.mesh.position.clone().project(camera);
+      const ex = ((screenPos.x + 1) * window.innerWidth) / 2;
+      const ey = ((-screenPos.y + 1) * window.innerHeight) / 2;
+      const dist = Math.hypot(ex - state.screenMouseX, ey - state.screenMouseY);
+      if (dist < 40) {
+        targetLocked = true;
+        break;
+      }
+    }
+    document.getElementById('target-lock').style.display = targetLocked ? 'block' : 'none';
+
+    // C. Superman Flight Movement (Flies horizontally across Left-to-Right)
+    const targetY = THREE.MathUtils.clamp(target3D.y * 0.85, -80, 80);
+    const targetZ = THREE.MathUtils.clamp(target3D.z + 50, 40, 140);
+    let targetX = -130;
+
+    if (state.keys['KeyW'] || state.keys['ArrowUp']) superman.position.y += 65 * dt;
+    if (state.keys['KeyS'] || state.keys['ArrowDown']) superman.position.y -= 65 * dt;
+    if (state.keys['KeyA'] || state.keys['ArrowLeft']) targetX -= 40;
+    if (state.keys['KeyD'] || state.keys['ArrowRight']) targetX += 60;
+
+    const lerpSpeed = state.boosting ? 9.0 : 4.5;
+    superman.position.y = THREE.MathUtils.lerp(superman.position.y, targetY, dt * lerpSpeed);
+    superman.position.z = THREE.MathUtils.lerp(superman.position.z, targetZ, dt * lerpSpeed);
+    superman.position.x = THREE.MathUtils.lerp(superman.position.x, targetX, dt * lerpSpeed);
+
+    // Dynamic Banking and Cape Physics
+    const pitch = (superman.position.y - targetY) * 0.015;
+    superman.rotation.z = -pitch;
+    superman.rotation.x = THREE.MathUtils.lerp(superman.rotation.x, (target3D.y - superman.position.y) * 0.008, dt * 5);
+
+    const waveSpeed = state.boosting ? 28 : 14;
+    const waveAmp = state.boosting ? 0.35 : 0.7;
+    const posAttr = capeGeo.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const u = (i % capeCols) / (capeCols - 1);
+      posAttr.setZ(i, Math.sin(now * 0.01 * waveSpeed + u * 8) * (u * waveAmp * 3.5));
+    }
+    posAttr.needsUpdate = true;
+
+    // Laser firing
+    if (state.firing && (now - state.lastFireTime > (state.boosting ? 100 : 160))) {
+      spawnPlayerLaser();
+    }
+
+    document.getElementById('speed-val').textContent = state.boosting ? "MACH 16.2 [BOOST]" : "MACH 3.8 [ORBIT]";
+    document.getElementById('speed-val').style.color = state.boosting ? "#ffea00" : "#00ffff";
+
+    // D. Inbound Enemy Spawning & Logic (Right to Left across Earth)
+    state.enemySpawnTimer += dt;
+    const spawnInterval = Math.max(0.6, 2.0 - state.wave * 0.15);
+    if (state.enemySpawnTimer > spawnInterval) {
+      state.enemySpawnTimer = 0;
+      state.enemies.push(createTieInterceptor(false));
+    }
+
+    state.bossSpawnTimer += dt;
+    if (state.bossSpawnTimer > 25.0) {
+      state.bossSpawnTimer = 0;
+      state.enemies.push(createTieInterceptor(true));
+      state.wave++;
+      document.getElementById('wave-val').textContent = state.wave;
+    }
+
+    // Update Enemies
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+      const e = state.enemies[i];
+      e.mesh.position.x -= e.speed * dt;
+      e.mesh.position.y += Math.sin(now * 0.003 + e.phase) * (dt * 30);
+      e.mesh.rotation.x += dt * 1.5;
+
+      if (now - e.lastShot > e.shootCooldown * 1000 && e.mesh.position.x > superman.position.x) {
+        e.lastShot = now;
+        spawnEnemyLaser(e.mesh.position, superman.position);
+      }
+
+      if (e.mesh.position.distanceTo(superman.position) < e.radius + 6) {
+        spawnExplosion(e.mesh.position, e.isBoss);
+        scene.remove(e.mesh);
+        state.enemies.splice(i, 1);
+        damagePlayer(e.isBoss ? 35 : 15);
+        continue;
+      }
+
+      if (e.mesh.position.x < -240) {
+        scene.remove(e.mesh);
+        state.enemies.splice(i, 1);
+      }
+    }
+
+    // E. Update Player Lasers
+    for (let i = state.playerLasers.length - 1; i >= 0; i--) {
+      const l = state.playerLasers[i];
+      l.pos.add(l.dir.clone().multiplyScalar(l.speed * dt));
+      l.life -= dt;
+
+      const pts = [l.pos.clone(), l.pos.clone().add(l.dir.clone().multiplyScalar(l.length))];
+      l.mesh.geometry.setFromPoints(pts);
+
+      let hit = false;
+      for (let j = state.enemies.length - 1; j >= 0; j--) {
+        const enemy = state.enemies[j];
+        if (l.pos.distanceTo(enemy.mesh.position) < enemy.radius + 3) {
+          hit = true;
+          enemy.hp--;
+          spawnExplosion(l.pos, false);
+
+          if (enemy.hp <= 0) {
+            spawnExplosion(enemy.mesh.position, enemy.isBoss);
+            state.score += enemy.isBoss ? 500 : 100;
+            document.getElementById('score-val').textContent = state.score;
+            scene.remove(enemy.mesh);
+            state.enemies.splice(j, 1);
+          }
+          break;
+        }
+      }
+
+      if (hit || l.life <= 0) {
+        scene.remove(l.mesh);
+        l.mesh.geometry.dispose();
+        state.playerLasers.splice(i, 1);
+      }
+    }
+
+    // F. Update Enemy Lasers
+    for (let i = state.enemyLasers.length - 1; i >= 0; i--) {
+      const el = state.enemyLasers[i];
+      el.pos.add(el.dir.clone().multiplyScalar(el.speed * dt));
+      el.life -= dt;
+
+      const pts = [el.pos.clone(), el.pos.clone().add(el.dir.clone().multiplyScalar(el.length))];
+      el.mesh.geometry.setFromPoints(pts);
+
+      if (el.pos.distanceTo(superman.position) < 7.5) {
+        damagePlayer(8);
+        spawnExplosion(el.pos, false);
+        scene.remove(el.mesh);
+        state.enemyLasers.splice(i, 1);
+        continue;
+      }
+
+      if (el.life <= 0) {
+        scene.remove(el.mesh);
+        el.mesh.geometry.dispose();
+        state.enemyLasers.splice(i, 1);
+      }
+    }
+
+    // G. Update Particles & Shockwaves
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.pos.add(p.vel.clone().multiplyScalar(dt));
+      p.life -= dt;
+
+      const pts = [p.pos.clone(), p.pos.clone().add(p.vel.clone().multiplyScalar(0.04))];
+      p.mesh.geometry.setFromPoints(pts);
+      p.mesh.material.opacity = p.life / p.maxLife;
+
+      if (p.life <= 0) {
+        scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        state.particles.splice(i, 1);
+      }
+    }
+
+    for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+      const s = state.shockwaves[i];
+      s.scale += dt * 32;
+      s.mesh.scale.set(s.scale, s.scale, s.scale);
+      s.opacity = Math.max(0, 1 - s.scale / s.maxScale);
+      s.mesh.material.opacity = s.opacity;
+
+      if (s.scale >= s.maxScale) {
+        scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        state.shockwaves.splice(i, 1);
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  function damagePlayer(amount) {
+    state.hp = Math.max(0, state.hp - amount);
+    document.getElementById('hp-bar-inner').style.width = (state.hp / state.maxHp * 100) + '%';
+
+    renderer.setClearColor(0x330011, 1);
+    setTimeout(() => renderer.setClearColor(0x020510, 1), 60);
+
+    if (state.hp <= 0) {
+      gameOver();
+    }
+  }
+
+  function gameOver() {
+    state.running = false;
+    document.getElementById('final-score').textContent = state.score;
+    document.getElementById('gameover-modal').style.display = 'block';
+  }
+
+  function resetGame() {
+    state.score = 0;
+    state.wave = 1;
+    state.hp = 100;
+    document.getElementById('score-val').textContent = '0';
+    document.getElementById('wave-val').textContent = '1';
+    document.getElementById('hp-bar-inner').style.width = '100%';
+
+    state.enemies.forEach(e => scene.remove(e.mesh));
+    state.playerLasers.forEach(l => scene.remove(l.mesh));
+    state.enemyLasers.forEach(el => scene.remove(el.mesh));
+    state.particles.forEach(p => scene.remove(p.mesh));
+    state.shockwaves.forEach(s => scene.remove(s.mesh));
+    state.enemies = [];
+    state.playerLasers = [];
+    state.enemyLasers = [];
+    state.particles = [];
+    state.shockwaves = [];
+
+    superman.position.set(-130, 0, 60);
+    state.running = true;
+  }
+
+  // --- 8. UI HANDLERS ---
+  document.getElementById('start-btn').addEventListener('click', () => {
+    AudioEngine.init();
+    document.getElementById('start-modal').style.display = 'none';
+    resetGame();
+  });
+
+  document.getElementById('restart-btn').addEventListener('click', () => {
+    AudioEngine.init();
+    document.getElementById('gameover-modal').style.display = 'none';
+    resetGame();
+  });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Kick off animation loop
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

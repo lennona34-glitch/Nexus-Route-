@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fractal Chaos Explorer & Audio-Reactive Zoomer</title>
+  <style>
+    :root {
+      --bg: #070913;
+      --panel-bg: rgba(13, 17, 34, 0.78);
+      --panel-border: rgba(99, 102, 241, 0.25);
+      --panel-glow: rgba(99, 102, 241, 0.15);
+      --accent: #6366f1;
+      --accent-glow: #818cf8;
+      --accent-cyan: #06b6d4;
+      --accent-pink: #ec4899;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --glass: backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      color: var(--text);
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: crosshair;
+    }
+
+    canvas#glcanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Top HUD Bar */
+    .top-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .brand-hud {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 10px 18px;
+      border-radius: 14px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 32px var(--panel-glow);
+      pointer-events: auto;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-pink));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 14px;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(236, 72, 153, 0.5);
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .brand-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--accent-glow);
+      font-family: monospace;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .btn {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(12px);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: var(--accent-glow);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.6), rgba(236, 72, 153, 0.6));
+      border-color: var(--accent-pink);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.5);
+    }
+
+    /* Floating Panels */
+    .panel {
+      position: absolute;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1);
+      z-index: 10;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) transparent;
+    }
+
+    .panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .panel::-webkit-scrollbar-thumb {
+      background: var(--accent);
+      border-radius: 4px;
+    }
+
+    .panel-left {
+      top: 80px;
+      left: 16px;
+      width: 320px;
+    }
+
+    .panel-right {
+      top: 80px;
+      right: 16px;
+      width: 300px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .control-val {
+      color: var(--accent-glow);
+      font-family: monospace;
+      font-weight: 600;
+    }
+
+    .range-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      outline: none;
+      transition: background 0.2s;
+    }
+
+    .range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--accent-cyan);
+      border: 2px solid #fff;
+      transition: transform 0.15s ease;
+    }
+
+    .range-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 10px;
+      font-size: 12px;
+      outline: none;
+      transition: border 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    /* Preset Buttons */
+    .preset-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 10px;
+      text-align: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .preset-pill:hover {
+      background: rgba(99, 102, 241, 0.25);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .preset-pill.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    /* Audio Visualizer Scope */
+    #audio-scope {
+      width: 100%;
+      height: 64px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      display: block;
+    }
+
+    /* Bottom Status HUD */
+    .bottom-hud {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .status-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 8px 16px;
+      backdrop-filter: blur(14px);
+      font-family: monospace;
+      font-size: 11px;
+      display: flex;
+      gap: 16px;
+      pointer-events: auto;
+    }
+
+    .status-item {
+      display: flex;
+      gap: 6px;
+    }
+
+    .status-label {
+      color: var(--text-muted);
+    }
+
+    .status-value {
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    /* Custom Color Palette Selector Bar */
+    .palette-preview {
+      width: 100%;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.2);
+      cursor: pointer;
+      margin-top: 4px;
+      transition: transform 0.15s;
+    }
+
+    .palette-preview:hover {
+      transform: scale(1.02);
+    }
+
+    /* Crosshair Radar Overlay */
+    .radar-circle {
+      position: absolute;
+      pointer-events: none;
+      border: 1px dashed rgba(6, 182, 212, 0.4);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.2s, height 0.2s, opacity 0.2s;
+      z-index: 5;
+      display: none;
+    }
+
+    /* Keyboard Shortcuts Modal */
+    .modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      background: var(--panel-bg);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      padding: 24px;
+      width: 480px;
+      box-shadow: 0 0 50px rgba(99, 102, 241, 0.4);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .key-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 12px;
+    }
+
+    .key-badge {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: monospace;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .toggle-ui-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background WebGL Fractal Canvas -->
+  <div id="canvas-container">
+    <canvas id="glcanvas"></canvas>
+    <div id="radar" class="radar-circle"></div>
+  </div>
+
+  <!-- Top Navigation & Controls Bar -->
+  <div class="top-bar">
+    <div class="brand-hud">
+      <div class="brand-icon">&#x269B;</div>
+      <div>
+        <div class="brand-title">Fractal Chaos Explorer</div>
+        <div style="font-size: 9px; color: var(--text-muted); letter-spacing: 0.5px;">AUDIO-REACTIVE DEEP ZOOM ENGINE</div>
+      </div>
+      <span class="brand-tag">v2.5 GLSL</span>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn" id="btn-audio-toggle">
+        <span id="audio-icon">&#x1F507;</span> Synth: <span id="audio-state-text">OFF</span>
+      </button>
+      <button class="btn" id="btn-auto-flight">
+        <span>&#x2708;&#xFE0F;</span> Auto Zoom
+      </button>
+      <button class="btn" id="btn-reset-view">
+        <span>&#x21BA;</span> Reset View
+      </button>
+      <button class="btn" id="btn-screenshot">
+        <span>&#x1F4F8;</span> 4K Capture
+      </button>
+      <button class="btn" id="btn-help">
+        <span>&#x2753;</span> Keys
+      </button>
+    </div>
+  </div>
+
+  <!-- Left Control Panel: Fractal & Chaos Parameters -->
+  <div class="panel panel-left" id="panel-left">
+    <div class="panel-header">
+      <span class="panel-title">&#x2699;&#xFE0F; Mathematical Geometry</span>
+      <span style="font-size: 10px; color: var(--text-muted);">PARAMS</span>
+    </div>
+
+    <div class="section-group">
+      <div class="control-label">
+        <span>Fractal Formula</span>
+      </div>
+      <select id="select-fractal">
+        <option value="0">Mandelbrot Set (Standard)</option>
+        <option value="1">Julia Set (Morphing Dynamic)</option>
+        <option value="2">Burning Ship Fractal (Chaotic Coast)</option>
+        <option value="3">Tricorn (Mandelbar Conjugate)</option>
+        <option value="4">Newton's Cubic Basin (z³ - 1)</option>
+        <option value="5">Collatz Chaos Matrix</option>
+      </select>
+    </div>
+
+    <div class="section-group">
+      <div class="control-label">
+        <span>Max Iterations</span>
+        <span class="control-val" id="val-iterations">256</span>
+      </div>
+      <input type="range" class="range-slider" id="slider-iterations" min="32" max="1024" step="8" value="256">
+    </div>
+
+    <div class="section-group">
+      <div class="control-label">
+        <span>Chaos Orbit Trap</span>
+        <span class="control-val" id="val-trap">None</span>
+      </div>
+      <select id="select-trap">
+        <option value="0">Standard Escape Time</option>
+        <option value="1">Cross Axis Trap (Luminous Spikes)</option>
+        <option value="2">Circular Ring Trap (Stellar Ripples)</option>
+        <option value="3">Rhombus Matrix (Sacred Diamond)</option>
+        <option value="4">Sine Chaos Wave</option>
+      </select>
+    </div>
+
+    <div class="section-group" id="julia-controls" style="display: none;">
+      <div class="control-label">
+        <span>Julia Constant Real (Cr)</span>
+        <span class="control-val" id="val-cr">-0.700</span>
+      </div>
+      <input type="range" class="range-slider" id="slider-cr" min="-2.0" max="2.0" step="0.001" value="-0.7">
+      
+      <div class="control-label" style="margin-top: 6px;">
+        <span>Julia Constant Imag (Ci)</span>
+        <span class="control-val" id="val-ci">0.270</span>
+      </div>
+      <input type="range" class="range-slider" id="slider-ci" min="-2.0" max="2.0" step="0.001" value="0.27">
+
+      <button class="btn" id="btn-julia-orbit" style="margin-top: 6px; justify-content: center; width: 100%;">
+        <span>&#x1F504;</span> Auto-Orbit Julia Phase
+      </button>
+    </div>
+
+    <div class="panel-header" style="margin-top: 8px;">
+      <span class="panel-title">&#x1F30C; Scenic Bookmarks</span>
+    </div>
+    <div class="grid-2">
+      <button class="preset-pill" data-preset="seahorse">Seahorse Valley</button>
+      <button class="preset-pill" data-preset="elephant">Elephant Valley</button>
+      <button class="preset-pill" data-preset="minibrot">Mini Mandelbrot</button>
+      <button class="preset-pill" data-preset="tendril">Spiral Spires</button>
+      <button class="preset-pill" data-preset="starfish">Cosmic Starfish</button>
+      <button class="preset-pill" data-preset="chaosneedle">Chaos Needle</button>
+    </div>
+
+    <div class="section-group" style="margin-top: 6px;">
+      <div class="control-label">
+        <span>Flight / Zoom Velocity</span>
+        <span class="control-val" id="val-speed">1.0x</span>
+      </div>
+      <input type="range" class="range-slider" id="slider-speed" min="0.1" max="3.0" step="0.1" value="1.0">
+    </div>
+  </div>
+
+  <!-- Right Control Panel: Color Palette & Reactive Audio Synth -->
+  <div class="panel panel-right" id="panel-right">
+    <div class="panel-header">
+      <span class="panel-title">&#x1F3A8; Color Spectrum & Shader</span>
+      <span style="font-size: 10px; color: var(--text-muted);">PALETTES</span>
+    </div>
+
+    <div class="section-group">
+      <div class="control-label">
+        <span>Color Palette</span>
+      </div>
+      <select id="select-palette">
+        <option value="0">Cyberpunk Neon City</option>
+        <option value="1">Electric Violet & Ultraviolet</option>
+        <option value="2">Solar Flare & Plasma Core</option>
+        <option value="3">Abyssal Deep Bioluminescence</option>
+        <option value="4">Matrix Terminal Emerald</option>
+        <option value="5">Monochromatic Quantum Void</option>
+        <option value="6">Thermal Infrared Radiation</option>
+        <option value="7">Psychedelic Acid Rainbow</option>
+        <option value="8">Imperial Gold & Obsidian</option>
+      </select>
+      <div id="palette-preview-bar" class="palette-preview"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="section-group">
+        <div class="control-label">
+          <span>Cycle Speed</span>
+          <span class="control-val" id="val-cycle-speed">0.2</span>
+        </div>
+        <input type="range" class="range-slider" id="slider-cycle-speed" min="0.0" max="2.0" step="0.05" value="0.2">
+      </div>
+      <div class="section-group">
+        <div class="control-label">
+          <span>Glow & Bloom</span>
+          <span class="control-val" id="val-glow">1.2</span>
+        </div>
+        <input type="range" class="range-slider" id="slider-glow" min="0.2" max="3.0" step="0.1" value="1.2">
+      </div>
+    </div>
+
+    <div class="section-group">
+      <div class="control-label">
+        <span>Color Density (Frequency)</span>
+        <span class="control-val" id="val-density">1.0</span>
+      </div>
+      <input type="range" class="range-slider" id="slider-density" min="0.1" max="5.0" step="0.1" value="1.0">
+    </div>
+
+    <div class="panel-header" style="margin-top: 8px;">
+      <span class="panel-title">&#x1F50A; Reactive Chaos Synthesizer</span>
+    </div>
+
+    <canvas id="audio-scope"></canvas>
+
+    <div class="grid-2">
+      <div class="section-group">
+        <div class="control-label">
+          <span>Drone Pitch</span>
+          <span class="control-val" id="val-synth-pitch">A2</span>
+        </div>
+        <input type="range" class="range-slider" id="slider-synth-pitch" min="40" max="300" step="1" value="110">
+      </div>
+      <div class="section-group">
+        <div class="control-label">
+          <span>Chaos FM Mod</span>
+          <span class="control-val" id="val-fm-depth">50%</span>
+        </div>
+        <input type="range" class="range-slider" id="slider-fm-depth" min="0" max="100" step="1" value="50">
+      </div>
+    </div>
+
+    <div class="section-group">
+      <div class="control-label">
+        <span>Audio Reactivity (Sound Modulates Fractal)</span>
+        <span class="control-val" id="val-audio-react">ON</span>
+      </div>
+      <input type="range" class="range-slider" id="slider-audio-react" min="0.0" max="2.0" step="0.1" value="1.0">
+    </div>
+
+    <div class="grid-2" style="margin-top: 4px;">
+      <button class="btn" id="btn-export-preset">
+        <span>&#x1F4BE;</span> Save Preset
+      </button>
+      <button class="btn" id="btn-import-preset">
+        <span>&#x1F4C2;</span> Load Preset
+      </button>
+    </div>
+    <input type="file" id="preset-file-input" style="display: none;" accept=".json">
+  </div>
+
+  <!-- Bottom Coordinate & Diagnostics HUD -->
+  <div class="bottom-hud">
+    <div class="status-card">
+      <div class="status-item">
+        <span class="status-label">CENTER:</span>
+        <span class="status-value" id="hud-center">-0.7000000000, 0.0000000000</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">ZOOM:</span>
+        <span class="status-value" id="hud-zoom">1.00x (10⁰)</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">FPS:</span>
+        <span class="status-value" id="hud-fps">60</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">ENGINE:</span>
+        <span class="status-value" style="color: var(--accent-pink);">WebGL2 Float Precision</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Help Modal -->
+  <div class="modal" id="help-modal">
+    <div class="modal-content">
+      <div class="modal-title">
+        <span>&#x2328;&#xFE0F; Chaos Explorer Navigation & Shortcuts</span>
+        <button class="btn" id="btn-close-modal" style="padding: 4px 8px;">&times;</button>
+      </div>
+      <div class="key-row">
+        <span>Pan Fractal Coordinates</span>
+        <span><span class="key-badge">Left Click + Drag</span> / <span class="key-badge">W A S D</span></span>
+      </div>
+      <div class="key-row">
+        <span>Deep Zoom In / Out</span>
+        <span><span class="key-badge">Mouse Wheel</span> / <span class="key-badge">Q / E</span></span>
+      </div>
+      <div class="key-row">
+        <span>Smooth Auto Zoom Flight</span>
+        <span><span class="key-badge">Spacebar</span></span>
+      </div>
+      <div class="key-row">
+        <span>Toggle Audio Synthesizer</span>
+        <span><span class="key-badge">M</span></span>
+      </div>
+      <div class="key-row">
+        <span>Cycle Color Palettes</span>
+        <span><span class="key-badge">C</span></span>
+      </div>
+      <div class="key-row">
+        <span>Next Fractal Formula</span>
+        <span><span class="key-badge">F</span></span>
+      </div>
+      <div class="key-row">
+        <span>4K Screenshot Render</span>
+        <span><span class="key-badge">P</span></span>
+      </div>
+      <div class="key-row">
+        <span>Reset Coordinates</span>
+        <span><span class="key-badge">R</span></span>
+      </div>
+      <div class="key-row">
+        <span>Toggle HUD UI Visibility</span>
+        <span><span class="key-badge">H</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebGL Shader Scripts & Application Logic -->
+  <script>
+    // --- Vertex Shader Source ---
+    const vsSource = `#version 300 es
+      in vec2 a_position;
+      out vec2 v_uv;
+      void main() {
+        v_uv = a_position * 0.5 + 0.5;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+
+    // --- Fragment Shader Source with High-Precision Fractal & Trap Math ---
+    const fsSource = `#version 300 es
+      precision highp float;
+      in vec2 v_uv;
+      out vec4 fragColor;
+
+      uniform vec2 u_resolution;
+      uniform vec2 u_center;
+      uniform float u_zoom;
+      uniform int u_max_iterations;
+      uniform int u_fractal_type;
+      uniform int u_trap_type;
+      uniform vec2 u_julia_c;
+      uniform int u_palette;
+      uniform float u_time;
+      uniform float u_density;
+      uniform float u_glow;
+      uniform float u_audio_pulse;
+
+      // Color Palette Cosine Generator
+      vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
+        return a + b * cos(6.28318530718 * (c * t + d));
+      }
+
+      vec3 getPaletteColor(float iter, float trapDist, int palIdx) {
+        float t = iter * u_density * 0.05 + u_time * 0.1 + u_audio_pulse * 0.08;
+        vec3 col = vec3(0.0);
+
+        if (palIdx == 0) { // Cyberpunk Neon
+          col = palette(t, vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(1.0, 1.0, 1.0), vec3(0.0, 0.33, 0.67));
+        } else if (palIdx == 1) { // Electric Violet
+          col = palette(t, vec3(0.5, 0.2, 0.8), vec3(0.5, 0.4, 0.6), vec3(2.0, 1.0, 1.0), vec3(0.5, 0.20, 0.25));
+        } else if (palIdx == 2) { // Solar Flare
+          col = palette(t, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.0, 0.25, 0.25));
+        } else if (palIdx == 3) { // Abyssal Deep Sea
+          col = palette(t, vec3(0.1, 0.5, 0.8), vec3(0.2, 0.5, 0.5), vec3(1.0, 1.0, 1.0), vec3(0.3, 0.6, 0.8));
+        } else if (palIdx == 4) { // Matrix Emerald
+          col = palette(t, vec3(0.0, 0.8, 0.2), vec3(0.1, 0.4, 0.2), vec3(1.0, 2.0, 1.0), vec3(0.1, 0.3, 0.1));
+        } else if (palIdx == 5) { // Quantum Void (Monochrome)
+          col = palette(t, vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0));
+        } else if (palIdx == 6) { // Thermal Infrared
+          col = palette(t, vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(1.0, 1.0, 0.5), vec3(0.8, 0.90, 0.30));
+        } else if (palIdx == 7) { // Psychedelic Acid
+          col = palette(t, vec3(0.8, 0.5, 0.4), vec3(0.5, 0.5, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.0, 0.33, 0.67));
+        } else { // Imperial Gold & Obsidian
+          col = palette(t, vec3(0.7, 0.5, 0.2), vec3(0.4, 0.3, 0.1), vec3(1.0, 1.0, 1.0), vec3(0.1, 0.2, 0.3));
+        }
+
+        // Orbit trap glow mixing
+        if (u_trap_type > 0) {
+          float trapFactor = exp(-4.0 * trapDist);
+          col += vec3(0.8, 0.4, 1.0) * trapFactor * 1.5;
+        }
+
+        return col;
+      }
+
+      // Complex number arithmetic helpers for Newton & Special Fractals
+      vec2 c_mult(vec2 a, vec2 b) {
+        return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+      }
+      vec2 c_div(vec2 a, vec2 b) {
+        float denom = b.x * b.x + b.y * b.y;
+        return vec2((a.x * b.x + a.y * b.y) / denom, (a.y * b.x - a.x * b.y) / denom);
+      }
+
+      void main() {
+        vec2 st = (gl_FragCoord.xy - 0.5 * u_resolution) / min(u_resolution.x, u_resolution.y);
+        vec2 c = u_center + st * (4.0 / u_zoom);
+        vec2 z = c;
+
+        if (u_fractal_type == 1) { // Julia Set
+          z = c;
+          c = u_julia_c;
+        }
+
+        float n = 0.0;
+        float maxIt = float(u_max_iterations);
+        float trapDist = 1e10;
+
+        for (int i = 0; i < 1024; i++) {
+          if (float(i) >= maxIt) break;
+
+          // Orbit trap calculations
+          if (u_trap_type == 1) { // Cross axis trap
+            trapDist = min(trapDist, min(abs(z.x), abs(z.y)));
+          } else if (u_trap_type == 2) { // Circular ring trap
+            trapDist = min(trapDist, abs(length(z) - 0.75));
+          } else if (u_trap_type == 3) { // Diamond / Rhombus trap
+            trapDist = min(trapDist, abs(abs(z.x) + abs(z.y) - 1.0));
+          } else if (u_trap_type == 4) { // Sine wave trap
+            trapDist = min(trapDist, abs(z.y - sin(z.x * 4.0)));
+          }
+
+          if (u_fractal_type == 0 || u_fractal_type == 1) {
+            // Mandelbrot & Julia: z = z^2 + c
+            z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+            if (dot(z, z) > 4.0) { n = float(i); break; }
+          } else if (u_fractal_type == 2) {
+            // Burning Ship: z = (|Re(z)| + i|Im(z)|)^2 + c
+            z = vec2(abs(z.x), abs(z.y));
+            z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+            if (dot(z, z) > 4.0) { n = float(i); break; }
+          } else if (u_fractal_type == 3) {
+            // Tricorn (Mandelbar): z = (conj(z))^2 + c
+            z = vec2(z.x * z.x - z.y * z.y, -2.0 * z.x * z.y) + c;
+            if (dot(z, z) > 4.0) { n = float(i); break; }
+          } else if (u_fractal_type == 4) {
+            // Newton Cubic Basin: z = z - (z^3 - 1)/(3z^2)
+            vec2 z2 = c_mult(z, z);
+            vec2 z3 = c_mult(z2, z);
+            vec2 num = z3 - vec2(1.0, 0.0);
+            vec2 den = 3.0 * z2;
+            z = z - c_div(num, den);
+            if (length(num) < 0.001) { n = float(i); break; }
+          } else if (u_fractal_type == 5) {
+            // Collatz Chaos Matrix Approximation
+            z = 0.25 * (1.0 + 4.0 * z - (1.0 + 2.0 * z) * cos(3.14159265 * z)) + c * 0.1;
+            if (dot(z, z) > 20.0) { n = float(i); break; }
+          }
+        }
+
+        vec3 finalColor = vec3(0.0);
+
+        if (n >= maxIt - 1.0) {
+          // Interior core of fractal
+          finalColor = vec3(0.01, 0.01, 0.03);
+          if (u_trap_type > 0) {
+            finalColor += vec3(0.2, 0.1, 0.4) * exp(-2.0 * trapDist);
+          }
+        } else {
+          // Continuous smooth iteration calculation (renormalization)
+          float log_zn = log(dot(z, z)) * 0.5;
+          float nu = log(log_zn / log(2.0)) / log(2.0);
+          float smooth_iter = n + 1.0 - nu;
+          if (smooth_iter < 0.0) smooth_iter = n;
+
+          finalColor = getPaletteColor(smooth_iter, trapDist, u_palette);
+          finalColor *= u_glow;
+        }
+
+        // Vignette & Contrast polish
+        vec2 uv_norm = v_uv * 2.0 - 1.0;
+        float vignette = 1.0 - dot(uv_norm * 0.4, uv_norm * 0.4);
+        finalColor *= vignette;
+
+        fragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    // --- State Management ---
+    const state = {
+      center: { x: -0.7, y: 0.0 },
+      targetCenter: { x: -0.7, y: 0.0 },
+      zoom: 1.0,
+      targetZoom: 1.0,
+      maxIterations: 256,
+      fractalType: 0,
+      trapType: 0,
+      juliaC: { x: -0.7, y: 0.27 },
+      palette: 0,
+      cycleSpeed: 0.2,
+      glow: 1.2,
+      density: 1.0,
+      flightSpeed: 1.0,
+      isAutoFlying: false,
+      autoJuliaOrbit: false,
+      audioEnabled: false,
+      audioReactivity: 1.0,
+      synthPitch: 110,
+      fmDepth: 50
+    };
+
+    // Preset Scenic Coordinates
+    const presets = {
+      seahorse: { center: { x: -0.743643887037158704752191506114774, y: 0.131825904205311970493132056385139 }, zoom: 25000, iter: 400, type: 0, pal: 0 },
+      elephant: { center: { x: 0.28054988, y: 0.00840502 }, zoom: 4500, iter: 320, type: 0, pal: 2 },
+      minibrot: { center: { x: -1.768778833, y: -0.001738994 }, zoom: 65000, iter: 512, type: 0, pal: 1 },
+      tendril: { center: { x: -0.226266488, y: 1.11617444 }, zoom: 12000, iter: 350, type: 0, pal: 7 },
+      starfish: { center: { x: -0.373995870, y: 0.659447869 }, zoom: 18000, iter: 420, type: 0, pal: 3 },
+      chaosneedle: { center: { x: -1.25066, y: 0.02012 }, zoom: 32000, iter: 600, type: 2, pal: 8 }
+    };
+
+    // --- WebGL Context & Compilation ---
+    const canvas = document.getElementById('glcanvas');
+    const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+
+    if (!gl) {
+      alert('WebGL 2 is required for high-precision Fractal Exploration.');
+    }
+
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const program = gl.createProgram();
+    const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(program));
+    }
+
+    // Quad Buffer
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1
+    ]), gl.STATIC_DRAW);
+
+    const posAttrLoc = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(posAttrLoc);
+    gl.vertexAttribPointer(posAttrLoc, 2, gl.FLOAT, false, 0, 0);
+
+    // Uniform Locations
+    const uLocs = {
+      resolution: gl.getUniformLocation(program, 'u_resolution'),
+      center: gl.getUniformLocation(program, 'u_center'),
+      zoom: gl.getUniformLocation(program, 'u_zoom'),
+      maxIterations: gl.getUniformLocation(program, 'u_max_iterations'),
+      fractalType: gl.getUniformLocation(program, 'u_fractal_type'),
+      trapType: gl.getUniformLocation(program, 'u_trap_type'),
+      juliaC: gl.getUniformLocation(program, 'u_julia_c'),
+      palette: gl.getUniformLocation(program, 'u_palette'),
+      time: gl.getUniformLocation(program, 'u_time'),
+      density: gl.getUniformLocation(program, 'u_density'),
+      glow: gl.getUniformLocation(program, 'u_glow'),
+      audioPulse: gl.getUniformLocation(program, 'u_audio_pulse')
+    };
+
+    // --- Web Audio API Synthesizer ---
+    let audioCtx = null;
+    let masterGain = null;
+    let carrierOsc = null;
+    let modOsc = null;
+    let modGain = null;
+    let subDrone = null;
+    let filterNode = null;
+    let analyserNode = null;
+    let audioScopeCanvas = document.getElementById('audio-scope');
+    let scopeCtx = audioScopeCanvas.getContext('2d');
+    let audioPulseValue = 0.0;
+
+    function initAudio() {
+      if (audioCtx) return;
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+
+      masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+      // Lowpass Filter for Atmospheric Depth
+      filterNode = audioCtx.createBiquadFilter();
+      filterNode.type = 'lowpass';
+      filterNode.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      filterNode.Q.setValueAtTime(4.0, audioCtx.currentTime);
+
+      // Carrier Oscillator (Complex Saw/Triangle Blend)
+      carrierOsc = audioCtx.createOscillator();
+      carrierOsc.type = 'sawtooth';
+      carrierOsc.frequency.setValueAtTime(state.synthPitch, audioCtx.currentTime);
+
+      // FM Modulator Oscillator (Generates Chaotic Metallic Harmonics)
+      modOsc = audioCtx.createOscillator();
+      modOsc.type = 'sine';
+      modOsc.frequency.setValueAtTime(state.synthPitch * 1.5, audioCtx.currentTime);
+
+      modGain = audioCtx.createGain();
+      modGain.gain.setValueAtTime(state.fmDepth * 5.0, audioCtx.currentTime);
+      modOsc.connect(modGain);
+      modGain.connect(carrierOsc.frequency);
+
+      // Sub Drone (Deep fundamental grounding bass)
+      subDrone = audioCtx.createOscillator();
+      subDrone.type = 'triangle';
+      subDrone.frequency.setValueAtTime(state.synthPitch * 0.5, audioCtx.currentTime);
+
+      // Analyser Node for Visualizer & Shader Audio Reactivity
+      analyserNode = audioCtx.createAnalyser();
+      analyserNode.fftSize = 256;
+
+      carrierOsc.connect(filterNode);
+      subDrone.connect(filterNode);
+      filterNode.connect(masterGain);
+      masterGain.connect(analyserNode);
+      analyserNode.connect(audioCtx.destination);
+
+      carrierOsc.start();
+      modOsc.start();
+      subDrone.start();
+    }
+
+    function toggleAudio() {
+      if (!audioCtx) {
+        initAudio();
+        state.audioEnabled = true;
+      } else {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+          state.audioEnabled = true;
+        } else if (audioCtx.state === 'running') {
+          audioCtx.suspend();
+          state.audioEnabled = false;
+        }
+      }
+      updateAudioUI();
+    }
+
+    function updateAudioUI() {
+      const btn = document.getElementById('btn-audio-toggle');
+      const icon = document.getElementById('audio-icon');
+      const text = document.getElementById('audio-state-text');
+      if (state.audioEnabled) {
+        btn.classList.add('active');
+        icon.innerHTML = '&#x1F50A;';
+        text.innerText = 'ON (ACTIVE)';
+      } else {
+        btn.classList.remove('active');
+        icon.innerHTML = '&#x1F507;';
+        text.innerText = 'OFF';
+      }
+    }
+
+    function updateAudioParams() {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      const now = audioCtx.currentTime;
+
+      // Base Pitch
+      const baseFreq = state.synthPitch;
+      carrierOsc.frequency.setTargetAtTime(baseFreq, now, 0.05);
+      subDrone.frequency.setTargetAtTime(baseFreq * 0.5, now, 0.05);
+
+      // Chaos Mod Depth modulated by Zoom Level (Deeper zoom = higher pitch resonance)
+      const zoomLog = Math.log10(Math.max(1.0, state.zoom));
+      const dynamicFM = (state.fmDepth * 4.0) + (zoomLog * 30.0);
+      modGain.gain.setTargetAtTime(dynamicFM, now, 0.05);
+      modOsc.frequency.setTargetAtTime(baseFreq * (1.5 + (Math.sin(performance.now() * 0.001) * 0.5)), now, 0.05);
+
+      // Cutoff Filter modulated by center coordinate chaotic energy
+      const coordEnergy = Math.sqrt(state.center.x * state.center.x + state.center.y * state.center.y);
+      const cutoff = Math.min(6000, 600 + (coordEnergy * 800) + (zoomLog * 400));
+      filterNode.frequency.setTargetAtTime(cutoff, now, 0.1);
+    }
+
+    function drawAudioVisualizer() {
+      if (!audioScopeCanvas) return;
+      const w = audioScopeCanvas.width = audioScopeCanvas.clientWidth;
+      const h = audioScopeCanvas.height = audioScopeCanvas.clientHeight;
+      scopeCtx.clearRect(0, 0, w, h);
+
+      if (!analyserNode || !state.audioEnabled) {
+        scopeCtx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+        scopeCtx.lineWidth = 1.5;
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(0, h / 2);
+        scopeCtx.lineTo(w, h / 2);
+        scopeCtx.stroke();
+        return;
+      }
+
+      const bufferLength = analyserNode.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserNode.getByteTimeDomainData(dataArray);
+
+      // Calculate RMS Audio Pulse for Shader Reactivity
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const val = (dataArray[i] - 128) / 128;
+        sum += val * val;
+      }
+      const rms = Math.sqrt(sum / bufferLength);
+      audioPulseValue = rms * state.audioReactivity;
+
+      // Draw Scope Waveform
+      scopeCtx.lineWidth = 2;
+      scopeCtx.strokeStyle = '#06b6d4';
+      scopeCtx.shadowColor = '#06b6d4';
+      scopeCtx.shadowBlur = 8;
+      scopeCtx.beginPath();
+
+      const sliceWidth = w * 1.0 / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * (h / 2);
+        if (i === 0) scopeCtx.moveTo(x, y);
+        else scopeCtx.lineTo(x, y);
+        x += sliceWidth;
+      }
+      scopeCtx.stroke();
+    }
+
+    // --- Interaction & Event Handlers ---
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let dragStartCenter = { x: 0, y: 0 };
+    const radar = document.getElementById('radar');
+
+    window.addEventListener('resize', resizeCanvas);
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    resizeCanvas();
+
+    // Mouse Drag Pan
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) { // Left click
+        isDragging = true;
+        dragStart = { x: e.clientX, y: e.clientY };
+        dragStartCenter = { ...state.targetCenter };
+        radar.style.display = 'block';
+        radar.style.left = `${e.clientX}px`;
+        radar.style.top = `${e.clientY}px`;
+        radar.style.width = '30px';
+        radar.style.height = '30px';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const minDim = Math.min(window.innerWidth, window.innerHeight);
+        const dx = (e.clientX - dragStart.x) / minDim * (4.0 / state.zoom);
+        const dy = (e.clientY - dragStart.y) / minDim * (4.0 / state.zoom);
+
+        state.targetCenter.x = dragStartCenter.x - dx;
+        state.targetCenter.y = dragStartCenter.y + dy; // Invert Y for WebGL coords
+
+        radar.style.left = `${e.clientX}px`;
+        radar.style.top = `${e.clientY}px`;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+      radar.style.display = 'none';
+    });
+
+    // Mouse Wheel Zoom
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.25 : 0.8;
+
+      // Mouse coordinate pivot zoom
+      const minDim = Math.min(window.innerWidth, window.innerHeight);
+      const mouseX = (e.clientX - window.innerWidth * 0.5) / minDim * (4.0 / state.zoom);
+      const mouseY = -(e.clientY - window.innerHeight * 0.5) / minDim * (4.0 / state.zoom);
+
+      state.targetZoom *= zoomFactor;
+      state.targetCenter.x += mouseX * (1 - 1 / zoomFactor);
+      state.targetCenter.y += mouseY * (1 - 1 / zoomFactor);
+    }, { passive: false });
+
+    // Keyboard Shortcuts
+    const keysDown = {};
+    window.addEventListener('keydown', (e) => {
+      keysDown[e.key.toLowerCase()] = true;
+
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        toggleAutoFlight();
+      } else if (e.key.toLowerCase() === 'm') {
+        toggleAudio();
+      } else if (e.key.toLowerCase() === 'c') {
+        cyclePalette();
+      } else if (e.key.toLowerCase() === 'f') {
+        cycleFractal();
+      } else if (e.key.toLowerCase() === 'r') {
+        resetView();
+      } else if (e.key.toLowerCase() === 'p') {
+        takeScreenshot();
+      } else if (e.key.toLowerCase() === 'h') {
+        toggleUI();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keysDown[e.key.toLowerCase()] = false;
+    });
+
+    function processKeyboardNavigation() {
+      const panSpeed = (0.02 / state.zoom) * state.flightSpeed;
+      if (keysDown['w'] || keysDown['arrowup']) state.targetCenter.y += panSpeed;
+      if (keysDown['s'] || keysDown['arrowdown']) state.targetCenter.y -= panSpeed;
+      if (keysDown['a'] || keysDown['arrowleft']) state.targetCenter.x -= panSpeed;
+      if (keysDown['d'] || keysDown['arrowright']) state.targetCenter.x += panSpeed;
+      if (keysDown['q']) state.targetZoom *= 1.04;
+      if (keysDown['e']) state.targetZoom *= 0.96;
+    }
+
+    // --- UI Controls Binding ---
+    const selectFractal = document.getElementById('select-fractal');
+    const juliaControls = document.getElementById('julia-controls');
+    selectFractal.addEventListener('change', (e) => {
+      state.fractalType = parseInt(e.target.value);
+      juliaControls.style.display = state.fractalType === 1 ? 'flex' : 'none';
+      if (state.fractalType === 1) {
+        state.targetCenter = { x: 0.0, y: 0.0 };
+        state.targetZoom = 1.0;
+      }
+    });
+
+    const sliderIterations = document.getElementById('slider-iterations');
+    const valIterations = document.getElementById('val-iterations');
+    sliderIterations.addEventListener('input', (e) => {
+      state.maxIterations = parseInt(e.target.value);
+      valIterations.innerText = state.maxIterations;
+    });
+
+    const selectTrap = document.getElementById('select-trap');
+    const valTrap = document.getElementById('val-trap');
+    selectTrap.addEventListener('change', (e) => {
+      state.trapType = parseInt(e.target.value);
+      valTrap.innerText = selectTrap.options[selectTrap.selectedIndex].text.split(' ')[0];
+    });
+
+    const sliderCr = document.getElementById('slider-cr');
+    const valCr = document.getElementById('val-cr');
+    sliderCr.addEventListener('input', (e) => {
+      state.juliaC.x = parseFloat(e.target.value);
+      valCr.innerText = state.juliaC.x.toFixed(3);
+    });
+
+    const sliderCi = document.getElementById('slider-ci');
+    const valCi = document.getElementById('val-ci');
+    sliderCi.addEventListener('input', (e) => {
+      state.juliaC.y = parseFloat(e.target.value);
+      valCi.innerText = state.juliaC.y.toFixed(3);
+    });
+
+    const btnJuliaOrbit = document.getElementById('btn-julia-orbit');
+    btnJuliaOrbit.addEventListener('click', () => {
+      state.autoJuliaOrbit = !state.autoJuliaOrbit;
+      btnJuliaOrbit.classList.toggle('active', state.autoJuliaOrbit);
+    });
+
+    const selectPalette = document.getElementById('select-palette');
+    const palettePreviewBar = document.getElementById('palette-preview-bar');
+    const paletteGradients = [
+      'linear-gradient(90deg, #0d0887, #6a00a8, #b12a90, #e16462, #fca636, #f0f921)',
+      'linear-gradient(90deg, #18002e, #4b0082, #8a2be2, #d8bfd8, #00ffff)',
+      'linear-gradient(90deg, #1a0000, #800000, #ff4500, #ffa500, #ffff00, #ffffff)',
+      'linear-gradient(90deg, #000814, #001d3d, #003566, #0077b6, #00b4d8, #90e0ef)',
+      'linear-gradient(90deg, #001a00, #004d00, #009900, #33cc33, #66ff66, #ccffcc)',
+      'linear-gradient(90deg, #000000, #222222, #555555, #888888, #cccccc, #ffffff)',
+      'linear-gradient(90deg, #000033, #0000ff, #00ffff, #ffff00, #ff0000, #ffffff)',
+      'linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #8b00ff)',
+      'linear-gradient(90deg, #0b090a, #161a1d, #660708, #a4161a, #ba181b, #e5383b, #d4af37)'
+    ];
+
+    function updatePaletteBar() {
+      palettePreviewBar.style.background = paletteGradients[state.palette];
+    }
+    updatePaletteBar();
+
+    selectPalette.addEventListener('change', (e) => {
+      state.palette = parseInt(e.target.value);
+      updatePaletteBar();
+    });
+
+    const sliderCycleSpeed = document.getElementById('slider-cycle-speed');
+    const valCycleSpeed = document.getElementById('val-cycle-speed');
+    sliderCycleSpeed.addEventListener('input', (e) => {
+      state.cycleSpeed = parseFloat(e.target.value);
+      valCycleSpeed.innerText = state.cycleSpeed.toFixed(2);
+    });
+
+    const sliderGlow = document.getElementById('slider-glow');
+    const valGlow = document.getElementById('val-glow');
+    sliderGlow.addEventListener('input', (e) => {
+      state.glow = parseFloat(e.target.value);
+      valGlow.innerText = state.glow.toFixed(1);
+    });
+
+    const sliderDensity = document.getElementById('slider-density');
+    const valDensity = document.getElementById('val-density');
+    sliderDensity.addEventListener('input', (e) => {
+      state.density = parseFloat(e.target.value);
+      valDensity.innerText = state.density.toFixed(1);
+    });
+
+    const sliderSpeed = document.getElementById('slider-speed');
+    const valSpeed = document.getElementById('val-speed');
+    sliderSpeed.addEventListener('input', (e) => {
+      state.flightSpeed = parseFloat(e.target.value);
+      valSpeed.innerText = state.flightSpeed.toFixed(1) + 'x';
+    });
+
+    const sliderSynthPitch = document.getElementById('slider-synth-pitch');
+    const valSynthPitch = document.getElementById('val-synth-pitch');
+    sliderSynthPitch.addEventListener('input', (e) => {
+      state.synthPitch = parseFloat(e.target.value);
+      valSynthPitch.innerText = `${Math.round(state.synthPitch)} Hz`;
+    });
+
+    const sliderFmDepth = document.getElementById('slider-fm-depth');
+    const valFmDepth = document.getElementById('val-fm-depth');
+    sliderFmDepth.addEventListener('input', (e) => {
+      state.fmDepth = parseFloat(e.target.value);
+      valFmDepth.innerText = `${state.fmDepth}%`;
+    });
+
+    const sliderAudioReact = document.getElementById('slider-audio-react');
+    const valAudioReact = document.getElementById('val-audio-react');
+    sliderAudioReact.addEventListener('input', (e) => {
+      state.audioReactivity = parseFloat(e.target.value);
+      valAudioReact.innerText = state.audioReactivity > 0 ? `${state.audioReactivity.toFixed(1)}x` : 'OFF';
+    });
+
+    // Scenic Presets Buttons
+    document.querySelectorAll('.preset-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.preset;
+        if (presets[key]) {
+          const p = presets[key];
+          state.targetCenter = { ...p.center };
+          state.targetZoom = p.zoom;
+          state.maxIterations = p.iter;
+          sliderIterations.value = p.iter;
+          valIterations.innerText = p.iter;
+          state.fractalType = p.type;
+          selectFractal.value = p.type;
+          juliaControls.style.display = p.type === 1 ? 'flex' : 'none';
+          state.palette = p.pal;
+          selectPalette.value = p.pal;
+          updatePaletteBar();
+        }
+      });
+    });
+
+    // Top Bar Action Buttons
+    document.getElementById('btn-audio-toggle').addEventListener('click', toggleAudio);
+
+    const btnAutoFlight = document.getElementById('btn-auto-flight');
+    function toggleAutoFlight() {
+      state.isAutoFlying = !state.isAutoFlying;
+      btnAutoFlight.classList.toggle('active', state.isAutoFlying);
+    }
+    btnAutoFlight.addEventListener('click', toggleAutoFlight);
+
+    function resetView() {
+      state.targetCenter = { x: -0.7, y: 0.0 };
+      state.targetZoom = 1.0;
+      state.fractalType = 0;
+      selectFractal.value = 0;
+      juliaControls.style.display = 'none';
+    }
+    document.getElementById('btn-reset-view').addEventListener('click', resetView);
+
+    // 4K High-Res Screenshot Render & Export
+    function takeScreenshot() {
+      // Temporarily render at ultra-high resolution offscreen
+      const originalW = canvas.width;
+      const originalH = canvas.height;
+      const targetW = 3840;
+      const targetH = 2160;
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+      gl.viewport(0, 0, targetW, targetH);
+
+      renderFrame(performance.now(), true);
+
+      const dataURL = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.download = `fractal_chaos_${Date.now()}_4K.png`;
+      link.href = dataURL;
+      link.click();
+
+      // Restore viewport
+      canvas.width = originalW;
+      canvas.height = originalH;
+      gl.viewport(0, 0, originalW, originalH);
+    }
+    document.getElementById('btn-screenshot').addEventListener('click', takeScreenshot);
+
+    // Preset JSON Save / Load
+    document.getElementById('btn-export-preset').addEventListener('click', () => {
+      const exportData = {
+        center: state.center,
+        zoom: state.zoom,
+        maxIterations: state.maxIterations,
+        fractalType: state.fractalType,
+        trapType: state.trapType,
+        juliaC: state.juliaC,
+        palette: state.palette,
+        cycleSpeed: state.cycleSpeed,
+        glow: state.glow,
+        density: state.density,
+        synthPitch: state.synthPitch,
+        fmDepth: state.fmDepth,
+        timestamp: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fractal_preset_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    const presetFileInput = document.getElementById('preset-file-input');
+    document.getElementById('btn-import-preset').addEventListener('click', () => {
+      presetFileInput.click();
+    });
+    presetFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (data.center) state.targetCenter = { ...data.center };
+          if (data.zoom) state.targetZoom = data.zoom;
+          if (data.maxIterations) {
+            state.maxIterations = data.maxIterations;
+            sliderIterations.value = data.maxIterations;
+            valIterations.innerText = data.maxIterations;
+          }
+          if (data.fractalType !== undefined) {
+            state.fractalType = data.fractalType;
+            selectFractal.value = data.fractalType;
+            juliaControls.style.display = data.fractalType === 1 ? 'flex' : 'none';
+          }
+          if (data.palette !== undefined) {
+            state.palette = data.palette;
+            selectPalette.value = data.palette;
+            updatePaletteBar();
+          }
+          if (data.glow) {
+            state.glow = data.glow;
+            sliderGlow.value = data.glow;
+            valGlow.innerText = data.glow.toFixed(1);
+          }
+        } catch (err) {
+          alert('Invalid preset JSON file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Keyboard Help Modal
+    const helpModal = document.getElementById('help-modal');
+    document.getElementById('btn-help').addEventListener('click', () => helpModal.classList.add('open'));
+    document.getElementById('btn-close-modal').addEventListener('click', () => helpModal.classList.remove('open'));
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) helpModal.classList.remove('open');
+    });
+
+    function cyclePalette() {
+      state.palette = (state.palette + 1) % 9;
+      selectPalette.value = state.palette;
+      updatePaletteBar();
+    }
+
+    function cycleFractal() {
+      state.fractalType = (state.fractalType + 1) % 6;
+      selectFractal.value = state.fractalType;
+      juliaControls.style.display = state.fractalType === 1 ? 'flex' : 'none';
+    }
+
+    let uiVisible = true;
+    function toggleUI() {
+      uiVisible = !uiVisible;
+      document.querySelectorAll('.panel, .top-bar, .bottom-hud').forEach(el => {
+        el.style.display = uiVisible ? 'flex' : 'none';
+      });
+    }
+
+    // --- Main Render & Simulation Loop ---
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
+    let calculatedFps = 60;
+
+    const hudCenter = document.getElementById('hud-center');
+    const hudZoom = document.getElementById('hud-zoom');
+    const hudFps = document.getElementById('hud-fps');
+
+    function renderFrame(now, isOffscreen = false) {
+      const dt = (now - lastTime) * 0.001;
+      lastTime = now;
+
+      // Smooth coordinate and zoom interpolation (Damped Spring)
+      if (!isOffscreen) {
+        state.center.x += (state.targetCenter.x - state.center.x) * 0.12;
+        state.center.y += (state.targetCenter.y - state.center.y) * 0.12;
+        state.zoom += (state.targetZoom - state.zoom) * 0.12;
+
+        processKeyboardNavigation();
+
+        // Auto Zoom Flight
+        if (state.isAutoFlying) {
+          state.targetZoom *= (1.0 + (0.015 * state.flightSpeed));
+        }
+
+        // Julia Orbit Animation
+        if (state.autoJuliaOrbit && state.fractalType === 1) {
+          const t = now * 0.0005;
+          state.juliaC.x = -0.8 + Math.sin(t) * 0.15;
+          state.juliaC.y = 0.156 + Math.cos(t * 1.3) * 0.15;
+          sliderCr.value = state.juliaC.x;
+          valCr.innerText = state.juliaC.x.toFixed(3);
+          sliderCi.value = state.juliaC.y;
+          valCi.innerText = state.juliaC.y.toFixed(3);
+        }
+
+        // Audio synthesizer reactive sync
+        updateAudioParams();
+        drawAudioVisualizer();
+
+        // Diagnostics HUD Update
+        frameCount++;
+        if (now - lastFpsUpdate > 500) {
+          calculatedFps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+          hudFps.innerText = calculatedFps;
+          frameCount = 0;
+          lastFpsUpdate = now;
+
+          hudCenter.innerText = `${state.center.x.toFixed(10)}, ${state.center.y.toFixed(10)}`;
+          const exp = Math.floor(Math.log10(state.zoom));
+          hudZoom.innerText = `${state.zoom.toFixed(2)}x (10^${exp})`;
+        }
+      }
+
+      // WebGL Draw Call
+      gl.useProgram(program);
+      gl.uniform2f(uLocs.resolution, canvas.width, canvas.height);
+      gl.uniform2f(uLocs.center, state.center.x, state.center.y);
+      gl.uniform1f(uLocs.zoom, state.zoom);
+      gl.uniform1i(uLocs.maxIterations, state.maxIterations);
+      gl.uniform1i(uLocs.fractalType, state.fractalType);
+      gl.uniform1i(uLocs.trapType, state.trapType);
+      gl.uniform2f(uLocs.juliaC, state.juliaC.x, state.juliaC.y);
+      gl.uniform1i(uLocs.palette, state.palette);
+      gl.uniform1f(uLocs.time, (now * 0.001) * state.cycleSpeed);
+      gl.uniform1f(uLocs.density, state.density);
+      gl.uniform1f(uLocs.glow, state.glow);
+      gl.uniform1f(uLocs.audioPulse, audioPulseValue);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      if (!isOffscreen) {
+        requestAnimationFrame(renderFrame);
+      }
+    }
+
+    requestAnimationFrame(renderFrame);
+  </script>
+</body>
+</html>

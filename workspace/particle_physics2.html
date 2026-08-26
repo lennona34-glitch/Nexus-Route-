@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Physics Particle Sandbox Playground</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #1e3c72, #2a5298);
+    }
+    canvas {
+      display: block;
+    }
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label for="gravity">Gravity: <input type="range" id="gravity" min="-5" max="5" step="0.1" value="0.1"></label><br>
+    <label for="friction">Friction: <input type="range" id="friction" min="0" max="1" step="0.01" value="0.01"></label><br>
+    <label for="mass">Mass: <input type="range" id="mass" min="0.1" max="5" step="0.1" value="1"></label><br>
+  </div>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    const gravity = document.getElementById('gravity');
+    const friction = document.getElementById('friction');
+    const mass = document.getElementById('mass');
+
+    const particles = [];
+
+    class Particle {
+      constructor(x, y, radius, color) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = color;
+        this.velocity = {
+          x: (Math.random() - 0.5) * 5,
+          y: (Math.random() - 0.5) * 5
+        };
+        this.mass = parseFloat(mass.value);
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      update() {
+        this.draw();
+
+        this.velocity.y += parseFloat(gravity.value);
+        this.velocity.x *= (1 - parseFloat(friction.value));
+        this.velocity.y *= (1 - parseFloat(friction.value));
+
+        this.x += this.velocity.x;
+        this.y += this.velocity.y;
+
+        if (this.x + this.radius > width || this.x - this.radius < 0) {
+          this.velocity.x = -this.velocity.x;
+        }
+        if (this.y + this.radius > height || this.y - this.radius < 0) {
+          this.velocity.y = -this.velocity.y;
+        }
+      }
+    }
+
+    function createParticle() {
+      const x = Math.random() * width;
+      const y = Math.random() * height;
+      const radius = Math.random() * 10 + 5;
+      const color = `hsl(${Math.random() * 360}, 50%, 50%)`;
+      particles.push(new Particle(x, y, radius, color));
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+      }
+    }
+
+    canvas.addEventListener('click', () => {
+      createParticle();
+    });
+
+    animate();
+  </script>
+</body>
+</html>
