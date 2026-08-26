@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Glassmorphic Audio Spectrum Deck</title>
+<style>
+  :root {
+    --bg-gradient: radial-gradient(circle at 50% 50%, #1a1a2e, #111);
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --accent-color: #00f0ff;
+    --text-color: #e0e0ff;
+    --bar-color: var(--accent-color);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-gradient);
+    color: var(--text-color);
+    touch-action: none;
+  }
+
+  #app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .glass-panel {
+    position: relative;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      inset 0 0 10px rgba(0, 240, 255, 0.1),
+      0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 1000px;
+    z-index: 2;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+  }
+
+  .controls-top {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .controls-bottom {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  button, select {
+    padding: 8px 14px;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+  }
+
+  button:hover, select:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  }
+
+  button:active {
+    transform: scale(0.97);
+  }
+
+  #drop-zone {
+    position: relative;
+    width: 100%;
+    height: 160px;
+    border: 2px dashed var(--glass-border);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  #drop-zone.dragover {
+    border-color: var(--accent-color);
+    background: rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+  }
+
+  #drop-zone p {
+    z-index: 3;
+  }
+
+  #spectrum {
+    width: 100%;
+    height: 320px;
+    display: block;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .fullscreen-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    padding: 10px 16px;
+    font-size: 1rem;
+  }
+
+  .preset-name-input {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-color);
+    outline: none;
+  }
+
+  .preset-name-input::placeholder {
+    color: #999;
+  }
+
+  @media (max-width: 768px) {
+    .header h1 { font-size: 1.4rem; }
+    #spectrum { height: 240px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <button class="fullscreen-btn" id="fsBtn">⛶ Fullscreen</button>
+  <div class="glass-panel">
+    <div class="header">
+      <h1>🎵 Glassmorphic Audio Spectrum Deck</h1>
+      <div class="controls-top">
+        <button id="startBtn">▶ Start</button>
+        <button id="pauseBtn">⏸ Pause</button>
+        <button id="stopBtn">⏹ Stop</button>
+      </div>
+    </div>
+
+    <div id="drop-zone">
+      <p>📁 Drag & Drop an Audio File Here</p>
+    </div>
+
+    <canvas id="spectrum"></canvas>
+
+    <div class="controls-bottom">
+      <label>FFT Size:</label>
+      <select id="fftSize">
+        <option value="64">64</option>
+        <option value="128" selected>128</option>
+        <option value="256">256</option>
+        <option value="512">512</option>
+        <option value="1024">1024</option>
+      </select>
+
+      <label>Sensitivity:</label>
+      <input type="range" id="sensitivity" min="1" max="5" value="3" />
+
+      <label>Bar Color:</label>
+      <input type="color" id="barColor" value="#00f0ff" />
+
+      <input type="text" id="presetName" class="preset-name-input" placeholder="Preset name..." />
+
+      <button id="savePreset">💾 Save Preset</button>
+      <button id="loadPreset">📂 Load Preset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let audioCtx = null;
+let analyser = null;
+let dataArray = null;
+let sourceNode = null;
+let canvasWidth = 0;
+let canvasHeight = 0;
+let animationFrameId = null;
+let isPlaying = false;
+
+const dropZone = document.getElementById('drop-zone');
+const canvas = document.getElementById('spectrum');
+const ctx = canvas.getContext('2d');
+const fsBtn = document.getElementById('fsBtn');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const fftSizeSelect = document.getElementById('fftSize');
+const sensitivitySlider = document.getElementById('sensitivity');
+const barColorPicker = document.getElementById('barColor');
+const presetNameInput = document.getElementById('presetName');
+const savePresetBtn = document.getElementById('savePreset');
+const loadPresetBtn = document.getElementById('loadPreset');
+
+function resizeCanvas() {
+  canvasWidth = canvas.clientWidth;
+  canvasHeight = canvas.clientHeight;
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function draw() {
+  if (!analyser || !isPlaying) return;
+
+  analyser.getByteFrequencyData(dataArray);
+  const sensitivity = parseFloat(sensitivitySlider.value);
+  const barColor = barColorPicker.value;
+
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+  const barWidth = canvasWidth / dataArray.length;
+  let x = 0;
+
+  for (let i = 0; i < dataArray.length; i++) {
+    const amplitude = dataArray[i] / 255;
+    const scaledAmplitude = Math.pow(amplitude, sensitivity);
+    const height = scaledAmplitude * canvasHeight;
+
+    // Gradient fill based on position
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+    gradient.addColorStop(0, barColor);
+    gradient.addColorStop(1, '#000');
+    ctx.fillStyle = gradient;
+
+    ctx.fillRect(x, canvasHeight - height, barWidth - 1, height);
+    x += barWidth;
+  }
+
+  animationFrameId = requestAnimationFrame(draw);
+}
+
+function setupAudioContext(arrayBuffer) {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = parseInt(fftSizeSelect.value);
+  const bufferLength = analyser.frequencyBinCount;
+  dataArray = new Uint8Array(bufferLength);
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = arrayBuffer;
+  source.connect(analyser).connect(audioCtx.destination);
+  source.start(0);
+  sourceNode = source;
+
+  isPlaying = true;
+  draw();
+}
+
+function handleFileSelect(file) {
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    const arrayBuffer = event.target.result;
+    setupAudioContext(arrayBuffer);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|ogg)$/i)) {
+    handleFileSelect(file);
+  } else {
+    alert('Please drop a valid audio file.');
+  }
+}
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', handleDrop);
+
+dropZone.addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'audio/*';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+  input.click();
+});
+
+startBtn.addEventListener('click', () => {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  if (!isPlaying && analyser) {
+    isPlaying = true;
+    draw();
+  }
+});
+
+pauseBtn.addEventListener('click', () => {
+  if (audioCtx) {
+    if (audioCtx.state === 'running') {
+      audioCtx.suspend();
+    } else {
+      audioCtx.resume();
+    }
+  }
+  isPlaying = !isPlaying;
+});
+
+stopBtn.addEventListener('click', () => {
+  isPlaying = false;
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+  if (sourceNode) {
+    sourceNode.stop();
+  }
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+});
+
+fftSizeSelect.addEventListener('change', () => {
+  if (analyser) {
+    analyser.fftSize = parseInt(fftSizeSelect.value);
+    const bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
+  }
+});
+
+fsBtn.addEventListener('click', () => {
+  const app = document.getElementById('app');
+  if (!document.fullscreenElement) {
+    app.requestFullscreen().catch(err => console.error("Fullscreen attempt failed:", err));
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+savePresetBtn.addEventListener('click', () => {
+  const preset = {
+    fftSize: parseInt(fftSizeSelect.value),
+    sensitivity: sensitivitySlider.value,
+    barColor: barColorPicker.value,
+  };
+  const name = presetNameInput.value.trim() || 'default';
+  localStorage.setItem(`spectrum-preset-${name}`, JSON.stringify(preset));
+  alert(`Preset "${name}" saved!`);
+});
+
+loadPresetBtn.addEventListener('click', () => {
+  const name = presetNameInput.value.trim() || 'default';
+  const data = localStorage.getItem(`spectrum-preset-${name}`);
+  if (data) {
+    const preset = JSON.parse(data);
+    fftSizeSelect.value = preset.fftSize;
+    sensitivitySlider.value = preset.sensitivity;
+    barColorPicker.value = preset.barColor;
+    if (analyser) {
+      analyser.fftSize = preset.fftSize;
+      const bufferLength = analyser.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
+    }
+    alert(`Preset "${name}" loaded!`);
+  } else {
+    alert(`No preset found for "${name}".`);
+  }
+});
+
+// Load default preset on page load
+window.addEventListener('load', () => {
+  const defaultPreset = localStorage.getItem('spectrum-preset-default');
+  if (defaultPreset) {
+    const preset = JSON.parse(defaultPreset);
+    fftSizeSelect.value = preset.fftSize;
+    sensitivitySlider.value = preset.sensitivity;
+    barColorPicker.value = preset.barColor;
+  }
+});
+</script>
+</body>
+</html>

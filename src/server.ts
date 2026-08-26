@@ -1136,6 +1136,15 @@ export async function startServer() {
     console.log(`🔑 Key Status:          http://${HOST}:${PORT}/v1/keys/status`);
     console.log(`🔒 Bound Interface:    ${HOST} (Localhost Secure Mode)`);
     console.log(`======================================================\n`);
+    // Resolved routing config, so "which build is actually serving me" is
+    // answerable from the banner instead of by guessing.
+    const startedAt = new Date().toISOString();
+    console.log(`🧭 OpenRouter model:   ${process.env.OPENROUTER_MODEL?.trim() || 'openrouter/free (default)'}`);
+    console.log(`🧭 Coding model:       ${process.env.OPENROUTER_CODING_MODEL?.trim() || 'inherits OpenRouter model'}`);
+    console.log(`⏱️  Turn limits:        cloud ${process.env.NEXUS_CLOUD_TURN_TIMEOUT_MS || 90000}ms / local ${process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS || 120000}ms / request ${process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS || 600000}ms`);
+    console.log(`🔁 Max agent turns:    ${process.env.NEXUS_MAX_AGENT_TURNS || 4}`);
+    console.log(`🕓 Started:            ${startedAt}`);
+    console.log(`======================================================\n`);
   } catch (err) {
     console.error('Failed to start server:', err);
     process.exit(1);

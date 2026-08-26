@@ -1,4 +1,6 @@
 [
   "xai",
-  "gemini"
+  "gemini",
+  "openai",
+  "anthropic"
 ]

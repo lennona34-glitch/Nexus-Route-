@@ -1,3 +1,9 @@
+param(
+    # A gateway already listening on 3000 is left alone by default. That silently
+    # keeps a stale build alive across edits, so -Restart replaces it instead.
+    [switch]$Restart
+)
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "       NexusRoute Gateway Launcher      " -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
@@ -7,6 +13,19 @@ Set-Location $rootDir
 
 # 1. Check & Start NexusRoute Gateway (Port 3000)
 $port3000 = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
+
+if ($port3000 -and $Restart) {
+    $ownerPid = ($port3000 | Select-Object -First 1).OwningProcess
+    Write-Host "[!] Stopping the gateway already on port 3000 (PID $ownerPid)..." -ForegroundColor Yellow
+    try {
+        Stop-Process -Id $ownerPid -Force -ErrorAction Stop
+        Start-Sleep -Seconds 2
+        $port3000 = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
+    } catch {
+        Write-Host "[x] Could not stop PID ${ownerPid}: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
 if (-not $port3000) {
     Write-Host "[+] Starting NexusRoute Gateway on http://localhost:3000..." -ForegroundColor Green
     # Run the TypeScript entry point directly, matching `npm start`. The compiled
@@ -14,7 +33,11 @@ if (-not $port3000) {
     Start-Process -FilePath "npm.cmd" -ArgumentList "start" -WorkingDirectory $rootDir -WindowStyle Hidden
     Start-Sleep -Seconds 2
 } else {
-    Write-Host "[*] NexusRoute Gateway is already running on port 3000." -ForegroundColor Cyan
+    $ownerPid = ($port3000 | Select-Object -First 1).OwningProcess
+    $since = try { (Get-Process -Id $ownerPid -ErrorAction Stop).StartTime } catch { $null }
+    Write-Host "[*] A gateway is ALREADY running on port 3000 (PID $ownerPid)." -ForegroundColor Cyan
+    if ($since) { Write-Host "    It started at $since, so it serves the code as of that moment." -ForegroundColor DarkGray }
+    Write-Host "    Edits made since then are NOT live. Re-run with -Restart to replace it." -ForegroundColor Yellow
 }
 
 # 2. Check & Start Local RTX 4060 GPU Engine (Port 5005)
