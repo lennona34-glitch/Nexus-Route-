@@ -29,9 +29,20 @@ export class LocalAdapter extends OpenAIAdapter {
     return m;
   }
 
+  // Models that reject an OpenAI-style `tools` payload outright. Everything else
+  // is attempted with tools attached: both chatCompletion and streamChatCompletion
+  // already retry without tools on a 400, so an unknown model degrades gracefully
+  // instead of being silently stripped of every tool it can actually use.
+  private static readonly NO_TOOL_SUPPORT = [
+    'gemma', 'phi-2', 'phi3', 'tinyllama', 'orca-mini', 'stablelm', 'vicuna',
+    'moondream', 'llava', 'bakllava', 'minicpm-v',
+    'starcoder', 'codellama', 'wizardcoder', 'stable-code',
+    'embed', 'bge-', 'nomic-',
+  ];
+
   private isKnownToolCallingModel(modelName: string): boolean {
     const m = modelName.toLowerCase();
-    return m.includes('qwen2.5-coder') || m.includes('llama3.1') || m.includes('llama3.2') || m.includes('mistral-nemo');
+    return !LocalAdapter.NO_TOOL_SUPPORT.some(name => m.includes(name));
   }
 
   override async chatCompletion(req: UniversalRequest, targetModel: string): Promise<UniversalResponse> {

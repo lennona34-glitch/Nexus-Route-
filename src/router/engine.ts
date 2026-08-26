@@ -149,13 +149,26 @@ function autonomousTaskProfile(req: UniversalRequest): AutonomousTaskProfile {
 }
 
 function scopeAutonomousTools(req: UniversalRequest, tools: ToolDefinition[]): ToolDefinition[] {
-  if (!requestExpectsFileWrite(req)) return tools;
-
   const builtInNames = new Set(ToolRegistry.getBuiltInTools().map(tool => tool.function.name));
   if (tools.some(tool => !builtInNames.has(tool.function.name))) return tools;
 
   const profile = autonomousTaskProfile(req);
-  const allowed = new Set(['write_file', 'patch_file', 'read_file', 'list_workspace_files']);
+  // The full built-in schema set is ~4k prompt tokens, re-sent on every agent
+  // turn and again on every cascade candidate. Scope it by task profile instead
+  // of shipping all of it on requests that will never touch most of the tools.
+  const allowed = requestExpectsFileWrite(req)
+    ? new Set(['write_file', 'patch_file', 'read_file', 'list_workspace_files'])
+    : new Set([
+        'read_file',
+        'list_workspace_files',
+        'write_file',
+        'patch_file',
+        'get_current_time',
+        'calculator',
+        'remember_fact',
+        'recall_memory',
+        'take_desktop_screenshot',
+      ]);
   if (req.messages.length > 6) allowed.add('recover_raw_context');
   if (profile.html) {
     allowed.add('open_in_browser_or_app');
@@ -268,12 +281,44 @@ function withoutAdapterPrefix(message: string): string {
   return message.replace(/^\[[A-Z]+\]\s*/, '');
 }
 
-function turnTimeoutMs(provider: ProviderType, requested?: number, remainingRequestMs?: number): number {
-  const defaultMs = provider === 'local' || provider === 'ollama'
-    ? positiveDuration(process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS, 180_000)
+// Reserved for each candidate still queued behind the current one. Without this
+// the first route consumes the whole request budget and every fallback dies
+// instantly with "exhausted its route-attempt time budget" - which makes the
+// cascade decorative rather than functional.
+const FAILOVER_RESERVE_MS = 20_000;
+// A fallback is worth attempting only if it gets a usable slice of time. Mock and
+// other instant routes finish well inside this, so the floor costs nothing.
+const MIN_ATTEMPT_MS = 15_000;
+
+function defaultTurnMs(provider: ProviderType): number {
+  return provider === 'local' || provider === 'ollama'
+    ? positiveDuration(process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS, 120_000)
     : positiveDuration(process.env.NEXUS_CLOUD_TURN_TIMEOUT_MS, 90_000);
-  const selected = positiveDuration(requested, defaultMs);
+}
+
+function turnTimeoutMs(provider: ProviderType, requested?: number, remainingRequestMs?: number): number {
+  const selected = positiveDuration(requested, defaultTurnMs(provider));
   return Math.max(25, Math.min(selected, remainingRequestMs ?? selected));
+}
+
+// Deadline for one cascade attempt. Bounded by the candidate's own timeout, the
+// provider default, and - critically - by what has to be left over for the
+// candidates queued behind it.
+function attemptDeadlineFor(
+  now: number,
+  requestDeadline: number,
+  requestedTimeoutMs: number | undefined,
+  provider: ProviderType,
+  candidatesRemaining: number,
+): number {
+  const budgetRemaining = Math.max(0, requestDeadline - now);
+  const reserve = Math.min(
+    FAILOVER_RESERVE_MS * Math.max(0, candidatesRemaining - 1),
+    Math.max(0, budgetRemaining - MIN_ATTEMPT_MS),
+  );
+  const share = budgetRemaining - reserve;
+  const ceiling = positiveDuration(requestedTimeoutMs, defaultTurnMs(provider));
+  return now + Math.max(MIN_ATTEMPT_MS, Math.min(share, ceiling));
 }
 
 async function withWallClockDeadline<T>(
@@ -341,6 +386,19 @@ async function* streamWithWallClockDeadline(
   } finally {
     if (!completed && iterator.return) void iterator.return(undefined).catch(() => {});
   }
+}
+
+// Local models often emit a tool call as plain text instead of a structured
+// tool_calls delta, so the start of a local turn is buffered to inspect it.
+// Once enough text has arrived and it clearly is not a tool-call payload the
+// buffer is released - otherwise a slow local model shows nothing at all for
+// minutes and looks like a hang.
+const TOOL_CALL_TEXT_PROBE_CHARS = 48;
+
+function mayStillBeTextualToolCall(text: string): boolean {
+  const trimmed = text.trimStart();
+  if (trimmed.length < TOOL_CALL_TEXT_PROBE_CHARS) return true;
+  return /^(\{|<tool_call>|```(?:json)?\s*\{)/.test(trimmed);
 }
 
 function parseToolResult(message: UniversalMessage): Record<string, unknown> | null {
@@ -1133,7 +1191,7 @@ export class RoutingEngine {
 
     if (requested === 'free' || requested === 'local' || requested === 'offline') {
       const localList: RouteCandidate[] = [
-        ...(hasOpenRouter ? [{ provider: 'openrouter' as ProviderType, model: 'openrouter/free', timeout_ms: 30000 }] : []),
+        ...(hasOpenRouter ? [{ provider: 'openrouter' as ProviderType, model: 'openrouter/free', timeout_ms: 90_000 }] : []),
         { provider: 'local', model: 'qwen2.5-coder:7b', timeout_ms: 20000 },
         { provider: 'local', model: 'llama3.1:8b', timeout_ms: 20000 },
         { provider: 'local', model: 'deepseek-r1:1.5b', timeout_ms: 15000 },
@@ -1287,7 +1345,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
   async executeChat(req: UniversalRequest): Promise<UniversalResponse> {
     const requestId = crypto.randomUUID();
     const requestStartedAt = Date.now();
-    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 180_000);
+    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 600_000);
     this.agentEventLog.record({
       requestId,
       sessionId: req.session_id,
@@ -1326,7 +1384,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
     const htmlRuntimeToolAvailable = !!effectiveReq.tools?.some(tool => tool.function.name === 'test_html_app');
     const startTime = requestStartedAt;
 
-    for (const candidate of routeCandidates) {
+    for (const [candidateIndex, candidate] of routeCandidates.entries()) {
       const { provider, model, timeout_ms } = candidate;
       const identity = candidateIdentity(provider, model);
 
@@ -1390,9 +1448,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
       });
 
       const attemptStart = Date.now();
-      const attemptDeadline = timeout_ms
-        ? Math.min(requestDeadline, attemptStart + timeout_ms)
-        : requestDeadline;
+      const attemptDeadline = attemptDeadlineFor(
+        attemptStart,
+        requestDeadline,
+        timeout_ms,
+        provider,
+        routeCandidates.length - candidateIndex,
+      );
       try {
         let currentMessages = [...effectiveReq.messages];
         let currentTools = effectiveReq.tools;
@@ -1417,7 +1479,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         };
         let currentResponse = await runTurn(currentMessages, currentTools);
         let turnCount = 0;
-        const maxTurns = 8;
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 4));
         let generatedImagesMarkdown = '';
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
@@ -1724,7 +1786,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
   async *executeStream(req: UniversalRequest): AsyncGenerator<UniversalStreamChunk> {
     const requestId = crypto.randomUUID();
     const requestStartedAt = Date.now();
-    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 180_000);
+    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 600_000);
     this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'request_started', requestedModel: req.model });
     // 1. Check Response Cache
     const cached = this.cache.get(req);
@@ -1851,7 +1913,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
     const rejectedWrites: RejectedFileWrite[] = [];
     let htmlRuntimeVerification: HtmlRuntimeVerification = { attempted: false, success: false, detail: 'Not tested yet.' };
 
-    for (const candidate of routeCandidates) {
+    for (const [candidateIndex, candidate] of routeCandidates.entries()) {
       const { provider, model, timeout_ms } = candidate;
       const identity = candidateIdentity(provider, model);
 
@@ -1931,9 +1993,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
       };
 
       const attemptStart = Date.now();
-      const attemptDeadline = timeout_ms
-        ? Math.min(requestDeadline, attemptStart + timeout_ms)
-        : requestDeadline;
+      const attemptDeadline = attemptDeadlineFor(
+        attemptStart,
+        requestDeadline,
+        timeout_ms,
+        provider,
+        routeCandidates.length - candidateIndex,
+      );
       const toolsExecuted: string[] = [];
       let hasYielded = false;
       let completedRouteInfo: RouteMetadata | undefined;
@@ -1956,7 +2022,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let currentMessages = [...effectiveReq.messages];
         let currentTools = effectiveReq.tools;
         let turnCount = 0;
-        const maxTurns = 8;
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 4));
         let accumulatedUsage: UniversalResponse['usage'] | undefined = undefined;
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
@@ -1978,9 +2044,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           let turnContent = '';
           let turnUsage: UniversalResponse['usage'] | undefined;
           const deferredChunks: UniversalStreamChunk[] = [];
-          const shouldBufferTurn =
+          // A file-write turn must stay buffered to the end so an unverified
+          // "I created the file" claim can still be suppressed. Everything else
+          // only buffers long enough to rule out a textual tool call.
+          const bufferUntilTurnEnds = fileWriteExpected;
+          let bufferingTurn =
             (!!currentTools && (provider === 'local' || provider === 'ollama')) ||
-            fileWriteExpected;
+            bufferUntilTurnEnds;
 
           for await (const chunk of stream) {
             if (chunk.usage && chunk.usage.total_tokens) {
@@ -1990,7 +2060,16 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             const delta = chunk.choices?.[0]?.delta?.content;
             if (delta) {
               turnContent += delta;
-              if (shouldBufferTurn) {
+              if (bufferingTurn && !bufferUntilTurnEnds && !mayStillBeTextualToolCall(turnContent)) {
+                bufferingTurn = false;
+                for (const heldChunk of deferredChunks) {
+                  markStreamStarted();
+                  recordedChunks.push(heldChunk);
+                  yield heldChunk;
+                }
+                deferredChunks.length = 0;
+              }
+              if (bufferingTurn) {
                 deferredChunks.push(chunk);
               } else {
                 markStreamStarted();
