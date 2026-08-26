@@ -188,7 +188,7 @@ export class OpenAIAdapter implements ProviderAdapter {
       if (routingMode !== 'balanced' || hasToolChain) {
         payload.provider = {
           ...(routingMode !== 'balanced' ? {
-            sort: routingMode === 'cheapest'
+            sort: (routingMode === 'cheapest' || routingMode === 'free')
             ? 'price'
             : routingMode === 'fastest'
               ? 'throughput'

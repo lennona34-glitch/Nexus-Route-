@@ -65,7 +65,7 @@ export function validateAndNormalizeRequest(payload: unknown): UniversalRequest 
     stop: typeof raw.stop === 'string' || Array.isArray(raw.stop) ? raw.stop : undefined,
     user: typeof raw.user === 'string' ? raw.user : undefined,
     session_id: typeof raw.session_id === 'string' ? raw.session_id.slice(0, 200) : undefined,
-    openrouter_routing: ['balanced', 'cheapest', 'fastest', 'tools'].includes(String(raw.openrouter_routing))
+    openrouter_routing: ['free', 'balanced', 'cheapest', 'fastest', 'tools'].includes(String(raw.openrouter_routing))
       ? raw.openrouter_routing as UniversalRequest['openrouter_routing']
       : undefined,
     metadata: typeof raw.metadata === 'object' && raw.metadata !== null ? (raw.metadata as Record<string, unknown>) : undefined,

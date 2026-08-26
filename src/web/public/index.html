@@ -120,7 +120,12 @@
                   <option value="reasoning">🧠 reasoning (Deep Logic Tier)</option>
                   <option value="coding">💻 coding (Code Synthesis Tier)</option>
                 </optgroup>
-                <optgroup label="Featured Free Coding & Reasoning">
+                <optgroup label="Featured 100% Free Models (Zero-Cost)">
+                  <option value="openrouter::meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B Instruct · Free · 128k ctx · tools</option>
+                  <option value="openrouter::deepseek/deepseek-r1:free">🧠 DeepSeek R1 · Free Reasoning · 64k ctx</option>
+                  <option value="openrouter::qwen/qwen-2.5-coder-32b-instruct:free">💻 Qwen 2.5 Coder 32B · Free Coding · 32k ctx · tools</option>
+                  <option value="openrouter::mistralai/mistral-small-24b-instruct-2501:free">⚡ Mistral Small 24B · Free · 32k ctx · tools</option>
+                  <option value="openrouter::google/gemini-2.0-flash-exp:free">✨ Gemini 2.0 Flash Exp · Free · 1M ctx · tools</option>
                   <option value="openrouter::stealth/ox-alpha">🧪 Ox Alpha · Free Preview · 1M ctx · tools</option>
                 </optgroup>
                 <optgroup id="providerModelsAnchor" label="Cloud Models (checking configured providers…)">
@@ -144,6 +149,7 @@
             <div class="select-group">
               <label for="openRouterRoutingSelect">OpenRouter Route</label>
               <select id="openRouterRoutingSelect" title="Applies whenever a request is dispatched through OpenRouter">
+                <option value="free">🟢 Free ($0.00 Models Only)</option>
                 <option value="balanced" selected>⚖ Balanced</option>
                 <option value="cheapest">💷 Cheapest</option>
                 <option value="fastest">⚡ Fastest</option>

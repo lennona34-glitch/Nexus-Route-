@@ -463,6 +463,90 @@ export class EndlessForgeEngine {
         palettes: 'ochre gold, burnt sienna, deep lapis lazuli, rose quartz, twilight violet',
         aspects: ['1216x832', '1152x768', '1024x1024'],
       },
+      {
+        name: 'Retro 80s Synthwave & Neon Outrun',
+        subjects: [
+          'a chrome retro sports car speeding down an endless glowing neon wireframe highway toward a giant digital sun',
+          'a cybernetic saxophonist performing on a rain-slicked skyscraper helipad under purple neon lightning',
+          'a glowing retro arcade cabinet projecting interactive 3D vector laser holograms in an abandoned neon lounge',
+          'an 80s anime mecha pilot with a reflective gold visor inside an illuminated cockpit soaring over a nocturnal city',
+        ],
+        settings: [
+          'infinite magenta wireframe grid horizon with laser palm tree silhouettes and a glowing retro grid sunset',
+          'dense neon-drenched rooftop overlooking a sprawling purple megacity with wet asphalt reflections and blue searchlights',
+          'subterranean retro-futuristic roller rink illuminated by pulsating neon lasers and chrome mirror balls',
+        ],
+        styles: [
+          'Vibrant synthwave neo-noir digital art with intense contrasting neon rim lights and laser grid aesthetics, 8k',
+          'Classic 1980s retro anime aesthetic in the style of Bubblegum Crisis and Akira, crisp cel shading and film grain',
+          'Cinematic outrun wallpaper illustration with sharp chrome reflections, deep purple shadows, and neon glow',
+        ],
+        palettes: 'neon magenta, electric cyan, midnight violet, solar gold, hot pink',
+        aspects: ['1216x832', '1152x768', '1024x1024'],
+      },
+      {
+        name: 'Eldritch Crystal Spires & Deep Cavern Relics',
+        subjects: [
+          'a subterranean crystal golem holding a glowing amethyst lantern inside a colossal underground geode cavern',
+          'an ancient scholar deciphering glowing emerald runes on floating obsidian monoliths in a subterranean sanctum',
+          'a swarm of bioluminescent glass moths hovering around an active subterranean stargate made of liquid mercury',
+          'a petrified stone colossus holding an incandescent sapphire star in its palms beneath underground waterfalls',
+        ],
+        settings: [
+          'vast underground cavern filled with towering purple amethyst crystals, glowing lichens, and underground mist',
+          'ancient submerged basalt ruins with glowing turquoise glyphs and shimmering caustic light reflections',
+          'crystal canyon illuminated by pulsing sapphire fissures and drifting radiant spore clouds',
+        ],
+        styles: [
+          'Dark high-fantasy concept art with dramatic crystal refraction and volumetric light rays, 8k resolution',
+          'Eldritch atmospheric digital painting in the style of Lovecraft, moody and awe-inspiring with intricate details',
+          'Detailed cinematic matte painting with deep cavern shadows and radiant subterranean luminescence',
+        ],
+        palettes: 'amethyst purple, emerald green, obsidian black, glowing sapphire, glowing turquoise',
+        aspects: ['832x1216', '1152x768', '1024x1024'],
+      },
+      {
+        name: 'Steampunk Aerostats & Victorian Skyports',
+        subjects: [
+          'a magnificent brass and mahogany airship docking at a towering Victorian cloud spire during a golden sunrise',
+          'a clockwork ornithopter pilot in leather flight jacket testing mechanical wings above a sea of golden clouds',
+          'an eccentric Victorian astronomer adjusting a giant brass telescope on a floating steam observatory platform',
+          'a mechanical courier automaton gliding across suspended copper cables between soaring steampunk skyscrapers',
+        ],
+        settings: [
+          'breathtaking cloud-level skyport at dawn with brass towers, steam plumes, and soaring zeppelins',
+          'floating Victorian city suspended above golden clouds with glowing gas lamps and ornate iron bridges',
+          'high-altitude observatory deck with polished brass instruments and expansive panoramic sky vistas',
+        ],
+        styles: [
+          'Masterpiece steampunk illustration with intricate polished brass gears, realistic steam physics, and warm sunrise light, 8k',
+          'Victorian retro-futuristic concept art in the style of Ian McQue, rich painterly textures and epic scale',
+          'Detailed romantic architectural fantasy painting with golden hour volumetric sunlight and atmospheric haze',
+        ],
+        palettes: 'burnished brass, copper, warm dawn amber, sky azure, mahogany',
+        aspects: ['1216x832', '1152x768', '1024x1024'],
+      },
+      {
+        name: 'Hyper-Macro Photorealism & Micro Ecosystems',
+        subjects: [
+          'an iridescent metallic scarab beetle perched on a mossy twig with a water droplet reflecting an entire galaxy',
+          'a miniature bioluminescent mushroom forest on an ancient tree root glowing with sapphire spores under moonlight',
+          'a delicate clockwork hummingbird with sapphire gears sipping nectar from a crystalline glass orchid',
+          'a tiny chameleon made of polished stained glass resting on an emerald fern in a dewy rainforest',
+        ],
+        settings: [
+          'extreme macro forest floor with dewy emerald moss, soft morning bokeh, and shimmering crystal water droplets',
+          'enchanted fairy ring of miniature glowing mushrooms with floating luminous spores at twilight',
+          'sunlit greenhouse terrace with dappled morning light filtering through dew-covered tropical leaves',
+        ],
+        styles: [
+          'Award-winning National Geographic macro photography, razor-sharp focal clarity, creamy f/1.4 bokeh, 8k',
+          'Hyper-realistic nature photography with studio rim lighting and microscopic texture detail',
+          'Ethereal magical realism digital art with soft glow, sparkling dew particles, and pristine clarity',
+        ],
+        palettes: 'emerald moss green, sapphire blue, golden pollen yellow, crystal clear dewdrops',
+        aspects: ['1024x1024', '832x1216', '1152x768'],
+      },
     ];
 
     const realmIndex = Math.floor((seedOffset + Math.random() * 100) % realms.length);

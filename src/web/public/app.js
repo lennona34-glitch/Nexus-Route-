@@ -1541,56 +1541,72 @@ if (clearAllHistoryBtn) {
 // INFINITE DYNAMIC CONTEXTUAL PRESET PROMPT GENERATOR & IDEA SYNTHESIZER
 // =========================================================================
 
+function fisherYatesShuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 const CURATED_PROMPT_DATABASE = [
-  // 🎮 3D & Retro Vector Games
+  // 🎮 3D, Android & Retro Vector Games
   { category: 'gaming', label: '🎮 1983 Vector Trench Run', prompt: 'Build a complete playable 1983 Atari Star Wars inspired 3D vector trench run game in trench_run.html using Three.js and UnrealBloomPass with wireframe neon canyon, TIE fighter dogfights, proton torpedo exhaust port finale, and procedural Web Audio SFX.' },
-  { category: 'gaming', label: '🎮 Cyberpunk Raycaster', prompt: 'Build a complete Wolfenstein 3D style pseudo-3D raycaster game in raycaster.html with neon textured walls, glowing sprite enemies, minimap, weapon firing animations, and retro sound effects.' },
+  { category: 'gaming', label: '📱 APB Police Pursuit APK', prompt: 'Build a complete high-octane native Android top-down police combat game APK named APBPursuit in apb_pursuit.apk using build_android_apk. Features sirens, touch steering, wanted bounties, EMP shockwave, chopper support, ToneGenerator sound DSP, and auto-launch on emulator!' },
+  { category: 'gaming', label: '🎮 Cyberpunk Raycaster 3D', prompt: 'Build a complete Wolfenstein 3D style pseudo-3D raycaster game in raycaster.html with neon textured walls, glowing sprite enemies, minimap, weapon firing animations, and retro sound effects.' },
   { category: 'gaming', label: '🎮 3D Wireframe Asteroids', prompt: 'Create a full 3D vector arcade Asteroids space shooter in asteroids_3d.html with 6DOF ship flight, glowing neon particle explosions, splitting asteroids, hyperspace button, and CRT bloom post-processing.' },
-  { category: 'gaming', label: '🎮 Neon Pinball Sandbox', prompt: 'Build a single-file playable neon pinball game in pinball.html with realistic flipper physics, bumpers, multiball drop targets, particle spark trails, and score combos.' },
+  { category: 'gaming', label: '🎮 Neon Pinball Physics', prompt: 'Build a single-file playable neon pinball game in pinball.html with realistic flipper physics, bumpers, multiball drop targets, particle spark trails, and score combos.' },
   { category: 'gaming', label: '🎮 Matrix Falling Sand Sim', prompt: 'Build an interactive falling sand cellular automata simulation in falling_sand.html with sand, water, fire, gunpowder, acid, glass, and plant elements that react chemically with mouse drawing.' },
   { category: 'gaming', label: '🎮 Tron Lightcycle Duel', prompt: 'Create a 3D Tron Lightcycle arena combat game in lightcycle.html where player and AI steer glowing light trails that leave solid lethal light walls at 60fps.' },
   { category: 'gaming', label: '🎮 Brick Breaker Arcade', prompt: 'Build a complete playable Brick Breaker arcade game in brick_breaker.html with paddle physics, particle explosions, laser power-ups, multiball, and Web Audio SFX.' },
   { category: 'gaming', label: '🎮 Roguelike Dungeon Crawler', prompt: 'Create a complete playable turn-based Roguelike dungeon crawler in dungeon.html with procedural floor generation, fog of war, inventory, loot chests, and turn-based combat.' },
+  { category: 'gaming', label: '🎮 3D Missile Command', prompt: 'Build an arcade 3D Missile Command defense game in missile_command.html with incoming ICBM parabolic trajectories, explosive blast radiuses, interceptor batteries, and neon city silhouettes.' },
+  { category: 'gaming', label: '🎮 Retro Lunar Lander 3D', prompt: 'Build an Apollo 11 Lunar Lander vector flight sim in lunar_lander.html with realistic gravity thrust physics, fuel management, crater landing pads, and radio telemetry.' },
+  { category: 'gaming', label: '🎮 Neon Space Invaders', prompt: 'Create a neon vector Space Invaders arcade game in space_invaders.html with marching alien fleets, destructible shields, UFO bonus ships, and pulsing 4-tone bass sound effects.' },
 
-  // 🎨 Mind-Blowing Studio Art & Visuals
+  // 🎨 Mind-Blowing Studio Art & Visuals (PromptForge SDXL)
+  { category: 'art', label: '🎨 Dalek Synthwave 1980s', prompt: 'Generate an award-winning retro 80s synthwave digital masterpiece of a golden Dalek cruising down an infinite glowing neon wireframe highway towards a giant magenta digital sun with palm trees and laser grids.' },
   { category: 'art', label: '🎨 Cyberpunk Neon City', prompt: 'Generate an award-winning cinematic masterpiece of a hyper-detailed cyberpunk metropolis at midnight with flying spinners, holographic neon billboards in torrential rain, reflections on wet asphalt, volumetric fog, and razor-sharp 8k details.' },
   { category: 'art', label: '🎨 Cosmic Moon Fisher', prompt: 'Generate a stunning award-winning digital artwork of a lone astronaut sitting peacefully on a lunar crater ledge fishing into a shimmering cosmic nebula with the glowing blue marble Earth rising in the background, Hasselblad 80mm lens, ray-traced starlight, 8k resolution.' },
   { category: 'art', label: '🎨 Ghibli Floating Island', prompt: 'Create a breathtaking Studio Ghibli inspired watercolor painting of a lush floating island fortress drifting through fluffy golden cumulus clouds at sunrise with ancient windmills, lush waterfalls cascading into open sky, and flock of white birds.' },
   { category: 'art', label: '🎨 Steampunk Chrono-Owl', prompt: 'Create a hyper-realistic macro photograph of an intricate steampunk mechanical owl with polished brass gears, titanium filigree plumage, and glowing blue sapphire lenses, dramatic studio lighting, 8k resolution, depth of field.' },
   { category: 'art', label: '🎨 Retro Sci-Fi 1970s Cover', prompt: 'Design a vintage 1970s sci-fi paperback book cover titled "The Last Starhopper" with Chris Foss style cosmic spaceships, swirling interstellar nebulae, bold retro typography, and vibrant airbrush textures.' },
   { category: 'art', label: '🎨 Synthwave DeLorean Highway', prompt: 'Generate an iconic synthwave digital art piece of a chrome DeLorean speeding down an endless glowing neon grid wireframe highway toward a giant magenta retro sun with palm tree silhouettes and purple laser grids.' },
-  { category: 'art', label: '🎨 Deep Sea Bioluminescence', prompt: 'Generate a cinematic deep-ocean digital painting of an atmospheric research submarine discovering a colossal mythical bioluminescent dragon-leviathan glowing with cyan and violet light in the Mariana Trench.' },
-  { category: 'art', label: '🎨 Da Vinci Blueprint', prompt: 'Create an authentic Renaissance parchment blueprint in the style of Leonardo da Vinci illustrating a fantastical clockwork flying dragon with sepia ink sketches, Italian mirror-writing annotations, and anatomical cross-sections.' },
+  { category: 'art', label: '🎨 Deep Sea Leviathan', prompt: 'Generate a cinematic deep-ocean digital painting of an atmospheric research submarine discovering a colossal mythical bioluminescent dragon-leviathan glowing with cyan and violet light in the Mariana Trench.' },
+  { category: 'art', label: '🎨 Da Vinci Flying Mech', prompt: 'Create an authentic Renaissance parchment blueprint in the style of Leonardo da Vinci illustrating a fantastical clockwork flying dragon with sepia ink sketches, Italian mirror-writing annotations, and anatomical cross-sections.' },
+  { category: 'art', label: '🎨 Eldritch Crystal Cavern', prompt: 'Generate a dark high-fantasy digital painting of an ancient scholar discovering towering glowing purple amethyst monoliths inscribed with alien runes in a subterranean basalt temple.' },
+  { category: 'art', label: '🎨 Solarpunk Coastal Ecocity', prompt: 'Generate a luminous solarpunk digital painting of an idyllic coastal white-terrace ecocity with vertical glass greenhouses, cascading waterfalls, solar gliders, and turquoise Mediterranean waters.' },
 
-  // 💻 Creative Web Apps & Interactive Tools
-  { category: 'coding', label: '🎵 3D Audio Visualizer', prompt: 'Create a responsive 3D audio frequency spectrum visualizer in visualizer.html using Web Audio API and Three.js with glowing reactive geometry, microphone input support, demo synth beat, and fullscreen mode.' },
-  { category: 'coding', label: '🎹 Step-Sequencer Synth', prompt: 'Build a sleek 16-step drum machine and chiptune synth in synth_sequencer.html with Web Audio oscillators, kick/snare/hihat synthesis, tempo BPM slider, and pattern saving.' },
-  { category: 'coding', label: '🌌 N-Body Gravity Sandbox', prompt: 'Build an interactive 3D N-body orbital gravity simulator in gravity_sim.html where users can click to spawn stars, planets, and black holes with trailing velocity vectors and collision merging.' },
-  { category: 'coding', label: '📊 Glassmorphic Kanban', prompt: 'Build a clean modern interactive Kanban board web app in kanban.html with drag-and-drop task cards, color labels, search filter, and local storage persistence.' },
-  { category: 'coding', label: '🎨 Palette Extractor Tool', prompt: 'Build a single-file web tool in palette.html where users can drag and drop any image to extract its dominant 6-color palette, color harmony schemes, and copy HEX/RGB codes.' },
+  // 💻 Creative Web Apps, Audio DSP & Tools
+  { category: 'coding', label: '🎵 Sound Forge Spectrum Deck', prompt: 'Create an interactive studio audio DSP spectrum analyzer in spectrum_deck.html with real-time FFT frequency bars, peak VU meters, customizable color gradients, and Web Audio mic/file input.' },
+  { category: 'coding', label: '🎹 16-Step Beatbox Synth', prompt: 'Build a sleek 16-step drum machine and chiptune synth in synth_sequencer.html with Web Audio oscillators, kick/snare/hihat synthesis, tempo BPM slider, and pattern saving.' },
+  { category: 'coding', label: '🌌 3D N-Body Gravity Sim', prompt: 'Build an interactive 3D N-body orbital gravity simulator in gravity_sim.html where users can click to spawn stars, planets, and black holes with trailing velocity vectors and collision merging.' },
+  { category: 'coding', label: '📊 Glassmorphic Kanban Board', prompt: 'Build a clean modern interactive Kanban board web app in kanban.html with drag-and-drop task cards, color labels, search filter, and local storage persistence.' },
+  { category: 'coding', label: '🎨 Color Palette Extractor', prompt: 'Build a single-file web tool in palette.html where users can drag and drop any image to extract its dominant 6-color palette, color harmony schemes, and copy HEX/RGB codes.' },
   { category: 'coding', label: '🌀 Fractal Mandelbrot Zoomer', prompt: 'Create a real-time GPU-accelerated Mandelbrot and Julia set fractal explorer in fractal.html with smooth mouse drag-zooming, color palette cycling, and coordinate readout.' },
-  { category: 'coding', label: '⏱️ Pomodoro Matrix Timer', prompt: 'Build a cyberpunk Matrix-themed Pomodoro productivity timer in timer.html with falling green glyphs, work/break interval audio chime, task checklist, and streak counter.' },
-  { category: 'coding', label: '📝 Markdown Mindmap Graph', prompt: 'Build an interactive visual mindmap and markdown note editor in mindmap.html with force-directed node physics, search, zoom/pan canvas, and export.' },
+  { category: 'coding', label: '⏱️ Matrix Cyberpunk Timer', prompt: 'Build a cyberpunk Matrix-themed Pomodoro productivity timer in timer.html with falling green glyphs, work/break interval audio chime, task checklist, and streak counter.' },
+  { category: 'coding', label: '📝 Visual Mindmap Graph', prompt: 'Build an interactive visual mindmap and markdown note editor in mindmap.html with force-directed node physics, search, zoom/pan canvas, and export.' },
 
   // 🧠 Deep Reasoning, Paradoxes & Logic
-  { category: 'reasoning', label: '🧠 Fermi Paradox Solutions', prompt: 'Provide a rigorous scientific analysis of the Fermi Paradox: Contrast the Great Filter hypothesis, Rare Earth hypothesis, and Dark Forest theory, and evaluate which aligns best with contemporary astrophysical data.' },
-  { category: 'reasoning', label: '🧠 Newcomb\'s Paradox', prompt: 'Explain Newcomb\'s Paradox in decision theory: Contrast the Causal Decision Theory (two-boxing) versus Evidential Decision Theory (one-boxing) perspectives and explain why superrationality favors one-boxing.' },
-  { category: 'reasoning', label: '🧠 Ship of Theseus & AI', prompt: 'Analyze the Ship of Theseus paradox through the lens of modern AI consciousness and gradual neural replacement (Moravec transfer). Where does identity persist if memories and neural weights are continuously mirrored?' },
-  { category: 'reasoning', label: '🧮 3 Boxes Logic Puzzle', prompt: 'Solve this logic puzzle step-by-step: Three boxes are labeled Apples, Oranges, and Mixed. Every label is guaranteed to be incorrect. You can pick only 1 fruit from 1 box. How do you deduce the correct label for all three boxes?' },
-  { category: 'reasoning', label: '🎲 100 Prisoners Problem', prompt: 'Explain the 100 Prisoners problem with the closed boxes loop strategy. Mathematically prove why following the permutation cycles raises the survival probability from virtually zero (1/2^100) to over 31.18%.' },
-  { category: 'reasoning', label: '♟️ Iterated Prisoner Dilemma', prompt: 'Explain the mathematical payoff matrix of the Prisoner\'s Dilemma and prove why Iterated Tit-for-Tat and Generous Tit-for-Tat are evolutionary stable strategies in repeated games.' },
+  { category: 'reasoning', label: '🧠 Fermi Paradox & Dark Forest', prompt: 'Provide a rigorous scientific analysis of the Fermi Paradox: Contrast the Great Filter hypothesis, Rare Earth hypothesis, and Liu Cixin\'s Dark Forest theory, evaluating each against modern exoplanet data.' },
+  { category: 'reasoning', label: '🧠 Newcomb\'s Decision Paradox', prompt: 'Explain Newcomb\'s Paradox in decision theory: Contrast Causal Decision Theory (two-boxing) versus Evidential Decision Theory (one-boxing) and explain why superrationality favors one-boxing.' },
+  { category: 'reasoning', label: '🧠 Ship of Theseus & AI Weights', prompt: 'Analyze the Ship of Theseus paradox through the lens of modern AI consciousness and gradual neural replacement (Moravec transfer). Where does identity persist if weights and memories are mirrored?' },
+  { category: 'reasoning', label: '🧮 3 Incorrect Boxes Puzzle', prompt: 'Solve this logic puzzle step-by-step: Three boxes are labeled Apples, Oranges, and Mixed. Every single label is guaranteed to be wrong. You can pick exactly 1 fruit from 1 box. How do you deduce all correct labels?' },
+  { category: 'reasoning', label: '🎲 100 Prisoners Cycle Proof', prompt: 'Explain the 100 Prisoners problem with the closed permutation cycle strategy. Prove mathematically why following the box cycles raises the survival probability from 1/(2^100) to over 31.18%.' },
+  { category: 'reasoning', label: '♟️ Iterated Tit-for-Tat Game', prompt: 'Explain the mathematical payoff matrix of the Prisoner\'s Dilemma and prove why Iterated Tit-for-Tat and Generous Tit-for-Tat are evolutionary stable strategies in repeated games.' },
 
-  // 🔬 Science, Space & Futuristic Engineering
-  { category: 'science', label: '🚀 Dyson Swarm Architecture', prompt: 'Explain the engineering physics of constructing a Dyson Swarm around the Sun: Address orbital mechanics, statite radiation-pressure levitation, mass requirements from Mercury, and wireless power transmission.' },
-  { category: 'science', label: '⚛️ Alcubierre Warp Drive', prompt: 'Explain the physics of the Alcubierre warp drive metric in General Relativity: How does it contract space-time ahead and expand it behind, and what are the exotic matter (negative energy) constraints?' },
-  { category: 'science', label: '🧬 CRISPR Epigenetic Editing', prompt: 'Explain how CRISPR-dCas9 (dead Cas9) fusion proteins perform epigenetic silencing and activation without cutting DNA double strands, and its implications for treating genetic disorders.' },
-  { category: 'science', label: '🌌 Black Hole Information Paradox', prompt: 'Explain Hawking radiation, the Black Hole Information Paradox, and how the AdS/CFT correspondence and holographic entanglement entropy propose to resolve the loss of quantum information.' },
+  // 🔬 Science, Space & Quantum Physics
+  { category: 'science', label: '🚀 Dyson Swarm Energy Physics', prompt: 'Explain the engineering physics of constructing a Dyson Swarm around the Sun: Address orbital mechanics, statite radiation-pressure levitation, mass requirements from Mercury, and microwave power transmission.' },
+  { category: 'science', label: '⚛️ Alcubierre Warp Metric', prompt: 'Explain the physics of the Alcubierre warp drive metric in General Relativity: How does it contract space-time ahead and expand it behind, and what are the exotic matter (negative energy) constraints?' },
+  { category: 'science', label: '🧬 CRISPR-dCas9 Epigenetics', prompt: 'Explain how CRISPR-dCas9 (dead Cas9) fusion proteins perform targeted epigenetic silencing and activation without cutting DNA double strands, and its medical implications.' },
+  { category: 'science', label: '🌌 Holographic Principle & BH', prompt: 'Explain Hawking radiation, the Black Hole Information Paradox, and how the AdS/CFT correspondence and holographic entanglement entropy propose to resolve the loss of quantum information.' },
 
   // 🛠️ System, Automation & Real-Time Powers
-  { category: 'tools', label: '🌐 Web Search Frontier AI', prompt: 'Search the web for the latest major open-source AI models and release highlights from this month and summarize top 3.' },
-  { category: 'tools', label: '📁 Workspace Audit', prompt: 'List all files currently created in the workspace directory and report their file sizes, categories, and modification dates.' },
+  { category: 'tools', label: '🌐 Web Search Frontier AI', prompt: 'Search the web for the latest major open-source AI models and release highlights from this month and summarize the top 3.' },
+  { category: 'tools', label: '📁 Workspace Audit & Files', prompt: 'List all files currently created in the workspace directory and report their file sizes, categories, and modification dates.' },
   { category: 'tools', label: '💱 £ Compound Growth Calc', prompt: 'Calculate the total accumulated value and interest on £20,000 invested at 8.4% annual return compounded monthly over 15 years using the calculator tool.' },
-  { category: 'tools', label: '⚡ Gateway Health & Latency', prompt: 'Inspect gateway telemetry: Which provider and model is currently active, what is the latency, and are tools enabled?' }
+  { category: 'tools', label: '⚡ Test System & Diagnostics', prompt: 'Run execute_command to verify our TypeScript build compiles with zero errors and test our Android ADB device bridge connection.' }
 ];
 
 // Procedural Combinatorial Idea Generator Matrices
@@ -1606,24 +1622,29 @@ const PROCEDURAL_MATRICES = {
       { name: 'Neon Space Invaders with Bloom', file: 'space_invaders_neon.html' },
       { name: '3D Vector Flight Dogfight Sim', file: 'dogfight_3d.html' },
       { name: 'Cyberpunk Drone Descent Maze', file: 'drone_descent.html' },
-      { name: 'Retro Wireframe Lunar Lander', file: 'lunar_lander_3d.html' }
+      { name: 'Retro Wireframe Lunar Lander', file: 'lunar_lander_3d.html' },
+      { name: 'Hovercraft Slipstream Racer', file: 'hover_racer.html' },
+      { name: 'Arcade Missile Silo Defense', file: 'missile_defense.html' }
     ],
     mechanics: [
       'ricocheting laser beams, destructible cover, and particle spark explosions',
       'smooth 60fps mouse crosshair aiming, dash dodging, and combo score multipliers',
       'procedural labyrinth maze generation, enemy patrol AI, and boss battles',
       'realistic gravity physics, elastic collision impulses, and slow-motion bullet time',
-      'power-up pickups, shield regeneration, and high-score local storage saving'
+      'power-up pickups, shield regeneration, and high-score local storage saving',
+      'boost slipstreams, neon trail collisions, and dynamic camera shake'
     ],
     aesthetics: [
       'Three.js UnrealBloomPass wireframe neon glow with CRT scanline post-processing',
       'HTML5 Canvas 60fps retro green phosphor CRT vector arcade aesthetics',
-      'vibrant synthwave magenta/cyan vector wireframe visuals with stars'
+      'vibrant synthwave magenta/cyan vector wireframe visuals with stars',
+      'deep amber retro terminal graphics with high-contrast bloom'
     ],
     audio: [
       'procedural Web Audio chiptune laser synthesizers and noise explosion envelopes',
       '8-bit retro arcade synth SFX and dynamic engine hum pitch shifting',
-      'procedural FM synth arpeggiator bassline and retro drum beats'
+      'procedural FM synth arpeggiator bassline and retro drum beats',
+      'dynamic stereo panning laser pulses and resonant low-pass filter sweeps'
     ]
   },
   apps: {
@@ -1634,12 +1655,15 @@ const PROCEDURAL_MATRICES = {
       { name: 'Fractal Chaos Explorer & Zoomer', file: 'fractal_explorer.html' },
       { name: 'Retro ASCII Art Video Camera', file: 'ascii_camera.html' },
       { name: 'Physics Particle Sandbox Playground', file: 'particle_physics.html' },
-      { name: 'Interactive Neural Network Visualizer', file: 'nn_visualizer.html' }
+      { name: 'Interactive Neural Network Visualizer', file: 'nn_visualizer.html' },
+      { name: 'Web Audio Synthesizer Keyboard', file: 'poly_synth.html' },
+      { name: 'Algorithmic Cellular Music Matrix', file: 'cellular_music.html' }
     ],
     features: [
       'interactive mouse controls, real-time parameter sliders, and smooth 60fps rendering',
       'drag-and-drop file import, preset saving to localStorage, and fullscreen support',
-      'reactive audio synthesis, customizable color gradients, and export capabilities'
+      'reactive audio synthesis, customizable color gradients, and export capabilities',
+      'custom envelope ADSR dials, dual oscillators, and stereo chorus FX'
     ]
   },
   art: {
@@ -1649,7 +1673,9 @@ const PROCEDURAL_MATRICES = {
       'dramatic chiaroscuro oil painting in the style of Rembrandt',
       'ethereal Studio Ghibli watercolor landscape',
       'intricate Leonardo da Vinci sepia parchment blueprint',
-      'epic dark fantasy digital masterpiece'
+      'epic dark fantasy digital masterpiece',
+      'vibrant 80s synthwave retro outrun digital art',
+      'award-winning National Geographic macro wildlife photography'
     ],
     subjects: [
       'a lone cybernetic ronin meditating beneath a glowing holographic cherry blossom tree',
@@ -1657,12 +1683,15 @@ const PROCEDURAL_MATRICES = {
       'a retro-futuristic Victorian observatory situated on the icy rings of Saturn',
       'a deep-sea research submarine discovering a majestic glowing leviathan in the abyss',
       'a bustling neo-Tokyo night market in torrential rain with flying noodle carts and neon umbrellas',
-      'a celestial celestial phoenix with liquid gold flame plumage rising from a crystal volcanic caldera'
+      'a celestial phoenix with liquid gold flame plumage rising from a crystal volcanic caldera',
+      'a chrome sports car speeding towards a giant wireframe sun down a neon highway',
+      'a metallic scarab beetle perched on moss with a dewdrop reflecting a spiral galaxy'
     ],
     atmospheres: [
       'volumetric god rays, neon puddle reflections, moody cinematic fog, and razor-sharp 8k details',
       'golden hour sunset light with anamorphic lens flares and rich atmospheric haze',
-      'dramatic high-contrast rim lighting, cinematic depth of field, and ray-traced starlight'
+      'dramatic high-contrast rim lighting, cinematic depth of field, and ray-traced starlight',
+      'mystical crystal luminescence, floating spore particles, and deep chromatic depth'
     ]
   },
   reasoning: {
@@ -1722,55 +1751,36 @@ function renderRandomPresets() {
   const container = document.getElementById('presetButtonsContainer');
   if (!container) return;
 
-  const currentModel = (modelSelect ? modelSelect.value : '').toLowerCase();
-  const shuffleArray = arr => [...arr].sort(() => 0.5 - Math.random());
-
   // Generate 3 fresh procedural prompts on the fly
   const dynamicGame = generateProceduralGameIdea();
   const dynamicArt = generateProceduralArtIdea();
   const dynamicApp = generateProceduralAppIdea();
 
-  // Pick curated candidates
-  const curatedArt = shuffleArray(CURATED_PROMPT_DATABASE.filter(p => p.category === 'art'))[0];
-  const curatedGame = shuffleArray(CURATED_PROMPT_DATABASE.filter(p => p.category === 'gaming'))[0];
-  const curatedReasoning = shuffleArray(CURATED_PROMPT_DATABASE.filter(p => p.category === 'reasoning'))[0];
-  const curatedSci = shuffleArray(CURATED_PROMPT_DATABASE.filter(p => p.category === 'science'))[0];
-  const curatedTools = shuffleArray(CURATED_PROMPT_DATABASE.filter(p => p.category === 'tools'))[0];
+  // Pick from shuffled curated library with true Fisher-Yates
+  const shuffledCurated = fisherYatesShuffle(CURATED_PROMPT_DATABASE);
+  
+  // Combine 3 dynamic procedural ideas + top shuffled curated picks
+  const candidatePool = [
+    dynamicGame,
+    dynamicArt,
+    dynamicApp,
+    ...shuffledCurated
+  ];
 
-  let selected = [];
-
-  if (currentModel.includes('reasoner') || currentModel.includes('o3') || currentModel.includes('r1')) {
-    selected = [
-      PROCEDURAL_MATRICES.reasoning.topics[Math.floor(Math.random() * PROCEDURAL_MATRICES.reasoning.topics.length)],
-      curatedReasoning,
-      curatedSci,
-      dynamicGame,
-      dynamicArt
-    ];
-  } else if (currentModel.includes('coder') || currentModel.includes('sonnet')) {
-    selected = [
-      dynamicGame,
-      dynamicApp,
-      curatedGame,
-      dynamicArt,
-      curatedTools
-    ];
-  } else {
-    // Rich balanced distribution: 2 procedural + 3 curated
-    selected = [
-      dynamicGame,
-      dynamicArt,
-      curatedReasoning || curatedSci,
-      dynamicApp,
-      curatedTools
-    ];
+  // Select 5 unique candidates across varied categories
+  const finalFive = [];
+  const usedLabels = new Set();
+  
+  for (const item of fisherYatesShuffle(candidatePool)) {
+    if (item && item.label && item.prompt && !usedLabels.has(item.label)) {
+      usedLabels.add(item.label);
+      finalFive.push(item);
+      if (finalFive.length >= 5) break;
+    }
   }
 
-  // Deduplicate and filter valid items
-  const uniqueSelected = Array.from(new Set(selected.filter(Boolean))).slice(0, 5);
-
   container.innerHTML = '';
-  uniqueSelected.forEach((item, index) => {
+  finalFive.forEach((item, index) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'preset-btn';

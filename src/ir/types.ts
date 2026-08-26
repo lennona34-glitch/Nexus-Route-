@@ -57,7 +57,7 @@ export interface UniversalRequest {
   stop?: string | string[];
   user?: string;
   session_id?: string;
-  openrouter_routing?: 'balanced' | 'cheapest' | 'fastest' | 'tools';
+  openrouter_routing?: 'free' | 'balanced' | 'cheapest' | 'fastest' | 'tools';
   art_engine?: 'cloud' | 'gpu' | 'together' | 'huggingface' | 'openai' | 'imagen' | 'auto' | string;
   enable_tools?: boolean;
   timeout_ms?: number;
