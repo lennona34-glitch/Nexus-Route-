@@ -2531,6 +2531,12 @@ if (chatForm) {
     await loadCacheStats();
     await saveCurrentSession();
   } catch (err) {
+    const failedLed = document.getElementById('kpiModelLed');
+    if (failedLed) {
+      const aborted = err.name === 'AbortError';
+      failedLed.className = `activity-led ${aborted ? 'idle' : 'error'}`;
+      failedLed.title = aborted ? 'Model Status: Standby' : `Route failed: ${err.message}`;
+    }
     if (bodyEl) {
       if (err.name === 'AbortError') {
         bodyEl.innerHTML += `<div style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">⏹️ Generation stopped.</div>`;
@@ -2819,7 +2825,13 @@ function updateTelemetry(routeInfo, usage, durationMs = 0) {
 
   const kpiModelLed = document.getElementById('kpiModelLed');
   if (kpiModelLed) {
-    const isSuccess = (routeInfo?.attempts?.some(a => a.status === 'success')) || routeInfo?.cached || (routeInfo?.selected_model && routeInfo.selected_model !== '-');
+    // selected_model is set the moment a candidate is picked, so testing it
+    // reported success for routes that went on to fail every attempt. Success
+    // means an attempt actually succeeded, or the answer came from cache.
+    const ledAttempts = Array.isArray(routeInfo?.attempts) ? routeInfo.attempts : [];
+    const isSuccess = !!routeInfo?.cached
+      || ledAttempts.some(a => a.status === 'success')
+      || (ledAttempts.length === 0 && routeInfo?.route_stage === 'completed');
     kpiModelLed.className = `activity-led ${isSuccess ? 'connected' : 'error'}`;
     kpiModelLed.title = isSuccess ? `Model Connected: ${routeInfo.selected_model}` : 'Model Disconnected / Failed';
   }

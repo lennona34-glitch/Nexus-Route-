@@ -321,6 +321,24 @@ function attemptDeadlineFor(
   return now + Math.max(MIN_ATTEMPT_MS, Math.min(share, ceiling));
 }
 
+// Never fire a turn that cannot plausibly finish. A doomed sliver request still
+// ships the entire prompt upstream and is billed for it.
+const MIN_TURN_MS = 10_000;
+
+// A turn that completes - and especially one that hands back a tool call - is
+// progress, so the route earns a fresh allowance for the next turn instead of
+// dividing one fixed budget across an unknown number of turns. maxTurns and the
+// overall request deadline stay the real ceilings.
+function extendAttemptDeadline(
+  current: number,
+  requestDeadline: number,
+  requestedTimeoutMs: number | undefined,
+  provider: ProviderType,
+): number {
+  const allowance = positiveDuration(requestedTimeoutMs, defaultTurnMs(provider));
+  return Math.min(requestDeadline, Math.max(current, Date.now() + allowance));
+}
+
 async function withWallClockDeadline<T>(
   operation: Promise<T>,
   timeoutMs: number,
@@ -1448,7 +1466,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
       });
 
       const attemptStart = Date.now();
-      const attemptDeadline = attemptDeadlineFor(
+      let attemptDeadline = attemptDeadlineFor(
         attemptStart,
         requestDeadline,
         timeout_ms,
@@ -1463,7 +1481,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         const runTurn = async (messages: UniversalMessage[], tools: UniversalRequest['tools']) => {
           modelTurnCount++;
           const remainingRequestMs = attemptDeadline - Date.now();
-          if (remainingRequestMs <= 0) throw new AdapterError(`${model} exhausted its route-attempt time budget`, provider, 408, true);
+          if (remainingRequestMs < MIN_TURN_MS) throw new AdapterError(`${model} exhausted its route-attempt time budget`, provider, 408, true);
           const timeout = turnTimeoutMs(provider, timeout_ms ?? effectiveReq.timeout_ms, remainingRequestMs);
           const turnStartedAt = Date.now();
           this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'turn_started', requestedModel: req.model, provider, model, connectionLabel: connection?.label, turn: modelTurnCount });
@@ -1475,6 +1493,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           );
           accumulatedUsage = mergeUsage(accumulatedUsage, turnResponse.usage);
           this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'turn_completed', requestedModel: req.model, provider, model, connectionLabel: connection?.label, turn: modelTurnCount, durationMs: Date.now() - turnStartedAt, promptTokens: turnResponse.usage?.prompt_tokens, completionTokens: turnResponse.usage?.completion_tokens });
+          attemptDeadline = extendAttemptDeadline(attemptDeadline, requestDeadline, timeout_ms ?? effectiveReq.timeout_ms, provider);
           return turnResponse;
         };
         let currentResponse = await runTurn(currentMessages, currentTools);
@@ -1993,7 +2012,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
       };
 
       const attemptStart = Date.now();
-      const attemptDeadline = attemptDeadlineFor(
+      let attemptDeadline = attemptDeadlineFor(
         attemptStart,
         requestDeadline,
         timeout_ms,
@@ -2032,7 +2051,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         while (turnCount < maxTurns) {
           turnCount++;
           const remainingRequestMs = attemptDeadline - Date.now();
-          if (remainingRequestMs <= 0) throw new AdapterError(`${model} exhausted its route-attempt time budget`, provider, 408, true);
+          if (remainingRequestMs < MIN_TURN_MS) throw new AdapterError(`${model} exhausted its route-attempt time budget`, provider, 408, true);
           const timeout = turnTimeoutMs(provider, timeout_ms ?? effectiveReq.timeout_ms, remainingRequestMs);
           const currentReq: UniversalRequest = { ...effectiveReq, messages: currentMessages, tools: currentTools, timeout_ms: timeout };
           const stream = streamWithWallClockDeadline(adapter.streamChatCompletion(currentReq, model), timeout, provider, model);
@@ -2097,6 +2116,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           accumulatedUsage = mergeUsage(accumulatedUsage, turnUsage);
           this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'turn_completed', requestedModel: req.model, provider, model, connectionLabel: connection?.label, turn: turnCount, durationMs: Date.now() - turnStartedAt, promptTokens: turnUsage?.prompt_tokens, completionTokens: turnUsage?.completion_tokens });
 
+          attemptDeadline = extendAttemptDeadline(attemptDeadline, requestDeadline, timeout_ms ?? effectiveReq.timeout_ms, provider);
           const fakeToolNames = textualToolTranscriptNames(turnContent, availableToolNames);
 
           // Intercept JSON tool calls emitted in text by local models. A textual
