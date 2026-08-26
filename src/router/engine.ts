@@ -23,6 +23,7 @@ import { ProviderConnectionManager, type ProviderConnection } from '../providers
 import { RouteTelemetryStore } from '../telemetry/route-store.js';
 import { finalizeUsageCost, mergeUsage, zeroUsageCostForCache } from '../telemetry/usage.js';
 import { AgentEventLog } from '../telemetry/agent-events.js';
+import { sanitizeWorkspacePath } from '../security/path.js';
 import { compressMessages } from '../context/compression.js';
 import { getGroqRequestBudget } from '../providers/groq-budget.js';
 
@@ -87,6 +88,21 @@ function extractFilenames(text: string): string[] {
     names.add(match[1].replace(/\\/g, '/').replace(/^\.\//, ''));
   }
   return [...names];
+}
+
+// The write check only sees tool calls made during THIS request, so a file
+// written on an earlier request looked unwritten and the model got called a liar
+// for correctly reporting finished work. Before saying nothing was saved, ask
+// the filesystem.
+function namedFilesPresentOnDisk(text: string, workspaceDir: string): string[] {
+  const present: string[] = [];
+  for (const name of extractFilenames(text)) {
+    try {
+      const full = sanitizeWorkspacePath(name, workspaceDir);
+      if (fs.existsSync(full) && fs.statSync(full).isFile()) present.push(name);
+    } catch {}
+  }
+  return present;
 }
 
 function isArtifactFollowUp(text: string): boolean {
@@ -1510,6 +1526,8 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         };
         let currentResponse = await runTurn(currentMessages, currentTools);
         let turnCount = 0;
+        // Distinguishes leaving the loop on purpose from running out of turns.
+        let finishedCleanly = false;
         const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 8));
         let generatedImagesMarkdown = '';
         let fileCorrectionAttempts = 0;
@@ -1587,18 +1605,21 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               if (choice?.message) {
                 choice.message.content = `⚠️ Incomplete tool execution: ${fakeToolNames.join(', ')} was printed as text but never ran.`;
               }
+              finishedCleanly = true;
               break;
             }
             if (dependencyIssues.length > 0) {
               if (choice?.message) {
                 choice.message.content = `⚠️ Incomplete HTML artifact: ${dependencyIssues.flatMap(issue => issue.missing).join(', ')} still ${dependencyIssues.flatMap(issue => issue.missing).length === 1 ? 'is' : 'are'} missing.`;
               }
+              finishedCleanly = true;
               break;
             }
             if (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success) {
               if (choice?.message) {
                 choice.message.content = `⚠️ Incomplete interactive artifact: ${htmlRuntimeVerification.detail}`;
               }
+              finishedCleanly = true;
               break;
             }
             if (fileWriteExpected && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
@@ -1616,6 +1637,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               currentResponse = await runTurn(currentMessages, currentTools);
               continue;
             }
+            finishedCleanly = true;
             break;
           }
 
@@ -1689,7 +1711,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
 
         const response = currentResponse;
         if (accumulatedUsage) response.usage = accumulatedUsage;
-        if (turnCount >= maxTurns && response.choices?.[0]?.message) {
+        if (turnCount >= maxTurns && !finishedCleanly && response.choices?.[0]?.message) {
           // Ran out of turns rather than finishing - mark it rather than
           // presenting a truncated result as a complete answer.
           this.agentEventLog.record({
@@ -2368,8 +2390,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               continue;
             }
 
+            // A missing write is only worth reporting if the files the model
+            // named are genuinely absent. Real problems - a tool printed as text,
+            // missing dependencies, a failed runtime test - still warn.
+            const claimedFilesOnDisk = namedFilesPresentOnDisk(turnContent, ToolRegistry.getWorkspaceDir());
+            const writeUnaccountedFor = verifiedWrites.length === 0 && claimedFilesOnDisk.length === 0;
             const suppressUnverifiedFileClaim = fileWriteExpected && (
-              verifiedWrites.length === 0 ||
+              writeUnaccountedFor ||
               fakeToolNames.length > 0 ||
               dependencyIssues.length > 0 ||
               (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success)
@@ -2507,9 +2534,11 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           }
         }
 
-        // The success path also leaves the loop and falls through here, so this
-        // must test the turn counter rather than assume exhaustion.
-        if (turnCount >= maxTurns) {
+        // The success path also leaves the loop and falls through here. Testing
+        // the counter alone was not enough: finishing cleanly ON the final
+        // allowed turn still tripped it. completedRouteInfo is set only when the
+        // turn actually completed, so its absence is what marks exhaustion.
+        if (turnCount >= maxTurns && !completedRouteInfo) {
         this.agentEventLog.record({
           requestId,
           sessionId: req.session_id,
