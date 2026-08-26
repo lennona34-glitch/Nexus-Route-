@@ -15,6 +15,15 @@ import { testHtmlRuntime } from './html-runtime.js';
 const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
+
+// String(value) on an object produces "[object Object]" rather than failing, so
+// a malformed tool call became a real file with that name and a success result.
+// Anything that is not a primitive is treated as absent instead.
+function textArg(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return '';
+  return String(value);
+}
 const __dirname = path.dirname(__filename);
 const defaultWorkspaceDir = path.join(__dirname, '../../workspace');
 
@@ -907,9 +916,20 @@ export class ToolRegistry {
       }
 
       case 'write_file': {
-        const rawFilename = String(args.filename || args.path || args.file || args.filepath || '').trim();
-        const content = String(args.content ?? args.code ?? args.text ?? '');
-        if (!rawFilename) return 'Error: Empty filename provided.';
+        // String() on an object yields "[object Object]", which silently wrote a
+        // junk file of that name and reported success - see workspace/[object
+        // Object]. A non-string filename is a malformed call, not a filename.
+        const rawFilename = textArg(args.filename ?? args.path ?? args.file ?? args.filepath).trim();
+        const contentSource = args.content ?? args.code ?? args.text ?? '';
+        if (!rawFilename) {
+          return typeof (args.filename ?? args.path ?? args.file ?? args.filepath) === 'object'
+            ? 'Error: filename must be a string, not an object.'
+            : 'Error: Empty filename provided.';
+        }
+        if (contentSource !== null && typeof contentSource === 'object') {
+          return 'Error: content must be a string, not an object.';
+        }
+        const content = String(contentSource);
 
         // Prevent path traversal outside workspace
         let safePath: string;

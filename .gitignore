@@ -17,15 +17,9 @@ config/provider_connections.json
 config/route_history.json
 
 # Local Workspace and Generated Content
-workspace/art/*
-!workspace/art/.gitkeep
-workspace/projects/*
-workspace/chats/*
-workspace/android/*
-workspace/windows/*
-workspace/plugins/*
-workspace/context/raw/*
-!workspace/context/raw/.gitkeep
+# Everything under workspace/ is agent output, not source.
+workspace/*
+!workspace/.gitkeep
 
 # Python & AI Models
 __pycache__/

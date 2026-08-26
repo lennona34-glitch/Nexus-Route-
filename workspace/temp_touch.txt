@@ -1,1 +1,0 @@
-// We want to write directly to C:\Users\adria\.gemini\antigravity\scratch\nexus-route
