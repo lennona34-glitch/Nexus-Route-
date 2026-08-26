@@ -155,7 +155,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     return m;
   }
 
-  private buildPayload(req: UniversalRequest, targetModel: string, stream: boolean): Record<string, unknown> {
+  protected buildPayload(req: UniversalRequest, targetModel: string, stream: boolean): Record<string, unknown> {
     const payload: Record<string, unknown> = {
       model: this.cleanModel(targetModel),
       messages: normalizeMessages(req),

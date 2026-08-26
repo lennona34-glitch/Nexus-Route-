@@ -1528,12 +1528,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let turnCount = 0;
         // Distinguishes leaving the loop on purpose from running out of turns.
         let finishedCleanly = false;
-        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 8));
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 12));
         let generatedImagesMarkdown = '';
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
         let dependencyCorrectionAttempts = 0;
         let runtimeCorrectionAttempts = 0;
+        const toolCallSignatureCounts: Map<string, number> = new Map();
 
         while (turnCount < maxTurns) {
           const choice = currentResponse.choices?.[0];
@@ -1644,7 +1645,38 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           turnCount++;
           toolCalls.forEach(toolCall => this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'tool_started', requestedModel: req.model, provider, model, turn: modelTurnCount, tool: toolCall.function.name }));
           const toolsStartedAt = Date.now();
-          const toolMessages = await ToolRegistry.executeToolCalls(toolCalls, req.art_engine);
+
+          // Intercept repeating tool calls with identical arguments
+          const activeToolCalls: ToolCall[] = [];
+          const bypassedResults: Map<number, UniversalMessage> = new Map();
+          toolCalls.forEach((tc, idx) => {
+            const sig = `${tc.function.name}::${tc.function.arguments || ''}`;
+            const count = (toolCallSignatureCounts.get(sig) || 0) + 1;
+            toolCallSignatureCounts.set(sig, count);
+            if (count >= 3) {
+              bypassedResults.set(idx, {
+                role: 'tool',
+                tool_call_id: tc.id,
+                name: tc.function.name,
+                content: JSON.stringify({
+                  error: `Repeated tool execution halted: "${tc.function.name}" was already executed with identical arguments. Please analyze previous results, explain any obstacle to the user, or take an alternative action.`,
+                }),
+              });
+            } else {
+              activeToolCalls.push(tc);
+            }
+          });
+
+          const executedMessages = activeToolCalls.length > 0
+            ? await ToolRegistry.executeToolCalls(activeToolCalls, req.art_engine)
+            : [];
+          
+          let execIdx = 0;
+          const toolMessages: UniversalMessage[] = toolCalls.map((_, idx) => {
+            if (bypassedResults.has(idx)) return bypassedResults.get(idx)!;
+            return executedMessages[execIdx++];
+          });
+
           toolCalls.forEach((toolCall, index) => this.agentEventLog.record({
             requestId,
             sessionId: req.session_id,
@@ -1696,15 +1728,24 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             ...toolMessages,
           ];
 
-          // If artwork was generated, disallow re-triggering image tools on synthesis turn to avoid duplicate images
+          // If artwork was generated or budget reached, disallow tools on synthesis turn so model responds cleanly
           const runtimeTestRequired = requestNeedsHtmlRuntimeTest(req, observedWrites, expectedFileTargets, rejectedWrites);
-          const nextTools = hasArt || (
+          const isPenultimateTurn = turnCount >= maxTurns - 1;
+          const nextTools = isPenultimateTurn || hasArt || (
             allRequestedFilesVerified(expectedFileTargets, verifiedWrites)
             && htmlDependencyIssues(observedWrites, expectedFileTargets).length === 0
             && (!runtimeTestRequired || htmlRuntimeVerification.success)
           )
             ? undefined
             : effectiveReq.tools;
+          
+          if (isPenultimateTurn && !nextTools) {
+            currentMessages.push({
+              role: 'user',
+              content: '[Notice: You have reached the execution turn budget for this step. Please provide a clear, concise final summary of what was accomplished and any recommended next steps for the user.]',
+            });
+          }
+
           currentTools = nextTools;
           currentResponse = await runTurn(currentMessages, nextTools);
         }
@@ -2093,12 +2134,13 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let currentMessages = [...effectiveReq.messages];
         let currentTools = effectiveReq.tools;
         let turnCount = 0;
-        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 8));
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 12));
         let accumulatedUsage: UniversalResponse['usage'] | undefined = undefined;
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
         let dependencyCorrectionAttempts = 0;
         let runtimeCorrectionAttempts = 0;
+        const toolCallSignatureCounts: Map<string, number> = new Map();
 
         while (turnCount < maxTurns) {
           turnCount++;
@@ -2217,7 +2259,38 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
 
             toolCallsArray.forEach(toolCall => this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'tool_started', requestedModel: req.model, provider, model, turn: turnCount, tool: toolCall.function.name }));
             const toolsStartedAt = Date.now();
-            const toolMessages = await ToolRegistry.executeToolCalls(toolCallsArray, req.art_engine);
+
+            // Intercept repeating tool calls with identical arguments
+            const activeToolCalls: ToolCall[] = [];
+            const bypassedResults: Map<number, UniversalMessage> = new Map();
+            toolCallsArray.forEach((tc, idx) => {
+              const sig = `${tc.function.name}::${tc.function.arguments || ''}`;
+              const count = (toolCallSignatureCounts.get(sig) || 0) + 1;
+              toolCallSignatureCounts.set(sig, count);
+              if (count >= 3) {
+                bypassedResults.set(idx, {
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  name: tc.function.name,
+                  content: JSON.stringify({
+                    error: `Repeated tool execution halted: "${tc.function.name}" was already executed with identical arguments. Please analyze previous results, explain any obstacle to the user, or take an alternative action.`,
+                  }),
+                });
+              } else {
+                activeToolCalls.push(tc);
+              }
+            });
+
+            const executedMessages = activeToolCalls.length > 0
+              ? await ToolRegistry.executeToolCalls(activeToolCalls, req.art_engine)
+              : [];
+            
+            let execIdx = 0;
+            const toolMessages: UniversalMessage[] = toolCallsArray.map((_, idx) => {
+              if (bypassedResults.has(idx)) return bypassedResults.get(idx)!;
+              return executedMessages[execIdx++];
+            });
+
             toolCallsArray.forEach((toolCall, index) => this.agentEventLog.record({
               requestId,
               sessionId: req.session_id,
@@ -2335,13 +2408,21 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
 
             // Allow chaining tools up to maxTurns, only disabling image generation if art was already rendered
             const runtimeTestRequired = requestNeedsHtmlRuntimeTest(req, observedWrites, expectedFileTargets, rejectedWrites);
-            currentTools = hasArt || (
+            const isPenultimateTurn = turnCount >= maxTurns - 1;
+            currentTools = isPenultimateTurn || hasArt || (
               allRequestedFilesVerified(expectedFileTargets, verifiedWrites)
               && htmlDependencyIssues(observedWrites, expectedFileTargets).length === 0
               && (!runtimeTestRequired || htmlRuntimeVerification.success)
             )
               ? undefined
               : effectiveReq.tools;
+            
+            if (isPenultimateTurn && currentTools === undefined) {
+              currentMessages.push({
+                role: 'user',
+                content: '[Notice: You have reached the execution turn budget for this step. Please provide a clear, concise final summary of what was accomplished, the status of any files, and any recommended next steps for the user.]',
+              });
+            }
           } else {
             // Finished without calling more tools or finished synthesis turn
             const dependencyIssues = htmlDependencyIssues(observedWrites, expectedFileTargets);

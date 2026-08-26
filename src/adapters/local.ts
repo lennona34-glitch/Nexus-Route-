@@ -45,6 +45,16 @@ export class LocalAdapter extends OpenAIAdapter {
     return !LocalAdapter.NO_TOOL_SUPPORT.some(name => m.includes(name));
   }
 
+  protected override buildPayload(req: UniversalRequest, targetModel: string, stream: boolean): Record<string, unknown> {
+    const payload = super.buildPayload(req, targetModel, stream);
+    const numCtx = Number(process.env.OLLAMA_NUM_CTX || 32768);
+    (payload as any).options = {
+      ...(typeof (payload as any).options === 'object' && (payload as any).options ? (payload as any).options : {}),
+      num_ctx: numCtx,
+    };
+    return payload;
+  }
+
   override async chatCompletion(req: UniversalRequest, targetModel: string): Promise<UniversalResponse> {
     const modelToUse = this.cleanModelName(targetModel);
 
