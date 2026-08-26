@@ -93,6 +93,13 @@ function normalizeMessages(req: UniversalRequest): UniversalRequest['messages'] 
     : message);
 }
 
+// Only Anthropic models need - and accept - an explicit cache breakpoint here.
+// Other providers on OpenRouter either cache automatically or ignore the field,
+// so it is not worth sending to them.
+function cachingSupported(model: string): boolean {
+  return /(^|\/)anthropic\/|claude/i.test(model);
+}
+
 export class OpenAIAdapter implements ProviderAdapter {
   readonly provider: ProviderType;
   protected baseUrl: string;
@@ -163,6 +170,19 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     if (this.provider === 'openrouter') {
       if (req.session_id) payload.session_id = req.session_id;
+      // Anthropic models do not cache unless a breakpoint is sent - unlike
+      // OpenAI models, which cache automatically. An agent loop re-sends the
+      // whole conversation every turn, so without this the repeated prefix is
+      // billed at full input price on each one. The top-level form lets
+      // OpenRouter advance the breakpoint as the conversation grows, which is
+      // the documented shape for multi-turn use and cannot exceed the
+      // four-breakpoint limit. Cache reads bill at 0.1x input.
+      if (cachingSupported(targetModel) && process.env.NEXUS_PROMPT_CACHE !== 'off') {
+        const ttl = process.env.NEXUS_PROMPT_CACHE_TTL?.trim();
+        payload.cache_control = ttl && ttl !== '5m'
+          ? { type: 'ephemeral', ttl }
+          : { type: 'ephemeral' };
+      }
       const routingMode = req.openrouter_routing || 'balanced';
       const hasToolChain = !!req.tools?.length || req.messages.some(message => !!message.tool_calls?.length || message.role === 'tool');
       if (routingMode !== 'balanced' || hasToolChain) {

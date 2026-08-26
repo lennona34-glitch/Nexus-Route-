@@ -2883,7 +2883,10 @@ function updateTelemetry(routeInfo, usage, durationMs = 0) {
       const speed = durSec > 0 && compTok > 0 ? (compTok / durSec).toFixed(1) : (totTok / durSec).toFixed(1);
 
       if (kpiTokens) kpiTokens.textContent = `${totTok.toLocaleString()} tok`;
-      const cacheTokens = lastRequestCachedTokens > 0 ? ` · ♻ ${lastRequestCachedTokens.toLocaleString()} cached` : '';
+      const cacheHitRate = promptTok > 0 ? Math.round((lastRequestCachedTokens / promptTok) * 100) : 0;
+      const cacheTokens = lastRequestCachedTokens > 0
+        ? ` · ♻ ${lastRequestCachedTokens.toLocaleString()} cached (${cacheHitRate}%)`
+        : '';
       if (kpiTokenBreakdown) kpiTokenBreakdown.textContent = `P: ${promptTok} | C: ${compTok} (⚡ ${speed} tok/s)${cacheTokens}`;
       if (kpiSessionTokens) kpiSessionTokens.textContent = `${sessionTotalTokens.toLocaleString()} tok`;
       if (kpiSessionCost) kpiSessionCost.textContent = `Total Cost: ${formatCurrency(sessionTotalCost, 5)}`;
