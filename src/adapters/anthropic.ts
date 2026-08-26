@@ -1,6 +1,7 @@
 import { ProviderAdapter, AdapterError, readStreamWithInactivityTimeout } from './base.js';
 import { UniversalRequest, UniversalResponse, UniversalStreamChunk, ProviderType, ContentPart } from '../ir/types.js';
 import { extractTextFromContent } from '../ir/validator.js';
+import { ToolRegistry } from '../tools/registry.js';
 
 interface AnthropicContentBlock {
   type: 'text' | 'image' | 'tool_use' | 'tool_result';
@@ -140,7 +141,14 @@ export class AnthropicAdapter implements ProviderAdapter {
     };
     const modelToUse = normalizeMap[cleanModel] || cleanModel;
 
-    const anthropicTools = req.tools && req.tools.length > 0 ? req.tools.map(t => ({
+    const hasToolHistory = anthropicMessages.some(m =>
+      Array.isArray(m.content) && m.content.some(b => b.type === 'tool_use' || b.type === 'tool_result')
+    );
+    const availableTools = (req.tools && req.tools.length > 0)
+      ? req.tools
+      : (hasToolHistory ? ToolRegistry.getBuiltInTools() : undefined);
+
+    const anthropicTools = availableTools && availableTools.length > 0 ? availableTools.map(t => ({
       name: t.function.name,
       description: t.function.description,
       input_schema: t.function.parameters || { type: 'object', properties: {} },

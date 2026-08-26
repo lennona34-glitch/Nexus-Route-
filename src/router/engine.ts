@@ -1739,18 +1739,19 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           // If artwork was generated or budget reached, disallow tools on synthesis turn so model responds cleanly
           const runtimeTestRequired = requestNeedsHtmlRuntimeTest(req, observedWrites, expectedFileTargets, rejectedWrites);
           const isPenultimateTurn = turnCount >= maxTurns - 1;
-          const nextTools = isPenultimateTurn || hasArt || (
+          const allDone = (
             allRequestedFilesVerified(expectedFileTargets, verifiedWrites)
             && htmlDependencyIssues(observedWrites, expectedFileTargets).length === 0
             && (!runtimeTestRequired || htmlRuntimeVerification.success)
-          )
+          );
+          const nextTools = isPenultimateTurn || hasArt || allDone
             ? undefined
             : effectiveReq.tools;
           
-          if (isPenultimateTurn && !nextTools) {
+          if (!nextTools) {
             currentMessages.push({
               role: 'user',
-              content: '[Notice: You have reached the execution turn budget for this step. Please provide a clear, concise final summary of what was accomplished and any recommended next steps for the user.]',
+              content: '[Task complete: All requested files and verifications are saved to disk. Please provide a clear, concise final summary of what was accomplished, how the application works, and how the user can interact with it.]',
             });
           }
 
@@ -2417,18 +2418,19 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             // Allow chaining tools up to maxTurns, only disabling image generation if art was already rendered
             const runtimeTestRequired = requestNeedsHtmlRuntimeTest(req, observedWrites, expectedFileTargets, rejectedWrites);
             const isPenultimateTurn = turnCount >= maxTurns - 1;
-            currentTools = isPenultimateTurn || hasArt || (
+            const allDone = (
               allRequestedFilesVerified(expectedFileTargets, verifiedWrites)
               && htmlDependencyIssues(observedWrites, expectedFileTargets).length === 0
               && (!runtimeTestRequired || htmlRuntimeVerification.success)
-            )
+            );
+            currentTools = isPenultimateTurn || hasArt || allDone
               ? undefined
               : effectiveReq.tools;
             
-            if (isPenultimateTurn && currentTools === undefined) {
+            if (currentTools === undefined) {
               currentMessages.push({
                 role: 'user',
-                content: '[Notice: You have reached the execution turn budget for this step. Please provide a clear, concise final summary of what was accomplished, the status of any files, and any recommended next steps for the user.]',
+                content: '[Task complete: All requested files and verifications are saved to disk. Please provide a clear, concise final summary of what was accomplished, how the application works, and how the user can interact with it.]',
               });
             }
           } else {
