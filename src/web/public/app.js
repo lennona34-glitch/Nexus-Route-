@@ -126,35 +126,36 @@ if (localStorage.getItem('nexus_inspector_collapsed') === 'true') {
   setInspectorCollapsed(true);
 }
 
-// Cheeky Claude Warm Terracotta Skin Handler
-const toggleClaudeSkinBtn = document.getElementById('toggleClaudeSkinBtn');
-function setClaudeSkin(active) {
+// Claude Code Terminal View Toggle Handler
+const toggleClaudeCodeBtn = document.getElementById('toggleClaudeCodeBtn');
+function setClaudeCodeMode(active) {
   if (active) {
-    document.body.classList.add('claude-skin');
-    if (toggleClaudeSkinBtn) {
-      toggleClaudeSkinBtn.innerHTML = '🧡 Claude Skin: ON';
-      toggleClaudeSkinBtn.classList.add('active');
+    document.body.classList.add('claude-code-mode');
+    if (toggleClaudeCodeBtn) {
+      toggleClaudeCodeBtn.innerHTML = '📟 Claude Code: ON';
+      toggleClaudeCodeBtn.classList.add('active');
     }
-    localStorage.setItem('nexus_claude_skin', 'true');
+    localStorage.setItem('nexus_claude_code_view', 'true');
   } else {
-    document.body.classList.remove('claude-skin');
-    if (toggleClaudeSkinBtn) {
-      toggleClaudeSkinBtn.innerHTML = '🧡 Claude Skin';
-      toggleClaudeSkinBtn.classList.remove('active');
+    document.body.classList.remove('claude-code-mode');
+    if (toggleClaudeCodeBtn) {
+      toggleClaudeCodeBtn.innerHTML = '📟 Claude Code View';
+      toggleClaudeCodeBtn.classList.remove('active');
     }
-    localStorage.setItem('nexus_claude_skin', 'false');
+    localStorage.setItem('nexus_claude_code_view', 'false');
   }
 }
 
-if (toggleClaudeSkinBtn) {
-  toggleClaudeSkinBtn.addEventListener('click', () => {
-    const isClaude = document.body.classList.contains('claude-skin');
-    setClaudeSkin(!isClaude);
+if (toggleClaudeCodeBtn) {
+  toggleClaudeCodeBtn.addEventListener('click', () => {
+    const isCc = document.body.classList.contains('claude-code-mode');
+    setClaudeCodeMode(!isCc);
   });
 }
 
-if (localStorage.getItem('nexus_claude_skin') === 'true') {
-  setClaudeSkin(true);
+// Enable Claude Code View by default (or restore user's preference)
+if (localStorage.getItem('nexus_claude_code_view') !== 'false') {
+  setClaudeCodeMode(true);
 }
 
 // Currency Settings (GBP £ by default for British user, toggleable to USD $)
@@ -1396,13 +1397,50 @@ function createNewSession() {
   activeFileTargets = [];
 
   chatMessages.innerHTML = `
-    <div class="message assistant">
-      <div class="message-meta">
-        <span class="sender-tag">NexusRoute Gateway</span>
-        <span class="time-tag">New Session</span>
+    <div class="claude-code-hero" id="claudeCodeHero">
+      <div class="cc-box">
+        <div class="cc-box-header">
+          <span class="cc-box-title">Claude Code v2.1.6</span>
+        </div>
+        <div class="cc-box-content">
+          <div class="cc-left-pane">
+            <div class="cc-welcome-text">Welcome back!</div>
+            <div class="cc-mascot-wrap">
+              <svg class="claude-code-pixel-bot" viewBox="0 0 16 14" width="56" height="49" shape-rendering="crispEdges">
+                <rect x="2" y="0" width="2" height="3" fill="#d97757" />
+                <rect x="12" y="0" width="2" height="3" fill="#d97757" />
+                <rect x="0" y="3" width="16" height="7" fill="#d97757" />
+                <rect x="3" y="4" width="2" height="2" fill="#0d0d0d" />
+                <rect x="11" y="4" width="2" height="2" fill="#0d0d0d" />
+                <rect x="3" y="10" width="2" height="4" fill="#d97757" />
+                <rect x="6" y="10" width="2" height="3" fill="#d97757" />
+                <rect x="8" y="10" width="2" height="3" fill="#d97757" />
+                <rect x="11" y="10" width="2" height="4" fill="#d97757" />
+              </svg>
+            </div>
+            <div class="cc-sub-bar">
+              <span>Sonnet 4.5 · Gemini 3.7 · RTX 4060 · PromptForge</span>
+            </div>
+            <div class="cc-path">~\\Claude Code · NexusRoute</div>
+          </div>
+
+          <div class="cc-divider"></div>
+
+          <div class="cc-right-pane">
+            <div class="cc-section-title">Tips for getting started</div>
+            <div class="cc-section-desc">Ask Claude or Gemini to create an app, build an Android game, or generate PromptForge art</div>
+
+            <div class="cc-section-title cc-margin-top">Recent activity</div>
+            <div class="cc-recent-activity">
+              <div class="cc-recent-item">⚡ <strong>APB Police Pursuit</strong> · Android Native APK</div>
+              <div class="cc-recent-item">🎨 <strong>PromptForge Studio</strong> · SDXL / Local Turbo</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="message-body">
-        Welcome to <strong>NexusRoute</strong>! Send a prompt below to see Pareto auto-dispatch, sub-2ms response caching, live tool calling, and telemetry in action.
+      <div class="cc-footer-hint">
+        <span class="cc-hint-item"><code>/model</code> to try Claude 3.7 Sonnet or Gemini Flash</span>
+        <span class="cc-hint-item"><code>?</code> for shortcuts · PromptForge RTX connected</span>
       </div>
     </div>
   `;
