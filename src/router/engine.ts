@@ -320,8 +320,8 @@ const MIN_ATTEMPT_MS = 15_000;
 
 function defaultTurnMs(provider: ProviderType): number {
   return provider === 'local' || provider === 'ollama'
-    ? positiveDuration(process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS, 120_000)
-    : positiveDuration(process.env.NEXUS_CLOUD_TURN_TIMEOUT_MS, 90_000);
+    ? positiveDuration(process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS, 300_000)
+    : positiveDuration(process.env.NEXUS_CLOUD_TURN_TIMEOUT_MS, 240_000);
 }
 
 function turnTimeoutMs(provider: ProviderType, requested?: number, remainingRequestMs?: number): number {
@@ -398,13 +398,17 @@ async function* streamWithWallClockDeadline(
   model: string,
 ): AsyncGenerator<UniversalStreamChunk> {
   const iterator = stream[Symbol.asyncIterator]();
-  const deadline = Date.now() + timeoutMs;
+  const maxTotalMs = Math.max(timeoutMs, 600_000); // 10 mins ceiling for very long active outputs
+  const inactivityAllowanceMs = Math.max(60_000, Math.min(timeoutMs, 120_000));
+  const absoluteDeadline = Date.now() + maxTotalMs;
+  let nextChunkDeadline = Date.now() + timeoutMs;
   let completed = false;
   try {
     while (true) {
-      const remaining = deadline - Date.now();
+      const now = Date.now();
+      const remaining = Math.min(nextChunkDeadline - now, absoluteDeadline - now);
       if (remaining <= 0) {
-        throw new AdapterError(`${model} exceeded the ${Math.round(timeoutMs / 1000)}s wall-clock turn limit`, provider, 408, true);
+        throw new AdapterError(`${model} streaming timed out after ${Math.round(timeoutMs / 1000)}s of inactivity`, provider, 408, true);
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
       let result: IteratorResult<UniversalStreamChunk>;
@@ -413,7 +417,7 @@ async function* streamWithWallClockDeadline(
           iterator.next(),
           new Promise<never>((_, reject) => {
             timer = setTimeout(() => reject(new AdapterError(
-              `${model} exceeded the ${Math.round(timeoutMs / 1000)}s wall-clock turn limit`,
+              `${model} streaming timed out after inactivity`,
               provider,
               408,
               true,
@@ -427,6 +431,8 @@ async function* streamWithWallClockDeadline(
         completed = true;
         return;
       }
+      // On every active chunk received, refresh the inactivity deadline so active streams are never killed
+      nextChunkDeadline = Date.now() + inactivityAllowanceMs;
       yield result.value;
     }
   } finally {

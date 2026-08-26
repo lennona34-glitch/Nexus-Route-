@@ -288,7 +288,12 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     const payload = this.buildPayload(req, targetModel, true);
     const controller = new AbortController();
-    const hardTimeoutMs = req.timeout_ms || (this.provider === 'xai' ? 150_000 : this.baseUrl.includes('localhost') || this.baseUrl.includes('11434') ? 180_000 : 90_000);
+    const hardTimeoutMs = req.timeout_ms || (
+      this.provider === 'xai' ? 180_000 :
+      this.provider === 'openrouter' ? 300_000 :
+      this.baseUrl.includes('localhost') || this.baseUrl.includes('11434') ? 300_000 :
+      240_000
+    );
     const hardTimeout = setTimeout(() => controller.abort(), hardTimeoutMs);
 
     let res: Response;
@@ -307,9 +312,11 @@ export class OpenAIAdapter implements ProviderAdapter {
       throw new AdapterError(`Network error reaching ${this.provider}: ${(err as Error).message}`, this.provider, 503, true, err);
     }
 
+    // Clear the initial connect timer once headers and stream are established
+    clearTimeout(hardTimeout);
+
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
-      clearTimeout(hardTimeout);
       throw new AdapterError(
         upstreamErrorMessage(this.provider, 'stream', res.status, upstreamError),
         this.provider,
@@ -321,7 +328,6 @@ export class OpenAIAdapter implements ProviderAdapter {
     }
 
     if (!res.body) {
-      clearTimeout(hardTimeout);
       throw new AdapterError(`${this.provider} response has no readable body stream`, this.provider, 502, true);
     }
 
