@@ -1072,7 +1072,7 @@ export class RoutingEngine {
       // Direct xAI has proven to be a dependable coding fallback. Keep it ahead
       // of low-TPM/free pools so a failed primary still has time to complete.
       if (hasXAI && excludeProv !== 'xai') list.push({ provider: 'xai', model: xaiFallbackModel, timeout_ms: 150_000 });
-      if (hasGroq && excludeProv !== 'groq') list.push({ provider: 'groq', model: 'qwen/qwen3.6-27b' });
+      if (hasGroq && excludeProv !== 'groq') list.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
       if (hasAnthropic && excludeProv !== 'anthropic') list.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
       if (hasOpenAI && excludeProv !== 'openai') list.push({ provider: 'openai', model: 'gpt-4o' });
       if (hasDeepSeek && excludeProv !== 'deepseek') list.push({ provider: 'deepseek', model: 'deepseek-chat' });

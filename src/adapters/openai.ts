@@ -6,6 +6,7 @@ interface NormalizedUpstreamError {
   message: string;
   code?: string | number;
   retryAfterMs?: number;
+  failedGeneration?: string;
 }
 
 function conciseText(value: unknown): string {
@@ -40,10 +41,17 @@ function normalizeUpstreamError(payload: unknown, fallback: string, headers?: He
     : {};
   const providerName = conciseText(metadata.provider_name || metadata.provider || root.provider);
   const detailed = conciseText(metadata.raw || error.detail || error.message || root.message || payload || fallback);
+  const failedGeneration = typeof error.failed_generation === 'string'
+    ? error.failed_generation
+    : typeof root.failed_generation === 'string'
+      ? root.failed_generation
+      : undefined;
+
   return {
     message: `${providerName ? `${providerName}: ` : ''}${detailed || fallback}`,
     code: error.code ?? root.code,
     retryAfterMs: retryAfterMs(headers),
+    failedGeneration,
   };
 }
 
@@ -262,6 +270,20 @@ export class OpenAIAdapter implements ProviderAdapter {
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
       clearTimeout(hardTimeout);
+      if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
+        return {
+          id: `salvage-${Date.now()}`,
+          object: 'chat.completion',
+          created: Math.floor(Date.now() / 1000),
+          model: targetModel,
+          choices: [{
+            index: 0,
+            message: { role: 'assistant', content: upstreamError.failedGeneration },
+            finish_reason: 'stop',
+          }],
+          usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+        };
+      }
       throw new AdapterError(
         upstreamErrorMessage(this.provider, 'request', res.status, upstreamError),
         this.provider,
@@ -317,6 +339,21 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
+      if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
+        const salvagedChunk: UniversalStreamChunk = {
+          id: `salvage-${Date.now()}`,
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model: targetModel,
+          choices: [{
+            index: 0,
+            delta: { content: upstreamError.failedGeneration },
+            finish_reason: 'stop',
+          }],
+        };
+        yield salvagedChunk;
+        return;
+      }
       throw new AdapterError(
         upstreamErrorMessage(this.provider, 'stream', res.status, upstreamError),
         this.provider,
@@ -359,6 +396,23 @@ export class OpenAIAdapter implements ProviderAdapter {
               continue;
             }
             if (parsed?.error) {
+              // If Groq or another provider fails tool calling syntax with 'failed_generation', salvage the raw text output!
+              if (parsed.error.code === 'tool_use_failed' && typeof parsed.error.failed_generation === 'string' && parsed.error.failed_generation.trim()) {
+                const salvagedChunk: UniversalStreamChunk = {
+                  id: `salvage-${Date.now()}`,
+                  object: 'chat.completion.chunk',
+                  created: Math.floor(Date.now() / 1000),
+                  model: targetModel,
+                  choices: [{
+                    index: 0,
+                    delta: { content: parsed.error.failed_generation },
+                    finish_reason: 'stop',
+                  }],
+                };
+                yield salvagedChunk;
+                return;
+              }
+
               const upstreamError = normalizeUpstreamError(parsed, `${this.provider} streaming provider failed`);
               const status = Number(upstreamError.code);
               const statusCode = Number.isFinite(status) && status >= 400 && status <= 599 ? status : 502;
