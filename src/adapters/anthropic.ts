@@ -98,16 +98,20 @@ export class AnthropicAdapter implements ProviderAdapter {
           });
         }
       } else if (msg.role === 'tool') {
-        anthropicMessages.push({
-          role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id: msg.tool_call_id,
-              content: extractTextFromContent(msg.content),
-            },
-          ],
-        });
+        const toolResultBlock: AnthropicContentBlock = {
+          type: 'tool_result',
+          tool_use_id: msg.tool_call_id || 'call_0',
+          content: extractTextFromContent(msg.content),
+        };
+        const lastMsg = anthropicMessages[anthropicMessages.length - 1];
+        if (lastMsg && lastMsg.role === 'user' && Array.isArray(lastMsg.content) && lastMsg.content.some(b => b.type === 'tool_result')) {
+          (lastMsg.content as AnthropicContentBlock[]).push(toolResultBlock);
+        } else {
+          anthropicMessages.push({
+            role: 'user',
+            content: [toolResultBlock],
+          });
+        }
       }
     }
 
@@ -121,22 +125,25 @@ export class AnthropicAdapter implements ProviderAdapter {
       'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-20241022',
       'claude-3-5-haiku-20241022': 'claude-3-5-haiku-20241022',
       'claude-3-5-haiku': 'claude-3-5-haiku-20241022',
+      'claude-3.5-haiku': 'claude-3-5-haiku-20241022',
       'claude-3-5-haiku-latest': 'claude-3-5-haiku-20241022',
       'claude-3-haiku-20240307': 'claude-3-haiku-20240307',
       'claude-3-haiku': 'claude-3-haiku-20240307',
+      'claude-haiku-4.5': 'claude-3-5-haiku-20241022',
+      'claude-haiku-4-5': 'claude-3-5-haiku-20241022',
+      'claude-haiku-4-5-20251001': 'claude-3-5-haiku-20241022',
       'claude-3-opus-20240229': 'claude-3-opus-20240229',
       'claude-3-opus': 'claude-3-opus-20240229',
       'claude-3-opus-latest': 'claude-3-opus-20240229',
       'claude-sonnet-5': 'claude-3-5-sonnet-20241022',
       'claude-sonnet-4-5-20250929': 'claude-3-5-sonnet-20241022',
-      'claude-haiku-4-5-20251001': 'claude-3-5-haiku-20241022',
     };
     const modelToUse = normalizeMap[cleanModel] || cleanModel;
 
     const anthropicTools = req.tools && req.tools.length > 0 ? req.tools.map(t => ({
       name: t.function.name,
       description: t.function.description,
-      input_schema: t.function.parameters,
+      input_schema: t.function.parameters || { type: 'object', properties: {} },
     })) : undefined;
 
     return {

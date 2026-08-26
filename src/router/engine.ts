@@ -1573,7 +1573,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
 
           if (!toolCalls || toolCalls.length === 0) {
             const dependencyIssues = htmlDependencyIssues(observedWrites, expectedFileTargets);
-            if (fakeToolNames.length > 0 && fakeToolCorrectionAttempts < 2) {
+            if (fakeToolNames.length > 0 && fakeToolCorrectionAttempts < 1) {
               fakeToolCorrectionAttempts++;
               turnCount++;
               currentMessages = [
@@ -1585,7 +1585,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               currentResponse = await runTurn(currentMessages, currentTools);
               continue;
             }
-            if (dependencyIssues.length > 0 && dependencyCorrectionAttempts < 3) {
+            if (dependencyIssues.length > 0 && dependencyCorrectionAttempts < 1) {
               dependencyCorrectionAttempts++;
               turnCount++;
               currentMessages = [
@@ -1598,7 +1598,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               continue;
             }
             const runtimeTestRequired = requestNeedsHtmlRuntimeTest(req, observedWrites, expectedFileTargets, rejectedWrites);
-            if (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success && runtimeCorrectionAttempts < 3) {
+            if (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success && runtimeCorrectionAttempts < 1 && verifiedWrites.length === 0) {
               runtimeCorrectionAttempts++;
               turnCount++;
               currentMessages = [
@@ -2434,7 +2434,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           } else {
             // Finished without calling more tools or finished synthesis turn
             const dependencyIssues = htmlDependencyIssues(observedWrites, expectedFileTargets);
-            if (fakeToolNames.length > 0 && fakeToolCorrectionAttempts < 2) {
+            if (fakeToolNames.length > 0 && fakeToolCorrectionAttempts < 1) {
               fakeToolCorrectionAttempts++;
               currentMessages = [
                 ...currentMessages,
@@ -2444,7 +2444,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               currentTools = effectiveReq.tools;
               continue;
             }
-            if (dependencyIssues.length > 0 && dependencyCorrectionAttempts < 3) {
+            if (dependencyIssues.length > 0 && dependencyCorrectionAttempts < 1) {
               dependencyCorrectionAttempts++;
               currentMessages = [
                 ...currentMessages,
@@ -2455,7 +2455,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               continue;
             }
             const runtimeTestRequired = requestNeedsHtmlRuntimeTest(req, observedWrites, expectedFileTargets, rejectedWrites);
-            if (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success && runtimeCorrectionAttempts < 3) {
+            if (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success && runtimeCorrectionAttempts < 1 && verifiedWrites.length === 0) {
               runtimeCorrectionAttempts++;
               currentMessages = [
                 ...currentMessages,
