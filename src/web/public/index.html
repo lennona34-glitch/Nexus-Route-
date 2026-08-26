@@ -13,20 +13,23 @@
   <div class="app-container">
     <!-- Navigation Header -->
     <header class="navbar">
-      <div class="brand">
-        <div class="logo-icon">⚡</div>
-        <div>
-          <div class="brand-title">NexusRoute</div>
-          <div class="brand-subtitle">Zero-Bloat AI Routing Gateway</div>
+      <div class="navbar-left">
+        <div class="brand">
+          <div class="logo-icon">⚡</div>
+          <div>
+            <div class="brand-title">NexusRoute</div>
+            <div class="brand-subtitle">Zero-Bloat AI Routing Gateway</div>
+          </div>
         </div>
-      </div>
-      <div class="nav-metrics">
+
         <div id="gpuMetricPill" class="metric-pill gpu-pill" title="Local GPU VRAM & Active Models">
           <span class="status-dot active" id="gpuLedDot"></span>
           <span class="pill-label" id="gpuMetricLabel">GPU: RTX 4060 · Loading...</span>
           <button id="quickUnloadGpuBtn" class="gpu-unload-btn" title="Unload all offline models from GPU VRAM">⚡ Unload</button>
         </div>
+      </div>
 
+      <div class="nav-metrics">
         <div id="providerBadges" class="provider-badges">
           <!-- Dynamically populated with provider status pills -->
         </div>
@@ -176,6 +179,7 @@
               </label>
             </div>
 
+            <button id="toggleClaudeSkinBtn" class="action-tag-btn claude-skin-btn" title="Toggle Claude Terracotta Warm Skin">🧡 Claude Skin</button>
             <button id="toggleFullscreenChatBtn" class="action-tag-btn" title="Toggle Fullscreen Chat (Hide/Show Telemetry Sidebar)">⤢ Fullscreen</button>
             <button id="newChatBtn" class="action-tag-btn" title="Start fresh conversation">🧹 New Chat</button>
           </div>

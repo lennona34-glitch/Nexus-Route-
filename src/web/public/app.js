@@ -126,6 +126,37 @@ if (localStorage.getItem('nexus_inspector_collapsed') === 'true') {
   setInspectorCollapsed(true);
 }
 
+// Cheeky Claude Warm Terracotta Skin Handler
+const toggleClaudeSkinBtn = document.getElementById('toggleClaudeSkinBtn');
+function setClaudeSkin(active) {
+  if (active) {
+    document.body.classList.add('claude-skin');
+    if (toggleClaudeSkinBtn) {
+      toggleClaudeSkinBtn.innerHTML = '🧡 Claude Skin: ON';
+      toggleClaudeSkinBtn.classList.add('active');
+    }
+    localStorage.setItem('nexus_claude_skin', 'true');
+  } else {
+    document.body.classList.remove('claude-skin');
+    if (toggleClaudeSkinBtn) {
+      toggleClaudeSkinBtn.innerHTML = '🧡 Claude Skin';
+      toggleClaudeSkinBtn.classList.remove('active');
+    }
+    localStorage.setItem('nexus_claude_skin', 'false');
+  }
+}
+
+if (toggleClaudeSkinBtn) {
+  toggleClaudeSkinBtn.addEventListener('click', () => {
+    const isClaude = document.body.classList.contains('claude-skin');
+    setClaudeSkin(!isClaude);
+  });
+}
+
+if (localStorage.getItem('nexus_claude_skin') === 'true') {
+  setClaudeSkin(true);
+}
+
 // Currency Settings (GBP £ by default for British user, toggleable to USD $)
 let currentCurrency = localStorage.getItem('nexus_currency') || 'GBP';
 const USD_TO_GBP_RATE = 0.785;

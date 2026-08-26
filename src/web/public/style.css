@@ -40,9 +40,9 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 10px 14px;
+  padding: 8px 14px;
   gap: 10px;
-  max-width: 1680px;
+  max-width: 98.5vw;
   margin: 0 auto;
   width: 100%;
 }
@@ -56,8 +56,15 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 .brand {
@@ -141,8 +148,8 @@ body {
 /* Grid Layout */
 .grid-layout {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 16px;
+  grid-template-columns: 2.2fr 0.8fr;
+  gap: 14px;
   flex: 1;
   min-height: 0;
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s ease;
@@ -2548,3 +2555,91 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
 }
+
+/* ==========================================================================
+   Chat Image & Artifact Enhancements (Sound Forge / Image previews)
+   ========================================================================== */
+.message-body img {
+  max-width: 100%;
+  max-height: 580px;
+  width: auto;
+  border-radius: 12px;
+  object-fit: contain;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border-color);
+  display: block;
+  margin: 12px 0;
+  background: #090d13;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.message-body img:hover {
+  transform: scale(1.01);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+}
+
+/* ==========================================================================
+   Cheeky Claude Warm Terracotta Skin Theme
+   ========================================================================== */
+body.claude-skin {
+  --bg-dark: #1a1714;
+  --bg-card: #25201b;
+  --bg-card-hover: #302a24;
+  --bg-input: #14120f;
+  --border-color: #40362e;
+  --border-active: #d97757;
+  --text-primary: #f7ebe4;
+  --text-secondary: #baa99e;
+  --text-muted: #8a7a70;
+  --accent-cyan: #d97757; /* Claude signature warm terracotta */
+  --accent-blue: #c8694a;
+  --accent-purple: #e28a6e;
+  --accent-green: #4da66e;
+  --accent-amber: #e59846;
+}
+
+body.claude-skin .logo-icon {
+  background: linear-gradient(135deg, #d97757, #9e4629);
+  box-shadow: 0 0 16px rgba(217, 119, 87, 0.45);
+}
+
+body.claude-skin .playground-card {
+  background: #25201b;
+  border-color: #40362e;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+body.claude-skin .message.assistant .message-body {
+  background: #1c1814;
+  border: 1px solid #40362e;
+  color: #f7ebe4;
+}
+
+body.claude-skin .message.user .message-body {
+  background: linear-gradient(135deg, #c8694a, #a84c2f);
+  color: #fff;
+  border: 1px solid #d97757;
+  box-shadow: 0 4px 18px rgba(200, 105, 74, 0.35);
+}
+
+body.claude-skin .claude-skin-btn {
+  background: #d97757;
+  color: #fff;
+  border-color: #e28a6e;
+  box-shadow: 0 0 14px rgba(217, 119, 87, 0.4);
+}
+
+body.claude-skin .claude-skin-btn:hover {
+  background: #e28a6e;
+}
+
+body.claude-skin .metric-pill.gpu-pill {
+  border-color: rgba(217, 119, 87, 0.4);
+  background: rgba(217, 119, 87, 0.08);
+}
+
+body.claude-skin .metric-pill.gpu-pill:hover {
+  border-color: #d97757;
+  background: rgba(217, 119, 87, 0.18);
+}
+
