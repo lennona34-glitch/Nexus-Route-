@@ -1,4 +1,4 @@
-﻿FROM wizardlm2:7b
+FROM wizardlm2:7b
 PARAMETER temperature 0.35
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
