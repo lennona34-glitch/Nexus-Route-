@@ -153,6 +153,7 @@ export class OpenAIAdapter implements ProviderAdapter {
     let m = targetModel;
     const discoveredPrefix = `${this.provider}::`;
     if (m.startsWith(discoveredPrefix)) return m.slice(discoveredPrefix.length);
+    if (m.startsWith('openrouter/')) m = m.slice(11);
     if (m.startsWith('groq/')) m = m.slice(5);
     if (m.startsWith('together/')) m = m.slice(9);
     if (m.startsWith('github/')) m = m.slice(7);
