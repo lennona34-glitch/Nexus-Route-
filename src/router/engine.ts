@@ -1166,6 +1166,29 @@ export class RoutingEngine {
       return list;
     };
 
+    const fallbackMockRoutes = this.config.virtual_models[requested]?.routes || [
+      { provider: 'mock', model: 'mock-gpt-4o' },
+      { provider: 'mock', model: 'mock-claude-3-5-sonnet' },
+      { provider: 'mock', model: 'mock-gemini-1-5-flash' },
+    ];
+
+    // 0. Free Mode Fortress: If user selected free routing, free target, or free model, strictly restrict to zero-cost models!
+    if (isFreeExplicit) {
+      const freeList = getFreeFallbacks(requested.startsWith('openrouter::') || requested.includes(':free') ? requested : undefined);
+      if (requested.startsWith('openrouter::') || requested.includes(':free') || requested.startsWith('local')) {
+        const prov = requested.startsWith('local') ? 'local' : 'openrouter';
+        const direct = directCandidate(prov, requested);
+        return {
+          candidates: [direct, ...freeList.filter(c => c.model !== direct.model && c.provider !== 'mock'), ...fallbackMockRoutes],
+          classification,
+        };
+      }
+      return {
+        candidates: [...freeList.filter(c => c.provider !== 'mock'), ...fallbackMockRoutes],
+        classification,
+      };
+    }
+
     // 1. If user requested explicit "provider/model" syntax
     const knownProviders: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'local', 'ollama', 'mock'];
     for (const prov of knownProviders) {
@@ -1333,19 +1356,7 @@ export class RoutingEngine {
       if (hasMistral) liveCandidates.push({ provider: 'mistral', model: 'mistral/mistral-small-latest' });
     }
 
-    const fallbackMockRoutes = this.config.virtual_models[requested]?.routes || [
-      { provider: 'mock', model: 'mock-gpt-4o' },
-      { provider: 'mock', model: 'mock-claude-3-5-sonnet' },
-      { provider: 'mock', model: 'mock-gemini-1-5-flash' },
-    ];
 
-    if (requested === 'free' || requested === 'local' || requested === 'offline') {
-      const localList: RouteCandidate[] = getFreeFallbacks();
-      return {
-        candidates: localList.filter(c => c.provider === 'mock' || !this.disabledProviders.has(c.provider)),
-        classification,
-      };
-    }
 
     const candidateList = liveCandidates.length > 0
       ? [...liveCandidates, ...fallbackMockRoutes]
