@@ -897,12 +897,16 @@ export class ToolRegistry {
     return this.builtInTools;
   }
 
-  static async executeTool(name: string, argsJson: string, defaultArtEngine?: string): Promise<string> {
+  static async executeTool(name: string, argsInput: string | Record<string, unknown>, defaultArtEngine?: string): Promise<string> {
     let args: Record<string, unknown> = {};
-    try {
-      args = JSON.parse(argsJson || '{}');
-    } catch {
-      return `Error: Invalid JSON arguments: ${argsJson}`;
+    if (typeof argsInput === 'object' && argsInput !== null) {
+      args = argsInput as Record<string, unknown>;
+    } else {
+      try {
+        args = JSON.parse(String(argsInput || '{}'));
+      } catch {
+        return `Error: Invalid JSON arguments: ${argsInput}`;
+      }
     }
 
     const ws = this.getWorkspaceDir();
@@ -916,13 +920,19 @@ export class ToolRegistry {
       }
 
       case 'write_file': {
-        // String() on an object yields "[object Object]", which silently wrote a
-        // junk file of that name and reported success - see workspace/[object
-        // Object]. A non-string filename is a malformed call, not a filename.
-        const rawFilename = textArg(args.filename ?? args.path ?? args.file ?? args.filepath).trim();
-        const contentSource = args.content ?? args.code ?? args.text ?? '';
+        // Normalize any parameter variations (filename, path, filePath, target_file, TargetFile, etc.)
+        const rawFilename = textArg(
+          args.filename ?? args.filePath ?? args.file_path ?? args.path ?? args.file ?? args.filepath ??
+          args.fileName ?? args.file_name ?? args.TargetFile ?? args.target_file ?? args.target ??
+          args.dest ?? args.destination ?? args.name
+        ).trim();
+        const contentSource = (
+          args.content ?? args.code ?? args.text ?? args.contents ?? args.file_content ??
+          args.fileContent ?? args.CodeContent ?? args.code_content ?? args.data ?? args.body ??
+          args.source ?? args.source_code ?? ''
+        );
         if (!rawFilename) {
-          return typeof (args.filename ?? args.path ?? args.file ?? args.filepath) === 'object'
+          return typeof (args.filename ?? args.filePath ?? args.file_path ?? args.path ?? args.file) === 'object'
             ? 'Error: filename must be a string, not an object.'
             : 'Error: Empty filename provided.';
         }
@@ -972,10 +982,19 @@ export class ToolRegistry {
       }
 
       case 'patch_file': {
-        const rawFilename = String(args.filename || args.path || args.file || args.filepath || '').trim();
-        const oldText = String(args.old_text ?? args.oldText ?? '');
-        const newText = String(args.new_text ?? args.newText ?? '');
-        const replaceAll = args.replace_all === true || args.replaceAll === true;
+        const rawFilename = textArg(
+          args.filename ?? args.filePath ?? args.file_path ?? args.path ?? args.file ?? args.filepath ??
+          args.fileName ?? args.file_name ?? args.TargetFile ?? args.target_file ?? args.target ?? args.name
+        ).trim();
+        const oldText = String(
+          args.old_text ?? args.oldText ?? args.find ?? args.targetContent ?? args.TargetContent ??
+          args.search ?? args.old_str ?? args.old_string ?? args.original ?? ''
+        );
+        const newText = String(
+          args.new_text ?? args.newText ?? args.replace ?? args.replacementContent ??
+          args.ReplacementContent ?? args.new_str ?? args.new_string ?? args.replacement ?? ''
+        );
+        const replaceAll = args.replace_all === true || args.replaceAll === true || args.all === true || args.AllowMultiple === true;
         if (!rawFilename) return 'Error: Empty filename provided.';
         if (!oldText) return 'Error: patch_file requires non-empty old_text.';
 
@@ -1017,7 +1036,10 @@ export class ToolRegistry {
       }
 
       case 'read_file': {
-        const rawFilename = String(args.filename || args.path || args.file || args.filepath || '').trim();
+        const rawFilename = textArg(
+          args.filename ?? args.filePath ?? args.file_path ?? args.path ?? args.file ?? args.filepath ??
+          args.fileName ?? args.file_name ?? args.TargetFile ?? args.target_file ?? args.target ?? args.name
+        ).trim();
         if (!rawFilename) return 'Error: Empty filename provided.';
 
         let safePath: string;
