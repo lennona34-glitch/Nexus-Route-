@@ -82,7 +82,7 @@ function extractFilenames(text: string): string[] {
   while ((verifiedMatch = verifiedPattern.exec(text)) !== null) {
     names.add(path.basename(verifiedMatch[1].replace(/\\/g, '/')));
   }
-  const filePattern = /(?:^|[\s"'`(])((?:[\w.-]+[\\/])*[\w.-]+\.(?:html?|css|js|mjs|cjs|ts|tsx|jsx|json|md|txt|py|java|kt|cpp|c|h|hpp|xml|yaml|yml|toml|ini|sql|ps1|bat|cmd))(?=$|[\s"'`,;:)])/gi;
+  const filePattern = /(?:^|[\s"'`(])((?:[\w.-]+[\\/])*[\w.-]+\.(?:html?|css|js|mjs|cjs|ts|tsx|jsx|json|md|txt|py|java|kt|cpp|c|h|hpp|xml|yaml|yml|toml|ini|sql|ps1|bat|cmd|exe|vst3))(?=$|[\s"'`,;:)])/gi;
   let match: RegExpExecArray | null;
   while ((match = filePattern.exec(text)) !== null) {
     names.add(match[1].replace(/\\/g, '/').replace(/^\.\//, ''));
@@ -1679,7 +1679,8 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               finishedCleanly = true;
               break;
             }
-            if (fileWriteExpected && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
+            const claimsFileCreatedInText = /(?:double-click\s*:|launch\s*:|created\s+|saved\s+to\s+|dist[\\/][\w.-]+|written\s+to\s+|output\s*:\s*`?[\w.-]+\.(?:exe|html|py|cpp))/i.test(choice?.message?.content || '');
+            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
               fileCorrectionAttempts++;
               turnCount++;
               currentMessages = [
@@ -2515,7 +2516,8 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               currentTools = effectiveReq.tools;
               continue;
             }
-            if (fileWriteExpected && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
+            const claimsFileCreatedInText = /(?:double-click\s*:|launch\s*:|created\s+|saved\s+to\s+|dist[\\/][\w.-]+|written\s+to\s+|output\s*:\s*`?[\w.-]+\.(?:exe|html|py|cpp))/i.test(turnContent);
+            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
               fileCorrectionAttempts++;
               currentMessages = [
                 ...currentMessages,
