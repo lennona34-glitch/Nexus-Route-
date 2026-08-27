@@ -1177,21 +1177,30 @@ export class RoutingEngine {
       : requested;
     const openRouterCodingModel = process.env.OPENROUTER_CODING_MODEL?.trim() || openRouterModel();
 
-    // Dedicated Vision Routing: If user attached a screenshot or image, ONLY route to vision-capable models
+    // Dedicated Vision Routing: If user attached a screenshot or image, route to frontier vision-capable models
     if (classification.hasVision) {
       const visionCandidates: RouteCandidate[] = [];
-      if (hasXAI) visionCandidates.push({ provider: 'xai', model: 'grok-4.6', timeout_ms: 150_000 });
+      if (hasAnthropic) {
+        visionCandidates.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
+        visionCandidates.push({ provider: 'anthropic', model: 'claude-3-5-haiku-20241022' });
+      }
+      if (hasOpenRouter) {
+        visionCandidates.push({ provider: 'openrouter', model: openRouterModel(), timeout_ms: 120_000 });
+      }
       if (hasGemini) {
         visionCandidates.push({ provider: 'gemini', model: 'gemini-1.5-flash' });
         visionCandidates.push({ provider: 'gemini', model: 'gemini-1.5-pro' });
       }
-      if (hasLocal) {
-        visionCandidates.push({ provider: 'local', model: 'local/moondream', timeout_ms: 30000 });
-        visionCandidates.push({ provider: 'local', model: 'local/llama3.2-vision', timeout_ms: 45000 });
+      if (hasOpenAI) {
+        visionCandidates.push({ provider: 'openai', model: 'gpt-4o' });
+        visionCandidates.push({ provider: 'openai', model: 'gpt-4o-mini' });
       }
-      if (hasAnthropic) visionCandidates.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
-      if (hasOpenAI) visionCandidates.push({ provider: 'openai', model: 'gpt-4o' });
+      if (hasXAI) visionCandidates.push({ provider: 'xai', model: 'grok-4.6', timeout_ms: 150_000 });
       if (hasGitHub) visionCandidates.push({ provider: 'github', model: 'github/gpt-4o' });
+      if (hasLocal) {
+        visionCandidates.push({ provider: 'local', model: 'local/llama3.2-vision', timeout_ms: 45000 });
+        visionCandidates.push({ provider: 'local', model: 'local/moondream', timeout_ms: 30000 });
+      }
       visionCandidates.push({ provider: 'mock', model: 'mock-gpt-4o' });
       return { candidates: visionCandidates, classification };
     }
