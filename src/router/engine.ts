@@ -1108,6 +1108,45 @@ export class RoutingEngine {
     const hasHuggingFace = isProvActive('huggingface');
     const hasLocal = !this.disabledProviders.has('local');
 
+    const isFreeExplicit = (
+      req.openrouter_routing === 'free' ||
+      requested === 'free' ||
+      requested.includes(':free') ||
+      requested.includes('openrouter/free') ||
+      requested.startsWith('local') ||
+      requested.startsWith('ollama')
+    );
+
+    const getFreeFallbacks = (excludeModel?: string): RouteCandidate[] => {
+      const freeEndpoints = [
+        'openrouter::openrouter/free',
+        'openrouter::nvidia/nemotron-3.5-lightning:free',
+        'openrouter::minimax/minimax-m3:free',
+        'openrouter::cohere/north-mini-code:free',
+        'openrouter::poolside/laguna-s-2.1:free',
+        'openrouter::liquid/lfm-2.5-2.6b:free',
+        'openrouter::dots-studio/dots-3-note-preview:free',
+      ];
+      const list: RouteCandidate[] = [];
+      if (hasOpenRouter) {
+        for (const endpoint of freeEndpoints) {
+          if (endpoint !== excludeModel && (!excludeModel || !excludeModel.includes(endpoint.replace('openrouter::', '')))) {
+            list.push({ provider: 'openrouter', model: endpoint, timeout_ms: 180_000 });
+          }
+        }
+      }
+      if (hasLocal) {
+        list.push(
+          { provider: 'local', model: 'qwen2.5-coder:7b', timeout_ms: 20000 },
+          { provider: 'local', model: 'llama3.1:8b', timeout_ms: 20000 },
+          { provider: 'local', model: 'deepseek-r1:1.5b', timeout_ms: 15000 },
+          { provider: 'local', model: 'qwen2.5-coder:14b', timeout_ms: 25000 }
+        );
+      }
+      list.push({ provider: 'mock', model: 'mock-gpt-4o' });
+      return list;
+    };
+
     const getCloudFallbacks = (excludeProv: string): RouteCandidate[] => {
       const list: RouteCandidate[] = [];
       const xaiFallbackModel = classification.category === 'CODE_DEV' || requestExpectsFileWrite(req)
@@ -1135,7 +1174,11 @@ export class RoutingEngine {
         const isEnabled = !this.disabledProviders.has(prov);
         const directList: RouteCandidate[] = [];
         if (hasKey && isEnabled) directList.push(directCandidate(prov, requested));
-        if (prov !== 'local' && prov !== 'ollama') directList.push(...getCloudFallbacks(prov));
+        if (isFreeExplicit) {
+          directList.push(...getFreeFallbacks(requested));
+        } else if (prov !== 'local' && prov !== 'ollama') {
+          directList.push(...getCloudFallbacks(prov));
+        }
         directList.push(
           { provider: 'mock', model: 'mock-gpt-4o' }
         );
@@ -1297,14 +1340,7 @@ export class RoutingEngine {
     ];
 
     if (requested === 'free' || requested === 'local' || requested === 'offline') {
-      const localList: RouteCandidate[] = [
-        ...(hasOpenRouter ? [{ provider: 'openrouter' as ProviderType, model: openRouterModel(), timeout_ms: 90_000 }] : []),
-        { provider: 'local', model: 'qwen2.5-coder:7b', timeout_ms: 20000 },
-        { provider: 'local', model: 'llama3.1:8b', timeout_ms: 20000 },
-        { provider: 'local', model: 'deepseek-r1:1.5b', timeout_ms: 15000 },
-        { provider: 'local', model: 'qwen2.5-coder:14b', timeout_ms: 25000 },
-        ...fallbackMockRoutes,
-      ];
+      const localList: RouteCandidate[] = getFreeFallbacks();
       return {
         candidates: localList.filter(c => c.provider === 'mock' || !this.disabledProviders.has(c.provider)),
         classification,
