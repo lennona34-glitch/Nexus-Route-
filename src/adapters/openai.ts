@@ -193,8 +193,9 @@ export class OpenAIAdapter implements ProviderAdapter {
           : { type: 'ephemeral' };
       }
       const routingMode = req.openrouter_routing || 'balanced';
+      const isFree = targetModel.includes(':free') || targetModel.includes('openrouter/free') || targetModel.includes('/free');
       const hasToolChain = !!req.tools?.length || req.messages.some(message => !!message.tool_calls?.length || message.role === 'tool');
-      if (routingMode !== 'balanced' || hasToolChain) {
+      if (routingMode !== 'balanced' || (hasToolChain && !isFree)) {
         payload.provider = {
           ...(routingMode !== 'balanced' ? {
             sort: (routingMode === 'cheapest' || routingMode === 'free')
@@ -204,7 +205,7 @@ export class OpenAIAdapter implements ProviderAdapter {
               : 'exacto',
           } : {}),
           allow_fallbacks: true,
-          ...(hasToolChain ? { require_parameters: true } : {}),
+          ...(hasToolChain && !isFree ? { require_parameters: true } : {}),
         };
       }
     }
@@ -271,6 +272,9 @@ export class OpenAIAdapter implements ProviderAdapter {
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
       clearTimeout(hardTimeout);
+      if (res.status === 404 && upstreamError.message && /support tool use/i.test(upstreamError.message) && payload.tools) {
+        return this.chatCompletion({ ...req, tools: undefined }, targetModel);
+      }
       if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
         return {
           id: `salvage-${Date.now()}`,
@@ -340,6 +344,10 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
+      if (res.status === 404 && upstreamError.message && /support tool use/i.test(upstreamError.message) && payload.tools) {
+        yield* this.streamChatCompletion({ ...req, tools: undefined }, targetModel);
+        return;
+      }
       if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
         const salvagedChunk: UniversalStreamChunk = {
           id: `salvage-${Date.now()}`,
