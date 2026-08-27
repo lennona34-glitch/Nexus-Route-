@@ -134,9 +134,9 @@ function requestedFilenames(req: UniversalRequest): string[] {
 function requestExpectsFileWrite(req: UniversalRequest): boolean {
   const text = latestUserText(req).toLowerCase();
   if (!text) return false;
-  const mentionsFilename = /\b[\w.-]+\.(?:html?|css|js|mjs|cjs|ts|tsx|jsx|json|md|txt|py|java|kt|cpp|c|h|hpp|xml|yaml|yml|toml|ini|sql|ps1|bat|cmd)\b/i.test(text);
-  const createArtifact = /\b(?:create|build|make|generate|edit|update)\b[\s\S]{0,140}\b(?:file|project|app|application|website|web\s*app|script|game|plugin|source|page)\b/i.test(text);
-  const explicitDiskWrite = /\b(?:write|save)\b[\s\S]{0,100}\b(?:file|disk|workspace|project|as\s+[\w.-]+\.)/i.test(text);
+  const mentionsFilename = /\b[\w.-]+\.(?:html?|css|js|mjs|cjs|ts|tsx|jsx|json|md|txt|py|java|kt|cpp|c|h|hpp|xml|yaml|yml|toml|ini|sql|ps1|bat|cmd|exe)\b/i.test(text);
+  const createArtifact = /\b(?:create|build|make|generate|edit|update|compile)\b[\s\S]{0,140}\b(?:file|project|app|application|website|web\s*app|script|game|plugin|source|page|exe|executable|binary)\b/i.test(text);
+  const explicitDiskWrite = /\b(?:write|save|compile)\b[\s\S]{0,100}\b(?:file|disk|workspace|project|as\s+[\w.-]+\.)/i.test(text);
   return mentionsFilename || createArtifact || explicitDiskWrite || (isArtifactFollowUp(text) && requestedFilenames(req).length > 0);
 }
 
@@ -144,6 +144,7 @@ interface AutonomousTaskProfile {
   html: boolean;
   android: boolean;
   windowsPlugin: boolean;
+  nativeExecutable: boolean;
   imageGeneration: boolean;
   webResearch: boolean;
 }
@@ -158,7 +159,8 @@ function autonomousTaskProfile(req: UniversalRequest): AutonomousTaskProfile {
   return {
     html: filenames.some(filename => /\.html?$/.test(filename)) || /\b(?:html|web\s*app|browser\s*game|canvas|webgl)\b/.test(text),
     android: filenames.some(filename => /\.(?:apk|java|kt)$/.test(filename)) || /\b(?:android|apk)\b/.test(text),
-    windowsPlugin: /\b(?:vst3?|juce|audio\s*plugin|windows\s*(?:desktop|app))\b/.test(text),
+    windowsPlugin: /\b(?:vst3?|juce|audio\s*plugin)\b/.test(text),
+    nativeExecutable: filenames.some(filename => /\.(?:exe|cpp|c|rs|go)$/.test(filename)) || /\b(?:exe|executable|c\+\+|cpp|clang|gcc|g\+\+|compile|binary|pyinstaller)\b/.test(text),
     imageGeneration: /\b(?:generate|render|create|make|call|use)\b[\s\S]{0,80}\b(?:image|artwork|sprite|texture|prompt\s*forge|promptforge)\b/.test(text),
     webResearch: /\b(?:web\s*search|search\s*(?:the\s*)?(?:web|internet)|look\s*up\s*online|latest\s+(?:docs|documentation|news))\b/.test(text),
   };
@@ -173,12 +175,13 @@ function scopeAutonomousTools(req: UniversalRequest, tools: ToolDefinition[]): T
   // turn and again on every cascade candidate. Scope it by task profile instead
   // of shipping all of it on requests that will never touch most of the tools.
   const allowed = requestExpectsFileWrite(req)
-    ? new Set(['write_file', 'patch_file', 'read_file', 'list_workspace_files'])
+    ? new Set(['write_file', 'patch_file', 'read_file', 'list_workspace_files', 'execute_command'])
     : new Set([
         'read_file',
         'list_workspace_files',
         'write_file',
         'patch_file',
+        'execute_command',
         'get_current_time',
         'calculator',
         'remember_fact',
@@ -194,7 +197,7 @@ function scopeAutonomousTools(req: UniversalRequest, tools: ToolDefinition[]): T
     allowed.add('build_android_apk');
     allowed.add('test_android_app');
   }
-  if (!profile.html || profile.windowsPlugin) allowed.add('execute_command');
+  allowed.add('execute_command');
   if (profile.imageGeneration) allowed.add('generate_image');
   if (profile.webResearch) {
     allowed.add('web_search');
@@ -215,6 +218,9 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
     '- MANDATORY AUTONOMOUS EXECUTION (ANTI-FOB-OFF RULE): You are an autonomous builder, NOT an advisory chatbot. NEVER reply with high-level summaries, bulleted advice, placeholder code ("// add logic here", "/* TODO */"), or telling the user to implement or run things themselves.',
     '- OVERWRITING & UPDATING EXISTING FILES: When asked to update, modify, fix, rewrite, or rebuild an existing file, you MUST overwrite or patch it with the new changes using write_file or patch_file. DO NOT assume the task is finished just because an older version of the file is present on disk.',
     '- DIRECT COMPILATION ONLY (NO BUILD.BAT / SCRIPT CRUTCHES): NEVER generate build.bat, compile.bat, or shell scripts asking the user to compile themselves. YOU must compile and build executables/binaries directly using execute_command (e.g. running "cmake --build ...", "cl.exe", "clang++", "g++", "cargo", or "npm run build"). If compilation fails, inspect the compiler output and repair the code directly.',
+    '- PYTHON & COMPILER ENVIRONMENT (WINDOWS): Python is available at `python` (or `py`). Native GCC/G++ is available at `g++`. CMake is available at `cmake`.',
+    '- COMPILING WINDOWS .EXE & C++ APPS: When asked to build a Windows .exe or C++ program, write the source code to `<name>.cpp` with write_file, then compile it to `<name>.exe` by running execute_command with `g++ -O3 <name>.cpp -lgdi32 -luser32 -lopengl32 -o <name>.exe`. NEVER claim a .exe was created without executing the compiler!',
+    '- RUNNING PYTHON SCRIPTS: When asked to run or test Python code, write the script with write_file, then execute it with execute_command using `python <script>.py`.',
     '- When asked to create, code, build, or fix something, you MUST immediately call the appropriate tool (write_file, build_android_apk, patch_file, execute_command) to deliver the 100% COMPLETE, fully working code and save it to disk.',
     '- NO EXCUSES OR REFUSALS: Never say "As an AI I cannot...", "Here is a starting template you can expand", or "I cannot write the full file". Write the entire code and execute tools directly.',
     '- Never claim a file was created, edited, tested, or verified unless the corresponding tool succeeded.',
@@ -676,24 +682,48 @@ function artifactValidationFailure(req: UniversalRequest, write: VerifiedFileWri
 
 function collectObservedFileWrites(
   toolCalls: ToolCall[],
-  toolMessages: UniversalMessage[]
+  toolMessages: UniversalMessage[],
+  expectedFilenames: string[] = []
 ): VerifiedFileWrite[] {
   const writes: VerifiedFileWrite[] = [];
+  const ws = ToolRegistry.getWorkspaceDir();
+
   toolCalls.forEach((toolCall, index) => {
-    if (!['write_file', 'patch_file'].includes(toolCall.function.name) || !toolMessages[index]) return;
-    const result = parseToolResult(toolMessages[index]);
-    const fullPath = typeof result?.fullPath === 'string' ? result.fullPath : '';
-    if (!fullPath || !fs.existsSync(fullPath)) return;
-    try {
-      const stats = fs.statSync(fullPath);
-      if (!stats.isFile()) return;
-      const write = {
-        filename: typeof result?.filename === 'string' ? result.filename : path.basename(fullPath),
-        full_path: fullPath,
-        bytes_written: stats.size,
-      };
-      writes.push(write);
-    } catch {}
+    if (!toolMessages[index]) return;
+    if (['write_file', 'patch_file'].includes(toolCall.function.name)) {
+      const result = parseToolResult(toolMessages[index]);
+      const fullPath = typeof result?.fullPath === 'string' ? result.fullPath : '';
+      if (!fullPath || !fs.existsSync(fullPath)) return;
+      try {
+        const stats = fs.statSync(fullPath);
+        if (!stats.isFile()) return;
+        writes.push({
+          filename: typeof result?.filename === 'string' ? result.filename : path.basename(fullPath),
+          full_path: fullPath,
+          bytes_written: stats.size,
+        });
+      } catch {}
+    } else if (toolCall.function.name === 'execute_command') {
+      const result = parseToolResult(toolMessages[index]);
+      if (result?.success) {
+        // If a compiler or script built/updated an expected binary or target file, record it as a verified write
+        for (const target of expectedFilenames) {
+          const fullPath = path.isAbsolute(target) ? target : path.resolve(ws, target.replace(/\//g, path.sep));
+          if (fs.existsSync(fullPath)) {
+            try {
+              const stats = fs.statSync(fullPath);
+              if (stats.isFile() && stats.size > 0) {
+                writes.push({
+                  filename: path.basename(fullPath),
+                  full_path: fullPath,
+                  bytes_written: stats.size,
+                });
+              }
+            } catch {}
+          }
+        }
+      }
+    }
   });
   return writes;
 }
@@ -744,7 +774,11 @@ function fileVerificationCorrection(expectedFileTargets: string[], rejectedWrite
   const detail = latestRejection
     ? ` The last write was rejected because ${latestRejection.reason}.`
     : '';
-  return `NexusRoute verification: the requested target${target} has not been updated or created during this turn.${detail} If the file already exists on disk from an earlier session, you MUST still call write_file with the full updated code or patch_file to apply the requested changes. DO NOT assume existing disk files satisfy the request. If building an executable/binary, do not create a helper/build script (like build.bat); run the compiler directly using execute_command.`;
+  const hasExeTarget = expectedFileTargets.some(t => /\.exe$/i.test(t));
+  const exeHint = hasExeTarget
+    ? ' If building an executable/binary, do not claim it was created until you have compiled it by calling execute_command (e.g. `g++ -O3 main.cpp -lgdi32 -luser32 -o app.exe`). Do NOT create build.bat helper scripts.'
+    : ' If building an executable/binary, do not create a helper/build script (like build.bat); run the compiler directly using execute_command.';
+  return `NexusRoute verification: the requested target${target} has not been updated or created during this turn.${detail} If the file already exists on disk from an earlier session, you MUST still call write_file with the full updated code or patch_file to apply the requested changes. DO NOT assume existing disk files satisfy the request.${exeHint}`;
 }
 
 function incompleteToolCorrection(toolNames: string[], dependencyIssues: MissingHtmlDependencies[]): string {
@@ -1713,7 +1747,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           }));
           collectSuccessfulTools(toolCalls, toolMessages).forEach(name => toolsExecuted.push(name));
           const previouslyVerified = new Set(verifiedWrites.map(write => write.full_path.toLowerCase()));
-          appendUniqueWrites(observedWrites, collectObservedFileWrites(toolCalls, toolMessages));
+          appendUniqueWrites(observedWrites, collectObservedFileWrites(toolCalls, toolMessages, expectedFileTargets));
           verifiedWrites = reassessVerifiedFileWrites(req, observedWrites, expectedFileTargets, rejectedWrites);
           htmlRuntimeVerification = updateHtmlRuntimeVerification(htmlRuntimeVerification, toolCalls, toolMessages);
           verifiedWrites
@@ -2328,7 +2362,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             }));
             collectSuccessfulTools(toolCallsArray, toolMessages).forEach(name => toolsExecuted.push(name));
             const previouslyVerified = new Set(verifiedWrites.map(write => write.full_path.toLowerCase()));
-            appendUniqueWrites(observedWrites, collectObservedFileWrites(toolCallsArray, toolMessages));
+            appendUniqueWrites(observedWrites, collectObservedFileWrites(toolCallsArray, toolMessages, expectedFileTargets));
             verifiedWrites = reassessVerifiedFileWrites(req, observedWrites, expectedFileTargets, rejectedWrites);
             htmlRuntimeVerification = updateHtmlRuntimeVerification(htmlRuntimeVerification, toolCallsArray, toolMessages);
             const newVerifiedWrites = verifiedWrites.filter(write => !previouslyVerified.has(write.full_path.toLowerCase()));
