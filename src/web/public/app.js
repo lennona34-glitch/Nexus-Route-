@@ -1989,6 +1989,8 @@ function openEndlessForgeSlideshow() {
     }
   } catch {}
 
+  resetSlideshowCursorTimer();
+
   // Fetch newest artwork and status immediately
   fetch('/v1/endless-forge/poll?since=0')
     .then((r) => r.json())
@@ -2009,6 +2011,8 @@ function openEndlessForgeSlideshow() {
 
 function closeEndlessForgeSlideshow() {
   if (!efSlideshowModal) return;
+  if (slideshowCursorTimer) clearTimeout(slideshowCursorTimer);
+  efSlideshowModal.classList.remove('cursor-hidden');
   efSlideshowModal.classList.add('hidden');
   try {
     if (document.exitFullscreen && document.fullscreenElement) {
@@ -2060,19 +2064,36 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Auto-hide topbar controls so picture is 100% clean and unobstructed
+// Auto-hide topbar controls & mouse cursor so picture is 100% clean and unobstructed
 const efSlideshowTopBar = document.getElementById('efSlideshowTopBar');
 let slideshowTopBarTimer = null;
+let slideshowCursorTimer = null;
+
+function resetSlideshowCursorTimer() {
+  if (slideshowCursorTimer) clearTimeout(slideshowCursorTimer);
+  if (efSlideshowModal && !efSlideshowModal.classList.contains('hidden')) {
+    efSlideshowModal.classList.remove('cursor-hidden');
+    slideshowCursorTimer = setTimeout(() => {
+      if (efSlideshowModal && !efSlideshowModal.classList.contains('hidden')) {
+        efSlideshowModal.classList.add('cursor-hidden');
+      }
+    }, 2200);
+  }
+}
+
 document.addEventListener('mousemove', (e) => {
-  if (efSlideshowModal && !efSlideshowModal.classList.contains('hidden') && efSlideshowTopBar) {
-    if (e.clientY < 90 && e.clientX > window.innerWidth - 260) {
-      efSlideshowTopBar.classList.add('user-active');
-      if (slideshowTopBarTimer) clearTimeout(slideshowTopBarTimer);
-      slideshowTopBarTimer = setTimeout(() => {
+  if (efSlideshowModal && !efSlideshowModal.classList.contains('hidden')) {
+    resetSlideshowCursorTimer();
+    if (efSlideshowTopBar) {
+      if (e.clientY < 90 && e.clientX > window.innerWidth - 260) {
+        efSlideshowTopBar.classList.add('user-active');
+        if (slideshowTopBarTimer) clearTimeout(slideshowTopBarTimer);
+        slideshowTopBarTimer = setTimeout(() => {
+          efSlideshowTopBar.classList.remove('user-active');
+        }, 2000);
+      } else {
         efSlideshowTopBar.classList.remove('user-active');
-      }, 2000);
-    } else {
-      efSlideshowTopBar.classList.remove('user-active');
+      }
     }
   }
 });

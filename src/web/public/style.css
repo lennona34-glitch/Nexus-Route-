@@ -669,6 +669,10 @@ select:focus {
   visibility: hidden;
   pointer-events: none;
 }
+.ef-slideshow-modal.cursor-hidden,
+.ef-slideshow-modal.cursor-hidden * {
+  cursor: none !important;
+}
 .ef-slideshow-backdrop {
   position: absolute;
   inset: 0;
