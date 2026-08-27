@@ -213,6 +213,8 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
     '',
     'OPERATING RULES:',
     '- MANDATORY AUTONOMOUS EXECUTION (ANTI-FOB-OFF RULE): You are an autonomous builder, NOT an advisory chatbot. NEVER reply with high-level summaries, bulleted advice, placeholder code ("// add logic here", "/* TODO */"), or telling the user to implement or run things themselves.',
+    '- OVERWRITING & UPDATING EXISTING FILES: When asked to update, modify, fix, rewrite, or rebuild an existing file, you MUST overwrite or patch it with the new changes using write_file or patch_file. DO NOT assume the task is finished just because an older version of the file is present on disk.',
+    '- DIRECT COMPILATION ONLY (NO BUILD.BAT / SCRIPT CRUTCHES): NEVER generate build.bat, compile.bat, or shell scripts asking the user to compile themselves. YOU must compile and build executables/binaries directly using execute_command (e.g. running "cmake --build ...", "cl.exe", "clang++", "g++", "cargo", or "npm run build"). If compilation fails, inspect the compiler output and repair the code directly.',
     '- When asked to create, code, build, or fix something, you MUST immediately call the appropriate tool (write_file, build_android_apk, patch_file, execute_command) to deliver the 100% COMPLETE, fully working code and save it to disk.',
     '- NO EXCUSES OR REFUSALS: Never say "As an AI I cannot...", "Here is a starting template you can expand", or "I cannot write the full file". Write the entire code and execute tools directly.',
     '- Never claim a file was created, edited, tested, or verified unless the corresponding tool succeeded.',
@@ -666,6 +668,9 @@ function artifactValidationFailure(req: UniversalRequest, write: VerifiedFileWri
       reasons.push('the requested browser audio engine is missing');
     }
   }
+  if ((extension === '.bat' || extension === '.cmd' || extension === '.sh') && !/\b(?:batch|script|bat\b|cmd\b|shell)\b/.test(requestText)) {
+    reasons.push('a batch/shell script was created instead of compiling the actual executable/binary directly using execute_command');
+  }
   return reasons.length > 0 ? reasons.join('; ') : null;
 }
 
@@ -739,7 +744,7 @@ function fileVerificationCorrection(expectedFileTargets: string[], rejectedWrite
   const detail = latestRejection
     ? ` The last write was rejected because ${latestRejection.reason}.`
     : '';
-  return `NexusRoute verification: the requested target${target} has not been successfully updated.${detail} For a focused edit to an existing file, call patch_file with the exact target; otherwise call write_file with complete, runnable content. Do not create a helper/build script instead of the requested target, and do not merely describe or claim the change.`;
+  return `NexusRoute verification: the requested target${target} has not been updated or created during this turn.${detail} If the file already exists on disk from an earlier session, you MUST still call write_file with the full updated code or patch_file to apply the requested changes. DO NOT assume existing disk files satisfy the request. If building an executable/binary, do not create a helper/build script (like build.bat); run the compiler directly using execute_command.`;
 }
 
 function incompleteToolCorrection(toolNames: string[], dependencyIssues: MissingHtmlDependencies[]): string {
