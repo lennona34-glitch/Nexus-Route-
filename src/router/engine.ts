@@ -292,8 +292,13 @@ function candidateIdentity(provider: ProviderType, model: string): string {
 }
 
 function candidateTimeoutOverride(provider: ProviderType, model: string): number | undefined {
-  if (provider === 'openrouter' && /(?:^|::)stealth\/ox-alpha$/i.test(model)) {
-    return positiveDuration(process.env.NEXUS_OX_ALPHA_TURN_TIMEOUT_MS, 75_000);
+  if (provider === 'openrouter') {
+    if (/(?:^|::)stealth\/ox-alpha$/i.test(model)) {
+      return positiveDuration(process.env.NEXUS_OX_ALPHA_TURN_TIMEOUT_MS, 75_000);
+    }
+    if (model.includes(':free') || model.includes('openrouter/free') || model.includes('/free')) {
+      return positiveDuration(process.env.NEXUS_FREE_TURN_TIMEOUT_MS, 180_000);
+    }
   }
   return undefined;
 }
@@ -409,7 +414,7 @@ async function* streamWithWallClockDeadline(
 ): AsyncGenerator<UniversalStreamChunk> {
   const iterator = stream[Symbol.asyncIterator]();
   const maxTotalMs = Math.max(timeoutMs, 600_000); // 10 mins ceiling for very long active outputs
-  const inactivityAllowanceMs = Math.max(60_000, Math.min(timeoutMs, 120_000));
+  const inactivityAllowanceMs = Math.max(120_000, Math.min(timeoutMs, 240_000));
   const absoluteDeadline = Date.now() + maxTotalMs;
   let nextChunkDeadline = Date.now() + timeoutMs;
   let completed = false;
