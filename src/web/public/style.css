@@ -704,28 +704,7 @@ select:focus {
   user-select: none;
 }
 .ef-slideshow-spinner {
-  position: absolute;
-  bottom: 120px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(129, 140, 248, 0.3);
-  padding: 8px 16px;
-  border-radius: 20px;
-  backdrop-filter: blur(12px);
-  color: #c7d2fe;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-}
-.ef-spinner-circle {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(129, 140, 248, 0.3);
-  border-top-color: #818cf8;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  display: none !important;
 }
 
 /* Floating Topbar for Slideshow - Completely hidden until deliberate hover/interaction */
@@ -766,14 +745,20 @@ select:focus {
   transform: translateY(-1px);
 }
 
-/* Suppress all toast alerts and notifications while in Fullscreen Slideshow */
+/* Suppress all toast alerts, banners, and notifications while in Fullscreen Slideshow */
 body:has(.ef-slideshow-modal:not(.hidden)) .toast,
 body:has(.ef-slideshow-modal:not(.hidden)) #toastContainer,
 body:has(.ef-slideshow-modal:not(.hidden)) .toast-notification,
-body:has(.ef-slideshow-modal:not(.hidden)) .notification-box {
+body:has(.ef-slideshow-modal:not(.hidden)) .notification-box,
+body:has(.ef-slideshow-modal:not(.hidden)) .notification,
+body:has(.ef-slideshow-modal:not(.hidden)) .ef-slideshow-spinner,
+body:has(.ef-slideshow-modal:not(.hidden)) .alert-badge,
+body:has(.ef-slideshow-modal:not(.hidden)) [class*="toast"],
+body:has(.ef-slideshow-modal:not(.hidden)) [class*="notification"] {
   display: none !important;
   opacity: 0 !important;
   pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 /* Floating Glass Overlay Card */

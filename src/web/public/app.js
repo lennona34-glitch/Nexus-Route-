@@ -1972,13 +1972,7 @@ function updateSlideshowArtwork(artwork, isProcessing = false) {
     efSsDownloadBtn.download = `${(artwork.title || 'endless_forge').replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
   }
 
-  if (efSlideshowSpinner) {
-    if (isProcessing) {
-      efSlideshowSpinner.classList.remove('hidden');
-    } else {
-      efSlideshowSpinner.classList.add('hidden');
-    }
-  }
+
 }
 
 function openEndlessForgeSlideshow() {
