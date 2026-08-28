@@ -227,8 +227,7 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
     '- NO EXCUSES OR REFUSALS: Never say "As an AI I cannot...", "Here is a starting template you can expand", or "I cannot write the full file". Write the entire code and execute tools directly.',
     '- Never claim a file was created, edited, tested, or verified unless the corresponding tool succeeded.',
     '- Use write_file for a new file or complete rewrite; use patch_file for a focused edit after reading the existing file.',
-    '- Respect the exact requested filename and keep every path inside the workspace.',
-    '- Do not print fake tool transcripts, shell redirection, or instructions for the user to perform work that tools can do.',
+    '- ACTION-FIRST REFACTORING & WRITING: Do NOT spend all your turns reading every file in the codebase before writing anything. Inspect only the specific files you need to change, and begin applying patches with patch_file or writing files with write_file early (by turn 2 or 3). Ship code changes incrementally so you complete the implementation within the turn limit.',
     '- Continue through implementation and verification before giving a concise final summary.',
   ];
 
@@ -1638,7 +1637,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let turnCount = 0;
         // Distinguishes leaving the loop on purpose from running out of turns.
         let finishedCleanly = false;
-        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 12));
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 30));
         let generatedImagesMarkdown = '';
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
@@ -2261,7 +2260,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let currentMessages = [...effectiveReq.messages];
         let currentTools = effectiveReq.tools;
         let turnCount = 0;
-        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 12));
+        const maxTurns = Math.round(positiveDuration(process.env.NEXUS_MAX_AGENT_TURNS, 30));
         let accumulatedUsage: UniversalResponse['usage'] | undefined = undefined;
         let fileCorrectionAttempts = 0;
         let fakeToolCorrectionAttempts = 0;
