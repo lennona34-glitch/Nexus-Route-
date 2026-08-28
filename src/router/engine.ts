@@ -1772,7 +1772,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               finishedCleanly = true;
               break;
             }
-            if (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success) {
+            if (runtimeTestRequired && htmlRuntimeToolAvailable && htmlRuntimeVerification.attempted && !htmlRuntimeVerification.success && verifiedWrites.length === 0) {
               if (choice?.message) {
                 choice.message.content = `⚠️ Incomplete interactive artifact: ${htmlRuntimeVerification.detail}`;
               }
@@ -2666,7 +2666,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               writeUnaccountedFor ||
               fakeToolNames.length > 0 ||
               dependencyIssues.length > 0 ||
-              (runtimeTestRequired && htmlRuntimeToolAvailable && !htmlRuntimeVerification.success)
+              (runtimeTestRequired && htmlRuntimeToolAvailable && htmlRuntimeVerification.attempted && !htmlRuntimeVerification.success && verifiedWrites.length === 0)
             );
             // Always release what the model produced. Withholding it destroyed
             // work the user could still use - often the full file contents in a
