@@ -459,6 +459,86 @@ async function* streamWithWallClockDeadline(
   }
 }
 
+function isImageModel(model: string): boolean {
+  const m = (model || '').toLowerCase();
+  return (
+    m.includes('wan2.7-image') ||
+    m.includes('wan2.7-image-pro') ||
+    m.includes('wan2.6-t2i') ||
+    m.includes('wanx-') ||
+    m.includes('dall-e') ||
+    m.includes('flux') ||
+    m.includes('imagen-3')
+  );
+}
+
+async function executeDirectImageRequest(
+  req: UniversalRequest,
+  requestId: string,
+  requestStartedAt: number
+): Promise<{ response: UniversalResponse; text: string }> {
+  const lastUserMsg = req.messages.filter(m => m.role === 'user').pop();
+  const promptText = typeof lastUserMsg?.content === 'string'
+    ? lastUserMsg.content
+    : (Array.isArray(lastUserMsg?.content)
+        ? (lastUserMsg?.content as any[]).map((c: any) => c.text || '').join(' ')
+        : 'artwork');
+  
+  const m = (req.model || '').toLowerCase();
+  const engine = m.includes('wan') ? 'qwen' : (m.includes('dall-e') ? 'openai' : (m.includes('imagen') ? 'imagen' : 'auto'));
+  const rawRes = await ToolRegistry.executeTool('generate_image', { prompt: promptText, engine });
+  let resultText = '';
+  try {
+    const parsed = JSON.parse(rawRes);
+    if (parsed.success && parsed.url) {
+      resultText = `![${promptText}](${parsed.url})\n\n*(Generated with ${parsed.engine} in ${parsed.resolution})*`;
+    } else {
+      resultText = `Error generating image: ${parsed.error || rawRes}`;
+    }
+  } catch {
+    resultText = rawRes;
+  }
+
+  const durationMs = Date.now() - requestStartedAt;
+  const provider = m.includes('wan') ? 'qwen' : 'cloud';
+  const imgResponse: UniversalResponse = {
+    id: `img-${Date.now()}`,
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: req.model,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: resultText,
+        },
+        finish_reason: 'stop',
+      },
+    ],
+    usage: { prompt_tokens: 20, completion_tokens: 50, total_tokens: 70 },
+    route_info: {
+      request_id: requestId,
+      route_stage: 'completed',
+      requested_model: req.model,
+      selected_provider: provider as ProviderType,
+      selected_model: req.model,
+      routing_strategy: 'direct',
+      attempts: [{
+        provider: provider as ProviderType,
+        model: req.model,
+        status: 'success',
+        latency_ms: durationMs,
+      }],
+      decision_reasons: ['Directly routed to studio image generation engine.'],
+      total_latency_ms: durationMs,
+      cached: false,
+    },
+  };
+
+  return { response: imgResponse, text: resultText };
+}
+
 // Local models often emit a tool call as plain text instead of a structured
 // tool_calls delta, so the start of a local turn is buffered to inspect it.
 // Once enough text has arrived and it clearly is not a tool-call payload the
@@ -1538,6 +1618,15 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
       stage: 'request_started',
       requestedModel: req.model,
     });
+
+    // Handle direct image generation models (e.g. wan2.7-image, dall-e-3, flux)
+    if (isImageModel(req.model)) {
+      const { response } = await executeDirectImageRequest(req, requestId, requestStartedAt);
+      if (response.route_info) this.telemetryStore.record({ requestedModel: req.model, routeInfo: response.route_info, usage: response.usage });
+      this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'request_completed', requestedModel: req.model, success: true, durationMs: Date.now() - requestStartedAt });
+      return response;
+    }
+
     // 1. Check Response Cache
     const cached = this.cache.get(req);
     if (cached) {
@@ -2163,6 +2252,46 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         },
       };
       this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'request_completed', requestedModel: req.model, success: true, durationMs: Date.now() - requestStartedAt, detail: 'response_cache_hit' });
+      return;
+    }
+
+    // Handle direct image generation models (e.g. wan2.7-image, dall-e-3, flux)
+    if (isImageModel(req.model)) {
+      const { response, text } = await executeDirectImageRequest(req, requestId, requestStartedAt);
+      if (response.route_info) this.telemetryStore.record({ requestedModel: req.model, routeInfo: response.route_info, usage: response.usage });
+      this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'request_completed', requestedModel: req.model, success: true, durationMs: Date.now() - requestStartedAt });
+
+      const chunk: UniversalStreamChunk = {
+        id: response.id,
+        object: 'chat.completion.chunk',
+        created: response.created,
+        model: req.model,
+        choices: [
+          {
+            index: 0,
+            delta: { content: text },
+            finish_reason: null,
+          },
+        ],
+      };
+      yield chunk;
+
+      const stopChunk: UniversalStreamChunk = {
+        id: response.id,
+        object: 'chat.completion.chunk',
+        created: response.created,
+        model: req.model,
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+          },
+        ],
+        usage: response.usage,
+        route_info: response.route_info,
+      };
+      yield stopChunk;
       return;
     }
 
