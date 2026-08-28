@@ -227,8 +227,7 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
     '- PYTHON & COMPILER ENVIRONMENT (WINDOWS): Python is available at `python` (or `py`). Native GCC/G++ is available at `g++`. CMake is available at `cmake`.',
     '- COMPILING WINDOWS .EXE & C++ APPS: When asked to build a Windows .exe or C++ program, write the source code to `<name>.cpp` with write_file, then compile it to `<name>.exe` by running execute_command with `g++ -O3 <name>.cpp -lgdi32 -luser32 -lopengl32 -o <name>.exe`. NEVER claim a .exe was created without executing the compiler!',
     '- RUNNING PYTHON SCRIPTS: When asked to run or test Python code, write the script with write_file, then execute it with execute_command using `python <script>.py`.',
-    '- When asked to create, code, build, or fix something, you MUST immediately call the appropriate tool (write_file, build_android_apk, patch_file, execute_command) to deliver the 100% COMPLETE, fully working code and save it to disk.',
-    '- NO EXCUSES OR REFUSALS: Never say "As an AI I cannot...", "Here is a starting template you can expand", or "I cannot write the full file". Write the entire code and execute tools directly.',
+    '- NO EXCUSES OR REFUSALS: NEVER say "As an AI I cannot...", "I don\'t have the capability to directly interact with or debug the file", "I cannot access your files", or "Here is a starting template". You ARE equipped with full workspace tools (read_file, write_file, patch_file, execute_command). When asked to debug, compile, or fix something, you MUST immediately call read_file to inspect the code and execute_command / patch_file to fix and compile it!',
     '- Never claim a file was created, edited, tested, or verified unless the corresponding tool succeeded.',
     '- Use write_file for a new file or complete rewrite; use patch_file for a focused edit after reading the existing file.',
     '- ACTION-FIRST REFACTORING & WRITING: Do NOT spend all your turns reading every file in the codebase before writing anything. Inspect only the specific files you need to change, and begin applying patches with patch_file or writing files with write_file early (by turn 2 or 3). Ship code changes incrementally so you complete the implementation within the turn limit.',
@@ -2625,6 +2624,20 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
                 ...currentMessages,
                 { role: 'assistant', content: turnContent || '' },
                 { role: 'user', content: htmlRuntimeCorrection(observedWrites, expectedFileTargets, htmlRuntimeVerification) },
+              ];
+              currentTools = effectiveReq.tools;
+              continue;
+            }
+            const claimsCannotAccessFiles = /(?:don't have the capability|cannot directly interact|cannot access (?:your )?files|don't have access to (?:your )?files|as an ai(?: language model)? i (?:cannot|can't))/i.test(turnContent);
+            if (claimsCannotAccessFiles && fileToolsAvailable && fileCorrectionAttempts < 2) {
+              fileCorrectionAttempts++;
+              currentMessages = [
+                ...currentMessages,
+                { role: 'assistant', content: turnContent || '' },
+                {
+                  role: 'user',
+                  content: '[System Action Required: You DO have direct workspace access and tools (read_file, patch_file, write_file, execute_command). Do NOT output disclaimer text or state that you cannot access files. Immediately call the appropriate tool to inspect, debug, or fix the file.]',
+                },
               ];
               currentTools = effectiveReq.tools;
               continue;
