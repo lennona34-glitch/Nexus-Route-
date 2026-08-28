@@ -1145,13 +1145,8 @@ export class RoutingEngine {
           }
         }
       }
-      if (hasLocal) {
-        list.push(
-          { provider: 'local', model: 'qwen2.5-coder:7b', timeout_ms: 20000 },
-          { provider: 'local', model: 'llama3.1:8b', timeout_ms: 20000 },
-          { provider: 'local', model: 'deepseek-r1:1.5b', timeout_ms: 15000 },
-          { provider: 'local', model: 'qwen2.5-coder:14b', timeout_ms: 25000 }
-        );
+      if (hasGroq && excludeModel !== 'groq/llama-3.3-70b-versatile') {
+        list.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
       }
       list.push({ provider: 'mock', model: 'mock-gpt-4o' });
       return list;
@@ -1159,20 +1154,24 @@ export class RoutingEngine {
 
     const getCloudFallbacks = (excludeProv: string): RouteCandidate[] => {
       const list: RouteCandidate[] = [];
-      const xaiFallbackModel = classification.category === 'CODE_DEV' || requestExpectsFileWrite(req)
-        ? 'grok-build-0.1'
-        : 'grok-4.6';
-      if (hasGemini && excludeProv !== 'gemini') list.push({ provider: 'gemini', model: 'gemini-flash-latest' });
-      if (hasOpenRouter && excludeProv !== 'openrouter') list.push({ provider: 'openrouter', model: openRouterModel() });
-      // Direct xAI has proven to be a dependable coding fallback. Keep it ahead
-      // of low-TPM/free pools so a failed primary still has time to complete.
-      if (hasXAI && excludeProv !== 'xai') list.push({ provider: 'xai', model: xaiFallbackModel, timeout_ms: 150_000 });
-      if (hasGroq && excludeProv !== 'groq') list.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
-      if (hasAnthropic && excludeProv !== 'anthropic') list.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
-      if (hasOpenAI && excludeProv !== 'openai') list.push({ provider: 'openai', model: 'gpt-4o' });
-      if (hasDeepSeek && excludeProv !== 'deepseek') list.push({ provider: 'deepseek', model: 'deepseek-chat' });
-      if (hasMistral && excludeProv !== 'mistral') list.push({ provider: 'mistral', model: 'mistral/mistral-small-latest' });
-      if (hasTogether && excludeProv !== 'together') list.push({ provider: 'together', model: 'together/meta-llama/Llama-3.3-70B-Instruct-Turbo' });
+      // 1. Subscription Tier Fallbacks (within Qwen plan)
+      if (hasQwen && excludeProv !== 'qwen') {
+        list.push(
+          { provider: 'qwen', model: 'qwen3.7-plus' },
+          { provider: 'qwen', model: 'qwen3.8-flash' },
+        );
+      }
+      // 2. Free Tier Fallbacks (Zero Extra Cost)
+      if (hasOpenRouter && excludeProv !== 'openrouter') {
+        list.push({ provider: 'openrouter', model: openRouterModel() });
+        list.push({ provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free' });
+        list.push({ provider: 'openrouter', model: 'openrouter::minimax/minimax-m3:free' });
+      }
+      if (hasGroq && excludeProv !== 'groq') {
+        list.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+      }
+      // NOTE: Paid pay-as-you-go providers (xAI, DeepSeek direct, OpenAI, Anthropic)
+      // are deliberately NOT in default cloud fallbacks to prevent unintended spend.
       return list;
     };
 
@@ -1328,49 +1327,66 @@ export class RoutingEngine {
     }
 
     if (effectiveTier === 'coding') {
-      if (hasXAI) liveCandidates.push({ provider: 'xai', model: 'grok-4.6', timeout_ms: 150_000 });
-      if (hasOpenRouter) liveCandidates.push({ provider: 'openrouter', model: openRouterCodingModel, timeout_ms: 90_000 });
-      if (hasDeepSeek) liveCandidates.push({ provider: 'deepseek', model: 'deepseek-chat' });
-      if (hasTogether) liveCandidates.push({ provider: 'together', model: 'together/meta-llama/Llama-3.3-70B-Instruct-Turbo' });
+      if (hasQwen) {
+        liveCandidates.push(
+          { provider: 'qwen', model: 'qwen3.8-max' },
+          { provider: 'qwen', model: 'qwen3.7-max' },
+          { provider: 'qwen', model: 'qwen3.7-plus' },
+        );
+      }
+      if (hasOpenRouter) {
+        liveCandidates.push(
+          { provider: 'openrouter', model: openRouterCodingModel, timeout_ms: 120_000 },
+          { provider: 'openrouter', model: 'openrouter::cohere/north-mini-code:free', timeout_ms: 120_000 },
+          { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
+        );
+      }
       if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
-      if (hasGemini) liveCandidates.push({ provider: 'gemini', model: 'gemini-1.5-flash' });
-      if (hasAnthropic) liveCandidates.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
-      if (hasOpenAI) liveCandidates.push({ provider: 'openai', model: 'gpt-4o' });
-      if (hasGitHub) liveCandidates.push({ provider: 'github', model: 'github/gpt-4o' });
-      if (hasMistral) liveCandidates.push({ provider: 'mistral', model: 'mistral/mistral-small-latest' });
     } else if (effectiveTier === 'reasoning') {
-      if (hasXAI) liveCandidates.push({ provider: 'xai', model: 'grok-4.6', timeout_ms: 150_000 });
-      if (hasOpenRouter) liveCandidates.push({ provider: 'openrouter', model: openRouterModel() });
-      if (hasDeepSeek) liveCandidates.push({ provider: 'deepseek', model: 'deepseek-reasoner' });
-      if (hasTogether) liveCandidates.push({ provider: 'together', model: 'together/deepseek-ai/DeepSeek-R1' });
-      if (hasGemini) liveCandidates.push({ provider: 'gemini', model: 'gemini-1.5-pro' });
-      if (hasGitHub) liveCandidates.push({ provider: 'github', model: 'github/o3-mini' });
-      if (hasOpenAI) liveCandidates.push({ provider: 'openai', model: 'o3-mini' });
-      if (hasAnthropic) liveCandidates.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
-      if (hasMistral) liveCandidates.push({ provider: 'mistral', model: 'mistral/mistral-small-latest' });
+      if (hasQwen) {
+        liveCandidates.push(
+          { provider: 'qwen', model: 'qwen3.7-max' },
+          { provider: 'qwen', model: 'deepseek-v4-pro' },
+          { provider: 'qwen', model: 'glm-5.2' },
+        );
+      }
+      if (hasOpenRouter) {
+        liveCandidates.push(
+          { provider: 'openrouter', model: openRouterModel(), timeout_ms: 120_000 },
+          { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
+        );
+      }
+      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
     } else if (effectiveTier === 'fast') {
-      if (hasOpenRouter) liveCandidates.push({ provider: 'openrouter', model: openRouterModel() });
-      if (hasDeepSeek) liveCandidates.push({ provider: 'deepseek', model: 'deepseek-chat' });
-      if (hasTogether) liveCandidates.push({ provider: 'together', model: 'together/meta-llama/Llama-3.3-70B-Instruct-Turbo' });
+      if (hasQwen) {
+        liveCandidates.push(
+          { provider: 'qwen', model: 'qwen3.8-flash' },
+          { provider: 'qwen', model: 'qwen3.6-flash' },
+          { provider: 'qwen', model: 'qwen3.7-plus' },
+        );
+      }
+      if (hasOpenRouter) {
+        liveCandidates.push(
+          { provider: 'openrouter', model: openRouterModel(), timeout_ms: 90_000 },
+          { provider: 'openrouter', model: 'openrouter::minimax/minimax-m3:free', timeout_ms: 90_000 },
+        );
+      }
       if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
-      if (hasXAI) liveCandidates.push({ provider: 'xai', model: 'grok-4.6', timeout_ms: 120_000 });
-      if (hasGemini) liveCandidates.push({ provider: 'gemini', model: 'gemini-1.5-flash' });
-      if (hasGitHub) liveCandidates.push({ provider: 'github', model: 'github/gpt-4o-mini' });
-      if (hasOpenAI) liveCandidates.push({ provider: 'openai', model: 'gpt-4o-mini' });
-      if (hasAnthropic) liveCandidates.push({ provider: 'anthropic', model: 'claude-haiku-4-5-20251001' });
-      if (hasMistral) liveCandidates.push({ provider: 'mistral', model: 'mistral/mistral-small-latest' });
     } else {
-      // General balanced
-      if (hasOpenRouter) liveCandidates.push({ provider: 'openrouter', model: openRouterModel() });
-      if (hasDeepSeek) liveCandidates.push({ provider: 'deepseek', model: 'deepseek-chat' });
-      if (hasTogether) liveCandidates.push({ provider: 'together', model: 'together/meta-llama/Llama-3.3-70B-Instruct-Turbo' });
+      // General balanced / auto
+      if (hasQwen) {
+        liveCandidates.push(
+          { provider: 'qwen', model: 'qwen3.7-max' },
+          { provider: 'qwen', model: 'qwen3.7-plus' },
+        );
+      }
+      if (hasOpenRouter) {
+        liveCandidates.push(
+          { provider: 'openrouter', model: openRouterModel(), timeout_ms: 120_000 },
+          { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
+        );
+      }
       if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
-      if (hasXAI) liveCandidates.push({ provider: 'xai', model: 'grok-4.6', timeout_ms: 150_000 });
-      if (hasGemini) liveCandidates.push({ provider: 'gemini', model: 'gemini-1.5-flash' });
-      if (hasOpenAI) liveCandidates.push({ provider: 'openai', model: 'gpt-4o' });
-      if (hasGitHub) liveCandidates.push({ provider: 'github', model: 'github/gpt-4o' });
-      if (hasAnthropic) liveCandidates.push({ provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' });
-      if (hasMistral) liveCandidates.push({ provider: 'mistral', model: 'mistral/mistral-small-latest' });
     }
 
 
