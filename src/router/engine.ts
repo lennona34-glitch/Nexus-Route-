@@ -339,8 +339,8 @@ const MIN_ATTEMPT_MS = 15_000;
 
 function defaultTurnMs(provider: ProviderType): number {
   return provider === 'local' || provider === 'ollama'
-    ? positiveDuration(process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS, 300_000)
-    : positiveDuration(process.env.NEXUS_CLOUD_TURN_TIMEOUT_MS, 240_000);
+    ? positiveDuration(process.env.NEXUS_LOCAL_TURN_TIMEOUT_MS, 360_000)
+    : positiveDuration(process.env.NEXUS_CLOUD_TURN_TIMEOUT_MS, 300_000);
 }
 
 function turnTimeoutMs(provider: ProviderType, requested?: number, remainingRequestMs?: number): number {
@@ -1503,7 +1503,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
   async executeChat(req: UniversalRequest): Promise<UniversalResponse> {
     const requestId = crypto.randomUUID();
     const requestStartedAt = Date.now();
-    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 600_000);
+    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 900_000);
     this.agentEventLog.record({
       requestId,
       sessionId: req.session_id,
@@ -1620,8 +1620,9 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
         let modelTurnCount = 0;
         const runTurn = async (messages: UniversalMessage[], tools: UniversalRequest['tools']) => {
           modelTurnCount++;
-          const remainingRequestMs = attemptDeadline - Date.now();
-          if (remainingRequestMs < MIN_TURN_MS) throw new AdapterError(`${model} exhausted its route-attempt time budget`, provider, 408, true);
+          attemptDeadline = extendAttemptDeadline(attemptDeadline, requestDeadline, timeout_ms ?? effectiveReq.timeout_ms, provider);
+          const remainingRequestMs = Math.min(attemptDeadline - Date.now(), Math.max(0, requestDeadline - Date.now()));
+          if (remainingRequestMs < MIN_TURN_MS) throw new AdapterError(`${model} exhausted request time budget`, provider, 408, true);
           const timeout = turnTimeoutMs(provider, timeout_ms ?? effectiveReq.timeout_ms, remainingRequestMs);
           const turnStartedAt = Date.now();
           this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'turn_started', requestedModel: req.model, provider, model, connectionLabel: connection?.label, turn: modelTurnCount });
@@ -2027,7 +2028,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
   async *executeStream(req: UniversalRequest): AsyncGenerator<UniversalStreamChunk> {
     const requestId = crypto.randomUUID();
     const requestStartedAt = Date.now();
-    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 600_000);
+    const requestDeadline = requestStartedAt + positiveDuration(process.env.NEXUS_AGENT_REQUEST_TIMEOUT_MS, 900_000);
     this.agentEventLog.record({ requestId, sessionId: req.session_id, stage: 'request_started', requestedModel: req.model });
     // 1. Check Response Cache
     const cached = this.cache.get(req);
@@ -2273,8 +2274,9 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
 
         while (turnCount < maxTurns) {
           turnCount++;
-          const remainingRequestMs = attemptDeadline - Date.now();
-          if (remainingRequestMs < MIN_TURN_MS) throw new AdapterError(`${model} exhausted its route-attempt time budget`, provider, 408, true);
+          attemptDeadline = extendAttemptDeadline(attemptDeadline, requestDeadline, timeout_ms ?? effectiveReq.timeout_ms, provider);
+          const remainingRequestMs = Math.min(attemptDeadline - Date.now(), Math.max(0, requestDeadline - Date.now()));
+          if (remainingRequestMs < MIN_TURN_MS) throw new AdapterError(`${model} exhausted request time budget`, provider, 408, true);
           const timeout = turnTimeoutMs(provider, timeout_ms ?? effectiveReq.timeout_ms, remainingRequestMs);
           const currentReq: UniversalRequest = { ...effectiveReq, messages: currentMessages, tools: currentTools, timeout_ms: timeout };
           const stream = streamWithWallClockDeadline(adapter.streamChatCompletion(currentReq, model), timeout, provider, model);

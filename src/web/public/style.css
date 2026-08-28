@@ -2659,224 +2659,55 @@ textarea:focus {
 }
 
 /* ==========================================================================
-   Claude Code Terminal View & Welcome Hero Box (CLI Aesthetic)
+   Clean Modern Empty Chat State
    ========================================================================== */
-.claude-code-hero {
-  max-width: 920px;
-  width: 100%;
-  margin: 18px auto;
-  font-family: var(--font-mono);
+.empty-chat-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: auto;
+  max-width: 620px;
+  padding: 50px 20px;
   animation: fadeIn 0.3s ease-out;
 }
 
-.cc-box {
-  position: relative;
-  background: #000000;
-  border: 1.5px solid #d97757;
-  border-radius: 12px;
-  padding: 24px 28px 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(217, 119, 87, 0.15);
-}
-
-.cc-box-header {
-  position: absolute;
-  top: -11px;
-  left: 28px;
-  background: #000000;
-  padding: 0 10px;
-}
-
-.cc-box-title {
-  color: #d97757;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.3px;
-}
-
-.cc-box-content {
-  display: grid;
-  grid-template-columns: 1fr 1px 1.15fr;
-  gap: 24px;
+.welcome-badge {
+  display: inline-flex;
   align-items: center;
-}
-
-.cc-left-pane {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-}
-
-.cc-welcome-text {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 0.2px;
-}
-
-.cc-mascot-wrap {
-  margin: 8px 0;
-  animation: floatMascot 3s ease-in-out infinite;
-}
-
-@keyframes floatMascot {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-.cc-sub-bar {
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--accent-cyan);
   font-size: 11px;
-  color: #a89f97;
-  letter-spacing: 0.2px;
-}
-
-.cc-path {
-  font-size: 11px;
-  color: #786f68;
-}
-
-.cc-divider {
-  background: #d97757;
-  opacity: 0.45;
-  height: 100%;
-  min-height: 120px;
-  width: 1px;
-}
-
-.cc-right-pane {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-}
-
-.cc-section-title {
-  color: #d97757;
-  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.2px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  letter-spacing: 0.5px;
 }
 
-.cc-section-title.cc-margin-top {
-  margin-top: 14px;
-}
-
-.cc-section-desc {
-  font-size: 11.5px;
-  color: #d4cbc3;
-  line-height: 1.45;
-}
-
-.cc-recent-activity {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 4px;
-}
-
-.cc-recent-item {
-  font-size: 11.5px;
-  color: #a89f97;
-}
-
-.cc-recent-item strong {
-  color: #f0e6de;
-}
-
-.cc-footer-hint {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  padding: 0 10px;
-  font-size: 11.5px;
-  color: #786f68;
-  font-family: var(--font-mono);
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cc-footer-hint code {
-  color: #d97757;
-  font-weight: 600;
-}
-
-/* ==========================================================================
-   Claude Code Full Terminal View (Active Mode)
-   ========================================================================== */
-body.claude-code-mode {
-  --bg-dark: #090909;
-  --bg-card: #0d0d0d;
-  --bg-card-hover: #171717;
-  --bg-input: #000000;
-  --border-color: #2e2823;
-  --border-active: #d97757;
-  --text-primary: #f5ebe4;
-  --text-secondary: #a69b92;
-  --text-muted: #6e645c;
-  --accent-cyan: #d97757;
-  --accent-blue: #c8694a;
-  --accent-purple: #e08b6e;
-}
-
-body.claude-code-mode .playground-card {
-  background: #0d0d0d;
-  border: 1.5px solid #332b25;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
-}
-
-body.claude-code-mode .chat-messages {
-  background: #000000;
-  font-family: var(--font-mono);
-}
-
-body.claude-code-mode .message.user .message-body {
-  background: #1e1814;
-  border: 1px solid #d97757;
-  color: #f7ebe4;
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(217, 119, 87, 0.2);
-}
-
-body.claude-code-mode .message.user .sender-tag::before {
-  content: "> ";
-  color: #d97757;
+.welcome-title {
+  font-size: 24px;
   font-weight: 800;
+  color: #fff;
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
 }
 
-body.claude-code-mode .message.assistant .message-body {
-  background: #080808;
-  border: 1px solid #2e2823;
-  color: #f5ebe4;
-  border-radius: 6px;
+.welcome-subtitle {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
-body.claude-code-mode .message.assistant .sender-tag::before {
-  content: "⏺ ";
-  color: #d97757;
-}
-
-/* PromptForge & Images framed in Claude Code retro CRT border */
-body.claude-code-mode .message-body img {
-  border: 1.5px solid #d97757;
-  border-radius: 8px;
-  box-shadow: 0 0 24px rgba(217, 119, 87, 0.35), 0 10px 40px rgba(0, 0, 0, 0.9);
-  background: #000000;
-  padding: 4px;
-}
-
-body.claude-code-mode .claude-code-btn {
-  background: #d97757;
-  color: #ffffff;
-  border-color: #e28a6e;
-  box-shadow: 0 0 14px rgba(217, 119, 87, 0.45);
-}
-
-body.claude-code-mode #promptInput::placeholder {
-  color: #6e645c;
-  font-family: var(--font-mono);
+.action-tag-btn.active {
+  background: var(--accent-cyan);
+  color: #000;
+  font-weight: 800;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }
 
 

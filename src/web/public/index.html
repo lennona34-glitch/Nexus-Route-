@@ -186,65 +186,15 @@
               </label>
             </div>
 
-            <button id="toggleClaudeCodeBtn" class="action-tag-btn claude-code-btn" title="Toggle Claude Code Terminal View">📟 Claude Code View</button>
+            <button type="button" id="topEndlessForgeBtn" class="action-tag-btn" title="Toggle Endless Forge Art Director Controls">🔥 Endless Forge</button>
+            <button type="button" id="topIdeasBtn" class="action-tag-btn" title="Toggle Prompt Ideas Strip">💡 Ideas</button>
             <button id="toggleFullscreenChatBtn" class="action-tag-btn" title="Toggle Fullscreen Chat (Hide/Show Telemetry Sidebar)">⤢ Fullscreen</button>
             <button id="newChatBtn" class="action-tag-btn" title="Start fresh conversation">🧹 New Chat</button>
           </div>
         </div>
 
-        <!-- Chat Transcript Area -->
-        <div class="chat-messages" id="chatMessages">
-          <!-- Claude Code Terminal Hero Welcome Box -->
-          <div class="claude-code-hero" id="claudeCodeHero">
-            <div class="cc-box">
-              <div class="cc-box-header">
-                <span class="cc-box-title">Claude Code v2.1.6</span>
-              </div>
-              <div class="cc-box-content">
-                <div class="cc-left-pane">
-                  <div class="cc-welcome-text">Welcome back!</div>
-                  <div class="cc-mascot-wrap">
-                    <svg class="claude-code-pixel-bot" viewBox="0 0 16 14" width="56" height="49" shape-rendering="crispEdges">
-                      <rect x="2" y="0" width="2" height="3" fill="#d97757" />
-                      <rect x="12" y="0" width="2" height="3" fill="#d97757" />
-                      <rect x="0" y="3" width="16" height="7" fill="#d97757" />
-                      <rect x="3" y="4" width="2" height="2" fill="#0d0d0d" />
-                      <rect x="11" y="4" width="2" height="2" fill="#0d0d0d" />
-                      <rect x="3" y="10" width="2" height="4" fill="#d97757" />
-                      <rect x="6" y="10" width="2" height="3" fill="#d97757" />
-                      <rect x="8" y="10" width="2" height="3" fill="#d97757" />
-                      <rect x="11" y="10" width="2" height="4" fill="#d97757" />
-                    </svg>
-                  </div>
-                  <div class="cc-sub-bar">
-                    <span>Sonnet 4.5 · Gemini 3.7 · RTX 4060 · PromptForge</span>
-                  </div>
-                  <div class="cc-path">~\Claude Code · NexusRoute</div>
-                </div>
-
-                <div class="cc-divider"></div>
-
-                <div class="cc-right-pane">
-                  <div class="cc-section-title">Tips for getting started</div>
-                  <div class="cc-section-desc">Ask Claude or Gemini to create an app, build an Android game, or generate PromptForge art</div>
-
-                  <div class="cc-section-title cc-margin-top">Recent activity</div>
-                  <div class="cc-recent-activity">
-                    <div class="cc-recent-item">⚡ <strong>APB Police Pursuit</strong> · Android Native APK</div>
-                    <div class="cc-recent-item">🎨 <strong>PromptForge Studio</strong> · SDXL / Local Turbo</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="cc-footer-hint">
-              <span class="cc-hint-item"><code>/model</code> to try Claude 3.7 Sonnet or Gemini Flash</span>
-              <span class="cc-hint-item"><code>?</code> for shortcuts · PromptForge RTX connected</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Endless Forge Art Director Controls Strip & Dropdown -->
-        <div class="endless-forge-strip" id="endlessForgeStrip">
+        <!-- Collapsible Top Drawers for Endless Forge & Ideas -->
+        <div class="endless-forge-strip hidden" id="endlessForgeStrip">
           <div class="endless-forge-header">
             <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
               <span class="endless-forge-badge" title="Endless Forge Art Director Controls">🔥 Endless Forge</span>
@@ -289,8 +239,7 @@
           </div>
         </div>
 
-        <!-- Dynamic Contextual Preset Buttons Strip -->
-        <div class="preset-strip" id="presetStrip">
+        <div class="preset-strip hidden" id="presetStrip">
           <div class="preset-header-strip">
             <span class="preset-label">💡 Ideas:</span>
             <button type="button" id="shufflePresetsBtn" class="shuffle-presets-btn" title="Shuffle prompt ideas (get random coherent questions)">🎲 Shuffle</button>
@@ -301,6 +250,15 @@
             <button class="preset-btn" data-prompt="Solve this logic puzzle step-by-step: Three boxes are labeled Apples, Oranges, and Mixed. Every label is incorrect. You can pick 1 fruit from 1 box. How do you deduce the correct labels?">🧠 Logic Puzzle</button>
             <button class="preset-btn" data-prompt="Search the web for the latest major open-source AI models and release highlights from this month and summarize top 3.">🌐 Web Search AI</button>
             <button class="preset-btn" data-prompt="Calculate standard deviation of [12, 18, 45, 92, 105, 114, 210] using calculator tool.">🧮 Math Calc</button>
+          </div>
+        </div>
+
+        <!-- Chat Transcript Area -->
+        <div class="chat-messages" id="chatMessages">
+          <div class="empty-chat-welcome" id="emptyChatWelcome">
+            <div class="welcome-badge">⚡ NexusRoute Autonomous AI</div>
+            <h2 class="welcome-title">What would you like to build?</h2>
+            <p class="welcome-subtitle">Ask anything, generate games, create native Windows/Android apps, or forge RTX artwork.</p>
           </div>
         </div>
 
