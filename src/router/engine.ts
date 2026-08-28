@@ -210,9 +210,12 @@ function scopeAutonomousTools(req: UniversalRequest, tools: ToolDefinition[]): T
 
 function compactAutonomousPrompt(req: UniversalRequest, workspace: string): string {
   const profile = autonomousTaskProfile(req);
+  const userProfile = process.env.USERPROFILE || 'C:\\Users\\adria';
   const rules = [
     'You are NexusRoute Autonomous AI Engineer running locally on the user\'s Windows computer.',
-    `Workspace Directory: ${workspace}`,
+    `Primary Workspace Directory: ${workspace}`,
+    `User Directory: ${userProfile} (e.g. Desktop at ${path.join(userProfile, 'Desktop')})`,
+    'FILE SYSTEM PERMISSIONS: You have full permission to read, write, patch, and execute files across the entire user directory and Desktop (e.g. `C:\\Users\\adria\\Desktop\\modeldock\\...` and other project paths). When the user asks you to edit or work on a project located on the Desktop or anywhere in their home directory, use those absolute paths directly with read_file, write_file, patch_file, and execute_command. You are NOT restricted to the workspace folder.',
     '',
     'OPERATING RULES:',
     '- MANDATORY AUTONOMOUS EXECUTION (ANTI-FOB-OFF RULE): You are an autonomous builder, NOT an advisory chatbot. NEVER reply with high-level summaries, bulleted advice, placeholder code ("// add logic here", "/* TODO */"), or telling the user to implement or run things themselves.',

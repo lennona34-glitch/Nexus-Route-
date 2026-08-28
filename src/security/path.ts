@@ -22,9 +22,9 @@ export function isInsideDir(childPath: string, parentDir: string): boolean {
 }
 
 /**
- * Resolves and validates that a raw target path is within the designated parent directory.
+ * Resolves and validates that a raw target path is within the designated parent directory or user profile.
  * If safe, returns the canonical absolute path.
- * If outside boundaries, throws a SecurityError.
+ * If outside boundaries or targeting Windows system directories, throws a SecurityError.
  */
 export function sanitizeWorkspacePath(rawPath: string, parentDir: string): string {
   if (!rawPath || typeof rawPath !== 'string') {
@@ -32,13 +32,38 @@ export function sanitizeWorkspacePath(rawPath: string, parentDir: string): strin
   }
 
   const resolvedParent = path.resolve(parentDir);
-  const resolvedTarget = path.isAbsolute(rawPath)
-    ? path.normalize(rawPath)
-    : path.resolve(resolvedParent, rawPath);
+  const userProfile = process.env.USERPROFILE || 'C:\\Users\\adria';
+  const resolvedUser = path.resolve(userProfile);
 
+  // If path is absolute (e.g. C:\Users\adria\Desktop\modeldock\...)
+  if (path.isAbsolute(rawPath) || /^[a-zA-Z]:[\\/]/.test(rawPath)) {
+    const resolvedTarget = path.resolve(rawPath);
+
+    // Guard against Windows system directories
+    const winDir = process.env.WINDIR || 'C:\\Windows';
+    if (!path.relative(winDir, resolvedTarget).startsWith('..')) {
+      throw new SecurityError(`Access denied: Writing to system directory "${rawPath}" is prohibited.`);
+    }
+
+    // Check if target is inside user profile or designated workspace
+    const isInsideWorkspace = isInsideDir(resolvedTarget, resolvedParent);
+    const isInsideUserProfile = isInsideDir(resolvedTarget, resolvedUser);
+
+    if (isInsideWorkspace || isInsideUserProfile || resolvedTarget.startsWith(resolvedUser)) {
+      return resolvedTarget;
+    }
+  }
+
+  // Otherwise resolve relative to parentDir
+  const resolvedTarget = path.resolve(resolvedParent, rawPath);
   const relative = path.relative(resolvedParent, resolvedTarget);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new SecurityError(`Access denied: Path "${rawPath}" is outside workspace boundary.`);
+  const relToUser = path.relative(resolvedUser, resolvedTarget);
+
+  const isInsideParent = !relative.startsWith('..') && !path.isAbsolute(relative);
+  const isInsideUser = !relToUser.startsWith('..') && !path.isAbsolute(relToUser);
+
+  if (!isInsideParent && !isInsideUser) {
+    throw new SecurityError(`Access denied: Path "${rawPath}" is outside accessible workspace boundaries.`);
   }
 
   return resolvedTarget;
