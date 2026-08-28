@@ -238,6 +238,7 @@ const DEFINITIONS: ProviderDefinition[] = [
   { provider: 'openrouter', displayName: 'OpenRouter', url: 'https://openrouter.ai/api/v1/models?output_modalities=text', headers: bearerHeaders, parse: parseOpenRouter },
   { provider: 'together', displayName: 'Together AI', url: 'https://api.together.xyz/v1/models', headers: bearerHeaders, parse: parseTogether },
   { provider: 'huggingface', displayName: 'Hugging Face', url: 'https://router.huggingface.co/v1/models', headers: bearerHeaders, parse: parseHuggingFace },
+  { provider: 'qwen', displayName: 'Qwen / DashScope', url: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
 ];
 
 function publicError(error: unknown): string {

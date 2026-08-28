@@ -9,5 +9,6 @@ export * from './xai.js';
 export * from './ollama.js';
 export * from './local.js';
 export * from './github.js';
+export * from './qwen.js';
 export * from './mock.js';
 export * from './factory.js';

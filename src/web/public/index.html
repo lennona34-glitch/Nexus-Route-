@@ -646,6 +646,21 @@
             <button class="save-key-btn" data-provider="huggingface">Save</button>
           </div>
         </div>
+
+        <!-- Qwen / DashScope Row (Alibaba Cloud) -->
+        <div class="key-input-row">
+          <div class="key-label">
+            <div class="provider-info-group">
+              <strong>🏮 Qwen / DashScope (Alibaba Cloud)</strong>
+              <a href="https://home.qwencloud.com/api-keys?target=individual" target="_blank" rel="noopener" class="get-key-link">Get Qwen Cloud Key ↗</a>
+            </div>
+            <span id="badge-qwen" class="provider-pill unconfigured">⚠️ Needs Key</span>
+          </div>
+          <div class="key-field-group">
+            <input type="password" id="key-qwen" placeholder="Paste sk-... from Qwen Cloud here" autocomplete="off">
+            <button class="save-key-btn" data-provider="qwen">Save</button>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <div id="modalToast" class="modal-toast"></div>
@@ -675,6 +690,7 @@
 
         <div class="connection-form-grid">
           <select id="capacityProvider">
+            <option value="qwen">🏮 Qwen / DashScope (Alibaba Cloud)</option>
             <option value="gemini">Google Gemini</option>
             <option value="groq">Groq</option>
             <option value="xai">xAI Grok</option>

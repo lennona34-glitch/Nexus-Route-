@@ -62,6 +62,7 @@ const ENV_KEYS: Partial<Record<ProviderType, string[]>> = {
   github: ['GITHUB_TOKEN', 'GH_TOKEN'],
   together: ['TOGETHER_API_KEY'],
   huggingface: ['HUGGINGFACE_API_KEY', 'HF_TOKEN'],
+  qwen: ['QWEN_API_KEY', 'DASHSCOPE_API_KEY'],
 };
 
 export const FREE_PROVIDER_CATALOG = [

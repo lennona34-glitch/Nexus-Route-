@@ -195,6 +195,7 @@ export type ProviderType =
   | 'github'
   | 'together'
   | 'huggingface'
+  | 'qwen'
   | 'local'
   | 'ollama'
   | 'mock';

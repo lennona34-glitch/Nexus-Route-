@@ -73,6 +73,8 @@ function saveEnvFile(provider: string, apiKey: string) {
     github: 'GITHUB_TOKEN',
     together: 'TOGETHER_API_KEY',
     huggingface: 'HUGGINGFACE_API_KEY',
+    qwen: 'QWEN_API_KEY',
+    dashscope: 'QWEN_API_KEY',
   };
 
   const varName = envVarMap[provider.toLowerCase()];

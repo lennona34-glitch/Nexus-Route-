@@ -12,6 +12,7 @@ import { MistralAdapter } from '../adapters/mistral.js';
 import { XAIAdapter } from '../adapters/xai.js';
 import { OllamaAdapter } from '../adapters/ollama.js';
 import { GitHubAdapter } from '../adapters/github.js';
+import { QwenAdapter } from '../adapters/qwen.js';
 import { LocalAdapter } from '../adapters/local.js';
 import { MockAdapter } from '../adapters/mock.js';
 import { MODEL_CATALOG, calculateEstimatedCost } from './capabilities.js';
@@ -968,6 +969,7 @@ export class RoutingEngine {
       baseUrl: 'https://router.huggingface.co/v1',
       apiKey: this.configuredKeys.get('huggingface'),
     }));
+    this.adapters.set('qwen', new QwenAdapter({ apiKey: this.configuredKeys.get('qwen') }));
     this.adapters.set('local', new LocalAdapter());
     this.adapters.set('ollama', new OllamaAdapter());
     this.adapters.set('mock', new MockAdapter());
@@ -983,6 +985,7 @@ export class RoutingEngine {
       case 'mistral': return new MistralAdapter({ apiKey });
       case 'xai': return new XAIAdapter({ apiKey });
       case 'github': return new GitHubAdapter({ apiKey });
+      case 'qwen': return new QwenAdapter({ apiKey });
       case 'openrouter': return new OpenAIAdapter({ provider, baseUrl: 'https://openrouter.ai/api/v1', apiKey });
       case 'together': return new OpenAIAdapter({ provider, baseUrl: 'https://api.together.xyz/v1', apiKey });
       case 'huggingface': return new OpenAIAdapter({ provider, baseUrl: 'https://router.huggingface.co/v1', apiKey });
@@ -1052,7 +1055,7 @@ export class RoutingEngine {
   }
 
   getProviderStatus(): Record<string, { configured: boolean; enabled: boolean; maskedKey?: string; connections?: number; usableConnections?: number; cooldownConnections?: number; exhaustedConnections?: number }> {
-    const providers: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'local', 'ollama', 'mock'];
+    const providers: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'qwen', 'local', 'ollama', 'mock'];
     const result: Record<string, { configured: boolean; enabled: boolean; maskedKey?: string; connections?: number; usableConnections?: number; cooldownConnections?: number; exhaustedConnections?: number }> = {};
     const poolSummary = this.connectionManager.getProviderSummary();
 
@@ -1110,6 +1113,7 @@ export class RoutingEngine {
     const hasGitHub = isProvActive('github');
     const hasTogether = isProvActive('together');
     const hasHuggingFace = isProvActive('huggingface');
+    const hasQwen = isProvActive('qwen');
     const hasLocal = !this.disabledProviders.has('local');
 
     const isFreeExplicit = (
@@ -1274,6 +1278,13 @@ export class RoutingEngine {
       const directList: RouteCandidate[] = [];
       if (hasXAI) directList.push({ provider: 'xai', model: requested, timeout_ms: 150_000 });
       directList.push(...getCloudFallbacks('xai'));
+      directList.push({ provider: 'mock', model: 'mock-gpt-4o' });
+      return { candidates: directList, classification };
+    }
+    if (requested.startsWith('qwen') || requested.startsWith('qwq')) {
+      const directList: RouteCandidate[] = [];
+      if (hasQwen) directList.push({ provider: 'qwen', model: requested });
+      directList.push(...getCloudFallbacks('qwen'));
       directList.push({ provider: 'mock', model: 'mock-gpt-4o' });
       return { candidates: directList, classification };
     }

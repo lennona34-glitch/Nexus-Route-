@@ -6,6 +6,7 @@ import { GroqAdapter } from './groq.js';
 import { DeepSeekAdapter } from './deepseek.js';
 import { MistralAdapter } from './mistral.js';
 import { XAIAdapter } from './xai.js';
+import { QwenAdapter } from './qwen.js';
 import { OllamaAdapter } from './ollama.js';
 
 export interface AdapterFactoryConfig {
@@ -33,6 +34,10 @@ export class AdapterFactory {
       case 'xai':
       case 'grok':
         return new XAIAdapter(config);
+      case 'qwen':
+      case 'dashscope':
+      case 'alibaba':
+        return new QwenAdapter(config);
       case 'openrouter':
         return new OpenAIAdapter({
           provider: 'openrouter',
