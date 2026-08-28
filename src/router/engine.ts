@@ -418,17 +418,17 @@ async function* streamWithWallClockDeadline(
   model: string,
 ): AsyncGenerator<UniversalStreamChunk> {
   const iterator = stream[Symbol.asyncIterator]();
-  const maxTotalMs = Math.max(timeoutMs, 600_000); // 10 mins ceiling for very long active outputs
-  const inactivityAllowanceMs = Math.max(120_000, Math.min(timeoutMs, 240_000));
+  const maxTotalMs = Math.max(timeoutMs, 900_000); // 15 mins ceiling for very long active outputs
+  const inactivityAllowanceMs = Math.max(300_000, Math.min(timeoutMs, 600_000)); // 5 to 10 mins inactivity allowance for deep-think models
   const absoluteDeadline = Date.now() + maxTotalMs;
-  let nextChunkDeadline = Date.now() + timeoutMs;
+  let nextChunkDeadline = Date.now() + Math.max(timeoutMs, inactivityAllowanceMs);
   let completed = false;
   try {
     while (true) {
       const now = Date.now();
       const remaining = Math.min(nextChunkDeadline - now, absoluteDeadline - now);
       if (remaining <= 0) {
-        throw new AdapterError(`${model} streaming timed out after ${Math.round(timeoutMs / 1000)}s of inactivity`, provider, 408, true);
+        throw new AdapterError(`${model} streaming timed out after ${Math.round(inactivityAllowanceMs / 1000)}s of inactivity`, provider, 408, true);
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
       let result: IteratorResult<UniversalStreamChunk>;

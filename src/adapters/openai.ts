@@ -386,7 +386,7 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     try {
       while (true) {
-        const inactivityTimeout = req.timeout_ms || (this.baseUrl.includes('localhost') || this.baseUrl.includes('11434') ? 180000 : 120000);
+        const inactivityTimeout = Math.max(300_000, req.timeout_ms || 300_000);
         const { done, value } = await readStreamWithInactivityTimeout(reader, inactivityTimeout, this.provider);
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
