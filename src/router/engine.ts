@@ -893,6 +893,7 @@ export class RoutingEngine {
             if (k === 'GITHUB_TOKEN' && v) this.configuredKeys.set('github', v);
             if (k === 'TOGETHER_API_KEY' && v) this.configuredKeys.set('together', v);
             if ((k === 'HUGGINGFACE_API_KEY' || k === 'HF_TOKEN') && v) this.configuredKeys.set('huggingface', v);
+            if ((k === 'QWEN_API_KEY' || k === 'DASHSCOPE_API_KEY') && v) this.configuredKeys.set('qwen', v);
           }
         }
       }
@@ -909,6 +910,7 @@ export class RoutingEngine {
     if ((process.env.GITHUB_TOKEN || process.env.GH_TOKEN) && !this.configuredKeys.has('github')) this.configuredKeys.set('github', (process.env.GITHUB_TOKEN || process.env.GH_TOKEN)!);
     if (process.env.TOGETHER_API_KEY && !this.configuredKeys.has('together')) this.configuredKeys.set('together', process.env.TOGETHER_API_KEY);
     if ((process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN) && !this.configuredKeys.has('huggingface')) this.configuredKeys.set('huggingface', (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN)!);
+    if ((process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY) && !this.configuredKeys.has('qwen')) this.configuredKeys.set('qwen', (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY)!);
 
     const isTest = process.env.NODE_ENV === 'test';
     this.connectionManager = new ProviderConnectionManager({
@@ -1198,7 +1200,7 @@ export class RoutingEngine {
     }
 
     // 1. If user requested explicit "provider/model" syntax
-    const knownProviders: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'local', 'ollama', 'mock'];
+    const knownProviders: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'qwen', 'local', 'ollama', 'mock'];
     for (const prov of knownProviders) {
       if (requested.startsWith(`${prov}/`) || requested.startsWith(`${prov}::`)) {
         const hasKey = prov === 'local' || prov === 'ollama' || prov === 'mock' || !!this.configuredKeys.get(prov) || this.connectionManager.hasUsable(prov);

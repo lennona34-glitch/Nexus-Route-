@@ -700,27 +700,42 @@ if (modalDoneBtn && keysModal) modalDoneBtn.addEventListener('click', () => keys
 
 // Save single provider key
 document.querySelectorAll('.save-key-btn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const provider = btn.getAttribute('data-provider');
-    const input = document.getElementById(`key-${provider}`);
+  const provider = btn.getAttribute('data-provider');
+  const input = document.getElementById(`key-${provider}`);
+
+  const handleSave = async () => {
     const keyVal = input ? input.value.trim() : '';
+    if (!keyVal) return;
 
     try {
+      btn.textContent = 'Saving...';
       const res = await fetch('/v1/keys', {
         method: 'POST',
         headers: adminHeaders(),
         body: JSON.stringify({ provider, apiKey: keyVal }),
       });
+      btn.textContent = 'Save';
       if (res.ok) {
-        if (modalToast) modalToast.textContent = `✓ ${provider} API key saved & loaded!`;
+        if (modalToast) modalToast.textContent = `✓ ${provider.toUpperCase()} API key saved & loaded!`;
         if (input) input.value = '';
         await Promise.all([loadProviderStatus(), loadProviderModels(true)]);
         setTimeout(() => { if (modalToast) modalToast.textContent = ''; }, 3000);
       }
     } catch {
+      btn.textContent = 'Save';
       if (modalToast) modalToast.textContent = `Error saving key.`;
     }
-  });
+  };
+
+  btn.addEventListener('click', handleSave);
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      }
+    });
+  }
 });
 
 // Virtual Client Keys Management

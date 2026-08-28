@@ -44,7 +44,7 @@ interface RawModel {
 interface ProviderDefinition {
   provider: ProviderType;
   displayName: string;
-  url: string;
+  url: string | ((apiKey: string) => string);
   headers?: (apiKey: string) => Record<string, string>;
   parse: (payload: unknown) => RawModel[];
 }
@@ -238,7 +238,15 @@ const DEFINITIONS: ProviderDefinition[] = [
   { provider: 'openrouter', displayName: 'OpenRouter', url: 'https://openrouter.ai/api/v1/models?output_modalities=text', headers: bearerHeaders, parse: parseOpenRouter },
   { provider: 'together', displayName: 'Together AI', url: 'https://api.together.xyz/v1/models', headers: bearerHeaders, parse: parseTogether },
   { provider: 'huggingface', displayName: 'Hugging Face', url: 'https://router.huggingface.co/v1/models', headers: bearerHeaders, parse: parseHuggingFace },
-  { provider: 'qwen', displayName: 'Qwen / DashScope', url: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  {
+    provider: 'qwen',
+    displayName: 'Qwen / DashScope',
+    url: apiKey => apiKey.startsWith('sk-sp-')
+      ? 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/models'
+      : 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models',
+    headers: bearerHeaders,
+    parse: parseOpenAIList,
+  },
 ];
 
 function publicError(error: unknown): string {
@@ -346,7 +354,8 @@ export class ProviderModelDiscovery {
   private async fetchProvider(definition: ProviderDefinition, apiKey: string): Promise<ProviderModelGroup> {
     const fetchedAt = Date.now();
     try {
-      const response = await this.fetchImpl(definition.url, {
+      const targetUrl = typeof definition.url === 'function' ? definition.url(apiKey) : definition.url;
+      const response = await this.fetchImpl(targetUrl, {
         method: 'GET',
         headers: definition.headers?.(apiKey),
         signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
