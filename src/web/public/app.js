@@ -74,7 +74,8 @@ function deriveProviderFromModel(model) {
   if (m.startsWith('openrouter')) return 'openrouter';
   if (m.startsWith('together') || m.includes('together')) return 'together';
   if (m.startsWith('huggingface') || m.startsWith('hf') || m.includes('flux')) return 'huggingface';
-  if (m.startsWith('qwen') || m.includes('groq')) return 'groq';
+  if (m.startsWith('qwen') || m.startsWith('qwq') || m.startsWith('glm') || m.startsWith('kimi')) return 'qwen';
+  if (m.startsWith('groq') || m.includes('groq')) return 'groq';
   if (m.startsWith('github')) return 'github';
   if (m.startsWith('local')) return 'local';
   if (m.startsWith('mock')) return 'mock';
@@ -514,7 +515,8 @@ if (cacheToggle) {
 
 function updateProviderUI(providers) {
   providerBadges.innerHTML = '';
-  const list = ['openai', 'anthropic', 'gemini', 'groq', 'xai', 'deepseek', 'mistral', 'openrouter', 'github', 'together', 'huggingface'];
+  const knownOrder = ['qwen', 'openai', 'anthropic', 'gemini', 'groq', 'xai', 'deepseek', 'mistral', 'openrouter', 'github', 'together', 'huggingface'];
+  const list = [...new Set([...knownOrder, ...Object.keys(providers || {})])].filter(p => !['local', 'ollama', 'mock'].includes(p));
   let anyConfigured = false;
 
   for (const p of list) {
