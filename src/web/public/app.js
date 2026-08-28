@@ -2592,13 +2592,13 @@ if (chatForm) {
   const bodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.message-body') : null;
   if (bodyEl) bodyEl.innerHTML = '<span style="color: var(--text-muted); font-size: 13px;">⚡ Thinking...</span>';
 
-  // Smart Sliding-Window Context Management (Prevents 28k-32k token overflow cutoffs)
+  // Smart Sliding-Window Context Management (Prevents token overflow cutoffs)
   let messagesToSend = conversationHistory;
-  if (conversationHistory.length > 12) {
+  if (conversationHistory.length > 8) {
     const systemMsgs = conversationHistory.filter(m => m.role === 'system');
     const nonSystem = conversationHistory.filter(m => m.role !== 'system');
     const firstUserMsg = nonSystem[0];
-    const recentTurns = nonSystem.slice(-10);
+    const recentTurns = nonSystem.slice(-8);
     messagesToSend = [...systemMsgs, ...(firstUserMsg && !recentTurns.includes(firstUserMsg) ? [firstUserMsg] : []), ...recentTurns];
   }
 

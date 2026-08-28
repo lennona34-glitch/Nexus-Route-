@@ -64,7 +64,10 @@ async function readUpstreamError(response: Response): Promise<NormalizedUpstream
   return normalizeUpstreamError(payload, response.statusText || `HTTP ${response.status}`, response.headers);
 }
 
-function retryableStatus(status: number): boolean {
+function retryableStatus(status: number, message?: string): boolean {
+  if (status === 400 && message && /(?:context length|maximum context|too many tokens|context_window_exceeded|overloaded|rate limit)/i.test(message)) {
+    return true;
+  }
   return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
 }
 
@@ -293,7 +296,7 @@ export class OpenAIAdapter implements ProviderAdapter {
         upstreamErrorMessage(this.provider, 'request', res.status, upstreamError),
         this.provider,
         res.status,
-        retryableStatus(res.status),
+        retryableStatus(res.status, upstreamError.message),
         undefined,
         upstreamError.retryAfterMs,
       );
@@ -367,7 +370,7 @@ export class OpenAIAdapter implements ProviderAdapter {
         upstreamErrorMessage(this.provider, 'stream', res.status, upstreamError),
         this.provider,
         res.status,
-        retryableStatus(res.status),
+        retryableStatus(res.status, upstreamError.message),
         undefined,
         upstreamError.retryAfterMs,
       );
