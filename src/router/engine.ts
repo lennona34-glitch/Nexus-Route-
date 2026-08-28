@@ -232,7 +232,7 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
     '- Never claim a file was created, edited, tested, or verified unless the corresponding tool succeeded.',
     '- Use write_file for a new file or complete rewrite; use patch_file for a focused edit after reading the existing file.',
     '- ACTION-FIRST REFACTORING & WRITING: Do NOT spend all your turns reading every file in the codebase before writing anything. Inspect only the specific files you need to change, and begin applying patches with patch_file or writing files with write_file early (by turn 2 or 3). Ship code changes incrementally so you complete the implementation within the turn limit.',
-    '- Continue through implementation and verification before giving a concise final summary.',
+    '- TOKEN CONSERVATION & MINIMAL WRAP-UP: Keep conversational summaries ultra-concise (1-2 sentences max, or just a direct next-step question). Do NOT output long bulleted recaps of features or repeating descriptions of code already written to disk.',
   ];
 
   if (profile.html) {
@@ -1885,7 +1885,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
           if (!nextTools) {
             currentMessages.push({
               role: 'user',
-              content: '[Task complete: All requested files and verifications are saved to disk. Please provide a clear, concise final summary of what was accomplished, how the application works, and how the user can interact with it.]',
+              content: '[Task complete: All files are saved and verified on disk. Keep your reply extremely short (1-2 sentences maximum, e.g. confirm the file is saved and ask any single relevant next-step question). Do not write bulleted feature lists or repeat what was built.]',
             });
           }
 
@@ -2576,7 +2576,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
             if (currentTools === undefined) {
               currentMessages.push({
                 role: 'user',
-                content: '[Task complete: All requested files and verifications are saved to disk. Please provide a clear, concise final summary of what was accomplished, how the application works, and how the user can interact with it.]',
+                content: '[Task complete: All files are saved and verified on disk. Keep your reply extremely short (1-2 sentences maximum, e.g. confirm the file is saved and ask any single relevant next-step question). Do not write bulleted feature lists or repeat what was built.]',
               });
             }
           } else {
