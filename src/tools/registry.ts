@@ -1377,6 +1377,15 @@ export class ToolRegistry {
           } catch {}
         }
 
+        // If the command is a compilation targeting an executable, kill any running instance first to prevent Windows file-lock Permission Denied errors
+        const exeMatch = cmd.match(/-o\s+["']?([^"'\s]+\.exe)["']?/i);
+        if (exeMatch && exeMatch[1]) {
+          const exeName = path.basename(exeMatch[1]);
+          try {
+            await execAsync(`taskkill /F /IM "${exeName}"`, { timeout: 2000 });
+          } catch {}
+        }
+
         try {
           const { stdout, stderr } = await execAsync(cmd, { cwd: ws, timeout: 30000 });
           return JSON.stringify({
@@ -1386,6 +1395,21 @@ export class ToolRegistry {
             success: true,
           });
         } catch (cmdErr: unknown) {
+          // If Windows locked the .exe file, attempt taskkill and one retry
+          if (exeMatch && exeMatch[1]) {
+            const exeName = path.basename(exeMatch[1]);
+            try {
+              await execAsync(`taskkill /F /IM "${exeName}"`, { timeout: 2000 });
+              const { stdout, stderr } = await execAsync(cmd, { cwd: ws, timeout: 30000 });
+              return JSON.stringify({
+                command: cmd,
+                stdout: stdout.trim(),
+                stderr: stderr.trim(),
+                success: true,
+              });
+            } catch {}
+          }
+
           // If CMD failed, attempt execution via PowerShell before giving up
           try {
             const escaped = cmd.replace(/"/g, '\\"');
@@ -1398,13 +1422,16 @@ export class ToolRegistry {
             });
           } catch (psErr: unknown) {
             const e = cmdErr as { stdout?: string; stderr?: string; message: string };
+            const isLockError = (e.stderr || '').includes('Permission denied') || (e.message || '').includes('Permission denied');
             return JSON.stringify({
               command: cmd,
               error: e.message,
               stdout: e.stdout?.trim() || '',
               stderr: e.stderr?.trim() || '',
               success: false,
-              guidance: 'Tip: For creating or editing files, use the "write_file" tool directly instead of shell commands.'
+              guidance: isLockError
+                ? 'Windows file lock: The target .exe is currently open and running. Close the running application window before recompiling.'
+                : 'Tip: For creating or editing files, use the "write_file" tool directly instead of shell commands.'
             });
           }
         }
