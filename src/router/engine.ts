@@ -216,6 +216,8 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
     '',
     'OPERATING RULES:',
     '- MANDATORY AUTONOMOUS EXECUTION (ANTI-FOB-OFF RULE): You are an autonomous builder, NOT an advisory chatbot. NEVER reply with high-level summaries, bulleted advice, placeholder code ("// add logic here", "/* TODO */"), or telling the user to implement or run things themselves.',
+    '- WRITE COMPLETE SOURCE DIRECTLY IN ONE SHOT: Write the complete, unified source code directly into `<name>.cpp` (or `<name>.py`, `index.html`) in a single `write_file` tool call. NEVER split source code into artificial partial chunks (e.g. part1, part2, part3) or attempt concatenation via shell commands.',
+    '- CALL TOOLS IMMEDIATELY (NO NARRATION OR PLANNING PREAMBLE): DO NOT write explanations of what you are going to do, plans, or step-by-step preambles like "## Step 1: Write Part 1...". Call `write_file` immediately with the full source code on your very first tool call.',
     '- OVERWRITING & UPDATING EXISTING FILES: When asked to update, modify, fix, rewrite, or rebuild an existing file, you MUST overwrite or patch it with the new changes using write_file or patch_file. DO NOT assume the task is finished just because an older version of the file is present on disk.',
     '- DIRECT COMPILATION ONLY (NO BUILD.BAT / SCRIPT CRUTCHES): NEVER generate build.bat, compile.bat, or shell scripts asking the user to compile themselves. YOU must compile and build executables/binaries directly using execute_command (e.g. running "cmake --build ...", "cl.exe", "clang++", "g++", "cargo", or "npm run build"). If compilation fails, inspect the compiler output and repair the code directly.',
     '- PYTHON & COMPILER ENVIRONMENT (WINDOWS): Python is available at `python` (or `py`). Native GCC/G++ is available at `g++`. CMake is available at `cmake`.',
@@ -781,9 +783,9 @@ function fileVerificationCorrection(expectedFileTargets: string[], rejectedWrite
     : '';
   const hasExeTarget = expectedFileTargets.some(t => /\.exe$/i.test(t));
   const exeHint = hasExeTarget
-    ? ' If building an executable/binary, do not claim it was created until you have compiled it by calling execute_command (e.g. `g++ -O3 main.cpp -lgdi32 -luser32 -o app.exe`). Do NOT create build.bat helper scripts.'
-    : ' If building an executable/binary, do not create a helper/build script (like build.bat); run the compiler directly using execute_command.';
-  return `NexusRoute verification: the requested target${target} has not been updated or created during this turn.${detail} If the file already exists on disk from an earlier session, you MUST still call write_file with the full updated code or patch_file to apply the requested changes. DO NOT assume existing disk files satisfy the request.${exeHint}`;
+    ? ' DO NOT output narration, concatenation plans, or partial steps in text. Call write_file NOW with the complete source code (e.g. `main.cpp`), then call execute_command with `g++ -O3 main.cpp -lgdi32 -luser32 -lopengl32 -o app.exe` to compile the binary.'
+    : ' DO NOT output narration, concatenation plans, or markdown roadmaps in text. Call write_file NOW with the complete source code directly.';
+  return `NexusRoute verification: the requested target${target} has not been written or updated during this turn.${detail}${exeHint} Do not assume existing files satisfy the request; write the full file now.`;
 }
 
 function incompleteToolCorrection(toolNames: string[], dependencyIssues: MissingHtmlDependencies[]): string {
@@ -1668,6 +1670,21 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               }));
               choice.message.tool_calls = toolCalls;
               choice.message.content = '';
+            } else if (allowedToolNames.has('write_file') && expectedFileTargets.length > 0) {
+              const codeBlockMatch = choice.message.content.match(/```(?:[a-zA-Z0-9_-]+)?\s*\n([\s\S]{50,}?)\n```/);
+              if (codeBlockMatch) {
+                const targetFile = expectedFileTargets[0].replace(/\.exe$/i, '.cpp');
+                toolCalls = [{
+                  id: `call_${Date.now()}_auto`,
+                  type: 'function' as const,
+                  function: {
+                    name: 'write_file',
+                    arguments: JSON.stringify({ filename: targetFile, content: codeBlockMatch[1].trim() }),
+                  },
+                }];
+                choice.message.tool_calls = toolCalls;
+                choice.message.content = '';
+              }
             }
           }
 
@@ -1732,7 +1749,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               break;
             }
             const claimsFileCreatedInText = /(?:double-click\s*:|launch\s*:|created\s+|saved\s+to\s+|dist[\\/][\w.-]+|written\s+to\s+|output\s*:\s*`?[\w.-]+\.(?:exe|html|py|cpp))/i.test(choice?.message?.content || '');
-            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
+            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 3) {
               fileCorrectionAttempts++;
               turnCount++;
               currentMessages = [
@@ -2335,6 +2352,17 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
                 });
               });
               turnContent = '';
+            } else if (allowedToolNames.has('write_file') && expectedFileTargets.length > 0) {
+              const codeBlockMatch = turnContent.match(/```(?:[a-zA-Z0-9_-]+)?\s*\n([\s\S]{50,}?)\n```/);
+              if (codeBlockMatch) {
+                const targetFile = expectedFileTargets[0].replace(/\.exe$/i, '.cpp');
+                accumulatedToolCalls.set(0, {
+                  id: `call_${Date.now()}_auto`,
+                  name: 'write_file',
+                  arguments: JSON.stringify({ filename: targetFile, content: codeBlockMatch[1].trim() }),
+                });
+                turnContent = '';
+              }
             }
           }
 
@@ -2569,7 +2597,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               continue;
             }
             const claimsFileCreatedInText = /(?:double-click\s*:|launch\s*:|created\s+|saved\s+to\s+|dist[\\/][\w.-]+|written\s+to\s+|output\s*:\s*`?[\w.-]+\.(?:exe|html|py|cpp))/i.test(turnContent);
-            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 1) {
+            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 3) {
               fileCorrectionAttempts++;
               currentMessages = [
                 ...currentMessages,
