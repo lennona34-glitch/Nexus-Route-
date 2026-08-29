@@ -24,6 +24,24 @@ function textArg(value: unknown): string {
   if (typeof value === 'object') return '';
   return String(value);
 }
+
+function unwrapToolArgs(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') return {};
+  let args = { ...raw };
+  for (const wrapperKey of ['input', 'params', 'parameters', 'arguments', 'properties', 'args', 'data']) {
+    if (args[wrapperKey] && typeof args[wrapperKey] === 'object' && !Array.isArray(args[wrapperKey])) {
+      args = { ...args, ...(args[wrapperKey] as Record<string, unknown>) };
+    } else if (typeof args[wrapperKey] === 'string') {
+      try {
+        const parsed = JSON.parse(args[wrapperKey] as string);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          args = { ...args, ...parsed };
+        }
+      } catch {}
+    }
+  }
+  return args;
+}
 const __dirname = path.dirname(__filename);
 const defaultWorkspaceDir = path.join(__dirname, '../../workspace');
 
@@ -920,26 +938,45 @@ export class ToolRegistry {
       }
 
       case 'write_file': {
-        // Normalize any parameter variations (filename, path, filePath, target_file, TargetFile, etc.)
-        const rawFilename = textArg(
-          args.filename ?? args.filePath ?? args.file_path ?? args.path ?? args.file ?? args.filepath ??
-          args.fileName ?? args.file_name ?? args.TargetFile ?? args.target_file ?? args.target ??
-          args.dest ?? args.destination ?? args.name
+        const unwrapped = unwrapToolArgs(args);
+        let rawFilename = (
+          textArg(unwrapped.filename) || textArg(unwrapped.filePath) || textArg(unwrapped.file_path) ||
+          textArg(unwrapped.path) || textArg(unwrapped.filepath) || textArg(unwrapped.fileName) ||
+          textArg(unwrapped.file_name) || textArg(unwrapped.TargetFile) || textArg(unwrapped.target_file) ||
+          textArg(unwrapped.target) || textArg(unwrapped.dest) || textArg(unwrapped.destination) ||
+          textArg(unwrapped.file)
         ).trim();
-        const contentSource = (
-          args.content ?? args.code ?? args.text ?? args.contents ?? args.file_content ??
-          args.fileContent ?? args.CodeContent ?? args.code_content ?? args.data ?? args.body ??
-          args.source ?? args.source_code ?? ''
+
+        if (!rawFilename && unwrapped.file && typeof unwrapped.file === 'object') {
+          const fObj = unwrapped.file as Record<string, any>;
+          rawFilename = (textArg(fObj.path) || textArg(fObj.name) || textArg(fObj.filename) || textArg(fObj.filepath)).trim();
+        }
+        if (!rawFilename && unwrapped.filename && typeof unwrapped.filename === 'object') {
+          const fObj = unwrapped.filename as Record<string, any>;
+          rawFilename = (textArg(fObj.value) || textArg(fObj.name) || textArg(fObj.path) || textArg(fObj.filename)).trim();
+        }
+        if (!rawFilename && (unwrapped['0'] || unwrapped['arg0'])) {
+          rawFilename = textArg(unwrapped['0'] || unwrapped['arg0']).trim();
+        }
+        if (!rawFilename && unwrapped.name && typeof unwrapped.name === 'string' && unwrapped.name !== 'write_file' && unwrapped.name.includes('.')) {
+          rawFilename = unwrapped.name.trim();
+        }
+
+        let contentSource = (
+          unwrapped.content ?? unwrapped.code ?? unwrapped.text ?? unwrapped.contents ?? unwrapped.file_content ??
+          unwrapped.fileContent ?? unwrapped.CodeContent ?? unwrapped.code_content ?? unwrapped.data ?? unwrapped.body ??
+          unwrapped.source ?? unwrapped.source_code ?? unwrapped['1'] ?? unwrapped['arg1']
         );
+        if ((contentSource === undefined || contentSource === null || contentSource === '') && unwrapped.file && typeof unwrapped.file === 'object') {
+          const fObj = unwrapped.file as Record<string, any>;
+          contentSource = fObj.content ?? fObj.code ?? fObj.body ?? fObj.data;
+        }
+        if (contentSource === undefined || contentSource === null) contentSource = '';
+
         if (!rawFilename) {
-          return typeof (args.filename ?? args.filePath ?? args.file_path ?? args.path ?? args.file) === 'object'
-            ? 'Error: filename must be a string, not an object.'
-            : 'Error: Empty filename provided.';
+          return 'Error: Empty filename provided.';
         }
-        if (contentSource !== null && typeof contentSource === 'object') {
-          return 'Error: content must be a string, not an object.';
-        }
-        const content = String(contentSource);
+        const content = typeof contentSource === 'object' ? JSON.stringify(contentSource, null, 2) : String(contentSource);
 
         // Prevent path traversal outside workspace
         let safePath: string;

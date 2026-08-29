@@ -112,12 +112,18 @@
             <h2>Live Playground</h2>
           </div>
           <div class="controls-row">
-            <div class="select-group">
+            <div class="select-group model-picker-wrapper">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <label for="modelSelect">Target / Alias</label>
+                <label for="modelPickerTrigger">Target / Alias</label>
                 <a href="#" id="quickKeysLink" style="font-size: 11px; color: var(--accent-cyan); text-decoration: none; font-weight: 600;" title="Configure Live Provider API Keys">🔑 Keys</a>
               </div>
-              <select id="modelSelect">
+              <button id="modelPickerTrigger" type="button" class="model-picker-trigger" title="Click to browse models grouped by provider">
+                <span id="modelPickerDisplay" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">✨ auto (Adaptive Pareto Dispatch)</span>
+                <span class="picker-chevron">▾</span>
+              </button>
+              
+              <!-- Hidden select for form bindings and legacy scripts -->
+              <select id="modelSelect" style="display: none;">
                 <optgroup label="Virtual Smart Routes (Pareto Auto-Dispatch)">
                   <option value="auto" selected>✨ auto (Adaptive Pareto Dispatch)</option>
                   <option value="fast">⚡ fast (Lowest Latency Tier)</option>
@@ -150,6 +156,16 @@
                   <option value="mock-fail-429">⚠️ mock-fail-429 (Simulate Rate Limit)</option>
                 </optgroup>
               </select>
+
+              <!-- Folded Provider Model Dropdown -->
+              <div id="modelPickerDropdown" class="model-picker-dropdown hidden">
+                <div class="model-picker-search-wrap">
+                  <input type="text" id="modelPickerSearch" placeholder="🔍 Search all models..." autocomplete="off" />
+                </div>
+                <div class="model-picker-accordion-list" id="modelPickerAccordionList">
+                  <!-- Dynamically rendered provider accordions (folded down by default) -->
+                </div>
+              </div>
             </div>
             <div class="select-group">
               <label for="openRouterRoutingSelect">OpenRouter Route</label>
@@ -1039,6 +1055,6 @@ console.log(res.choices[0].message.content);</code></pre>
     </div>
   </div>
 
-  <script src="app.js?v=2.4.6"></script>
+  <script src="app.js?v=2.4.7"></script>
 </body>
 </html>

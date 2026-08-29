@@ -346,18 +346,27 @@ async function loadProviderModels(force = false) {
       const group = document.createElement('optgroup');
       group.dataset.liveProviderCatalogue = 'true';
 
+      let provName = provider.displayName;
+      const isArtProv = provider.id === 'qwen' || provider.id === 'dashscope' || provider.id === 'huggingface';
+      if (isArtProv && !provName.includes('🎨')) {
+        provName = `🎨 ${provName}`;
+      }
+
       if (provider.status === 'ready' && Array.isArray(provider.models) && provider.models.length > 0) {
-        group.label = `${provider.displayName} · ${provider.models.length} available`;
+        group.label = `${provName} · ${provider.models.length} available`;
         for (const model of provider.models) {
           const option = document.createElement('option');
           option.value = model.routeId;
           const details = [model.free ? 'free' : '', formatContextLength(model.contextLength), model.supportsTools ? 'tools' : ''].filter(Boolean);
-          option.textContent = `${model.free ? '🟢 ' : ''}${model.name || model.id}${details.length ? ` · ${details.join(' · ')}` : ''}`;
-          option.title = `${provider.displayName}: ${model.id}`;
+          const lowerM = (model.name || model.id || '').toLowerCase();
+          const isArtModel = lowerM.includes('wan') || lowerM.includes('flux') || lowerM.includes('dall-e') || lowerM.includes('imagen') || lowerM.includes('sdxl') || lowerM.includes('diffusion');
+          const artPrefix = isArtModel && !model.name?.includes('🎨') ? '🎨 ' : '';
+          option.textContent = `${model.free ? '🟢 ' : ''}${artPrefix}${model.name || model.id}${details.length ? ` · ${details.join(' · ')}` : ''}`;
+          option.title = `${provName}: ${model.id}`;
           group.appendChild(option);
         }
       } else {
-        group.label = `${provider.displayName} · ${provider.status}`;
+        group.label = `${provName} · ${provider.status}`;
         const option = document.createElement('option');
         option.disabled = true;
         option.textContent = provider.error || 'No chat models were returned by this provider.';
@@ -383,6 +392,8 @@ async function loadProviderModels(force = false) {
     if (currentSelected && Array.from(modelSelect.options).some(option => option.value === currentSelected)) {
       modelSelect.value = currentSelected;
     }
+    updateModelPickerDisplay();
+    renderFoldedModelPicker();
   } catch (err) {
     console.warn('Failed to load provider model catalogues:', err);
   }
@@ -412,7 +423,7 @@ async function loadDynamicLocalModels() {
           else if (lower.includes('llama')) icon = '🦙';
           else if (lower.includes('deepseek')) icon = '🐋';
           else if (lower.includes('moondream')) icon = '🌙';
-          else if (lower.includes('animat') || lower.includes('safetensor')) icon = '🎨';
+          else if (lower.includes('animat') || lower.includes('safetensor') || lower.includes('flux') || lower.includes('sdxl') || lower.includes('wan')) icon = '🎨';
 
           opt.textContent = `${icon} ${m.cleanName} (${m.sizeGb})`;
           optgroup.appendChild(opt);
@@ -420,6 +431,8 @@ async function loadDynamicLocalModels() {
         if (currentSelected && modelSelect) {
           modelSelect.value = currentSelected;
         }
+        updateModelPickerDisplay();
+        renderFoldedModelPicker();
       }
     }
   } catch (err) {
@@ -3549,6 +3562,152 @@ if (startPullModelBtn && pullModelInput) {
       startPullModelBtn.disabled = false;
       startPullModelBtn.textContent = '📥 Pull Model';
     }
+  });
+}
+
+// ==========================================================================
+// Folded Provider Model Picker (Collapsible Accordions with Palette Emojis)
+// ==========================================================================
+const modelPickerTrigger = document.getElementById('modelPickerTrigger');
+const modelPickerDisplay = document.getElementById('modelPickerDisplay');
+const modelPickerDropdown = document.getElementById('modelPickerDropdown');
+const modelPickerSearch = document.getElementById('modelPickerSearch');
+const modelPickerAccordionList = document.getElementById('modelPickerAccordionList');
+
+function updateModelPickerDisplay() {
+  if (!modelSelect || !modelPickerDisplay) return;
+  const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+  if (selectedOption) {
+    modelPickerDisplay.textContent = selectedOption.textContent.trim();
+  }
+}
+
+function renderFoldedModelPicker(filterText = '') {
+  if (!modelSelect || !modelPickerAccordionList) return;
+  const query = filterText.toLowerCase().trim();
+  modelPickerAccordionList.innerHTML = '';
+
+  const optgroups = Array.from(modelSelect.querySelectorAll('optgroup'));
+  let totalMatches = 0;
+
+  for (const group of optgroups) {
+    let groupLabel = group.label || 'Models';
+    const options = Array.from(group.querySelectorAll('option')).filter(opt => !opt.disabled);
+    if (options.length === 0) continue;
+
+    // Detect art servers / providers and prepend 🎨
+    const lowerGroup = groupLabel.toLowerCase();
+    const isArtServer = lowerGroup.includes('qwen') || lowerGroup.includes('wan') || lowerGroup.includes('hugging') || lowerGroup.includes('flux') || lowerGroup.includes('art') || lowerGroup.includes('image');
+    if (isArtServer && !groupLabel.includes('🎨')) {
+      groupLabel = `🎨 ${groupLabel}`;
+    }
+
+    // Filter matching options
+    const matchingOptions = query
+      ? options.filter(opt => opt.textContent.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query))
+      : options;
+
+    if (query && matchingOptions.length === 0) continue;
+    totalMatches += matchingOptions.length;
+
+    // By default, ALL providers are folded down (collapsed). They only expand on user click or active search query.
+    const accordion = document.createElement('div');
+    accordion.className = `provider-accordion ${query ? 'open' : ''}`;
+
+    const isSelectedInGroup = options.some(opt => opt.value === modelSelect.value);
+
+    accordion.innerHTML = `
+      <div class="provider-accordion-header ${isSelectedInGroup ? 'active' : ''}">
+        <div class="provider-header-left">
+          <span>${escapeHtml(groupLabel)}</span>
+        </div>
+        <div class="provider-header-right">
+          <span class="provider-count-pill">${matchingOptions.length}</span>
+          <span class="provider-accordion-chevron">▶</span>
+        </div>
+      </div>
+      <div class="provider-accordion-content"></div>
+    `;
+
+    const header = accordion.querySelector('.provider-accordion-header');
+    const content = accordion.querySelector('.provider-accordion-content');
+
+    if (header) {
+      header.addEventListener('click', (e) => {
+        e.stopPropagation();
+        accordion.classList.toggle('open');
+      });
+    }
+
+    for (const opt of matchingOptions) {
+      const isSelected = opt.value === modelSelect.value;
+      const item = document.createElement('div');
+      item.className = `model-picker-item ${isSelected ? 'selected' : ''}`;
+      
+      let itemLabel = opt.textContent.trim();
+      const lowerItem = itemLabel.toLowerCase();
+      if ((lowerItem.includes('wan') || lowerItem.includes('flux') || lowerItem.includes('dall-e') || lowerItem.includes('sdxl') || lowerItem.includes('imagen')) && !itemLabel.includes('🎨')) {
+        itemLabel = `🎨 ${itemLabel}`;
+      }
+
+      item.innerHTML = `
+        <div class="model-picker-item-name">
+          <span>${escapeHtml(itemLabel)}</span>
+        </div>
+        ${isSelected ? '<span style="color: var(--accent-cyan); font-weight: bold;">✓</span>' : ''}
+      `;
+
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        modelSelect.value = opt.value;
+        modelSelect.dispatchEvent(new Event('change'));
+        updateModelPickerDisplay();
+        renderFoldedModelPicker();
+        if (modelPickerDropdown) modelPickerDropdown.classList.add('hidden');
+      });
+
+      if (content) content.appendChild(item);
+    }
+
+    modelPickerAccordionList.appendChild(accordion);
+  }
+
+  if (totalMatches === 0) {
+    modelPickerAccordionList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 11.5px;">No matching models found.</div>';
+  }
+}
+
+if (modelPickerTrigger && modelPickerDropdown) {
+  modelPickerTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = modelPickerDropdown.classList.contains('hidden');
+    if (isHidden) {
+      modelPickerDropdown.classList.remove('hidden');
+      renderFoldedModelPicker(modelPickerSearch ? modelPickerSearch.value : '');
+      if (modelPickerSearch) {
+        setTimeout(() => modelPickerSearch.focus(), 50);
+      }
+    } else {
+      modelPickerDropdown.classList.add('hidden');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (modelPickerDropdown && !modelPickerDropdown.contains(e.target) && e.target !== modelPickerTrigger && !modelPickerTrigger.contains(e.target)) {
+      modelPickerDropdown.classList.add('hidden');
+    }
+  });
+}
+
+if (modelPickerSearch) {
+  modelPickerSearch.addEventListener('input', (e) => {
+    renderFoldedModelPicker(e.target.value);
+  });
+}
+
+if (modelSelect) {
+  modelSelect.addEventListener('change', () => {
+    updateModelPickerDisplay();
   });
 }
 
