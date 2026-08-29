@@ -71,6 +71,21 @@ function retryableStatus(status: number, message?: string): boolean {
   return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
 }
 
+function isToolUnsupportedError(status: number, message?: string): boolean {
+  if (!message) return false;
+  return (
+    /support tool use/i.test(message) ||
+    /function calling not support/i.test(message) ||
+    /function calling is not supported/i.test(message) ||
+    /does not support tools/i.test(message) ||
+    /tools are not supported/i.test(message) ||
+    /tools is not supported/i.test(message) ||
+    /invalid parameter: tools/i.test(message) ||
+    /tool_choice is not supported/i.test(message) ||
+    /tools parameter is not supported/i.test(message)
+  );
+}
+
 function upstreamErrorMessage(provider: ProviderType, kind: 'request' | 'stream', status: number, error: NormalizedUpstreamError): string {
   const code = error.code !== undefined && String(error.code) !== String(status) ? `, code ${error.code}` : '';
   return `${provider} ${kind} error (${status}${code}): ${error.message}`;
@@ -275,8 +290,8 @@ export class OpenAIAdapter implements ProviderAdapter {
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
       clearTimeout(hardTimeout);
-      if (res.status === 404 && upstreamError.message && /support tool use/i.test(upstreamError.message) && payload.tools) {
-        return this.chatCompletion({ ...req, tools: undefined }, targetModel);
+      if ((res.status === 400 || res.status === 404 || res.status === 422) && isToolUnsupportedError(res.status, upstreamError.message) && payload.tools) {
+        return this.chatCompletion({ ...req, tools: undefined, tool_choice: undefined }, targetModel);
       }
       if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
         return {
@@ -347,8 +362,8 @@ export class OpenAIAdapter implements ProviderAdapter {
 
     if (!res.ok) {
       const upstreamError = await readUpstreamError(res);
-      if (res.status === 404 && upstreamError.message && /support tool use/i.test(upstreamError.message) && payload.tools) {
-        yield* this.streamChatCompletion({ ...req, tools: undefined }, targetModel);
+      if ((res.status === 400 || res.status === 404 || res.status === 422) && isToolUnsupportedError(res.status, upstreamError.message) && payload.tools) {
+        yield* this.streamChatCompletion({ ...req, tools: undefined, tool_choice: undefined }, targetModel);
         return;
       }
       if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {

@@ -747,8 +747,8 @@ function artifactValidationFailure(req: UniversalRequest, write: VerifiedFileWri
   if (!expectsCompleteArtifact && !expectsInteractiveHtml) {
     return reasons.length > 0 ? reasons.join('; ') : null;
   }
-  if (write.bytes_written < 800) reasons.push(`only ${write.bytes_written} bytes were written`);
-  if (/\b(?:placeholder|coming soon|lorem ipsum|not implemented|todo\s*:?\s*(?:build|create|implement)|actual (?:game|app|page|website) content)\b/.test(normalized)) {
+  if (write.bytes_written === 0) reasons.push(`the file is empty (0 bytes)`);
+  if (normalized.length < 150 && /\b(?:placeholder|coming soon|lorem ipsum|not implemented|todo\s*:?\s*(?:build|create|implement)|actual (?:game|app|page|website) content)\b/.test(normalized)) {
     reasons.push('placeholder or unfinished-content text is present');
   }
   if (expectsInteractiveHtml && !/<script\b|\bon(?:click|load|keydown|pointerdown)\s*=/.test(normalized)) {
@@ -2765,7 +2765,7 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               continue;
             }
             const claimsFileCreatedInText = /(?:double-click\s*:|launch\s*:|created\s+|saved\s+to\s+|dist[\\/][\w.-]+|written\s+to\s+|output\s*:\s*`?[\w.-]+\.(?:exe|html|py|cpp))/i.test(turnContent);
-            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && fileCorrectionAttempts < 3) {
+            if ((fileWriteExpected || claimsFileCreatedInText) && fileToolsAvailable && verifiedWrites.length === 0 && observedWrites.length === 0 && fileCorrectionAttempts < 1) {
               fileCorrectionAttempts++;
               currentMessages = [
                 ...currentMessages,
