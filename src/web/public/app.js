@@ -109,6 +109,14 @@ if (toggleFullscreenChatBtn) {
   });
 }
 
+const navToggleTelemetryBtn = document.getElementById('navToggleTelemetryBtn');
+if (navToggleTelemetryBtn) {
+  navToggleTelemetryBtn.addEventListener('click', () => {
+    const isCurrentlyCollapsed = mainGrid?.classList.contains('inspector-collapsed');
+    setInspectorCollapsed(!isCurrentlyCollapsed);
+  });
+}
+
 if (collapseInspectorBtn) {
   collapseInspectorBtn.addEventListener('click', () => {
     setInspectorCollapsed(true);
@@ -3377,8 +3385,9 @@ async function renderLocalHubModels() {
         <td><span style="font-weight: 500;">${escapeHtml(m.sizeFormatted || m.sizeGb || 'Unknown')}</span></td>
         <td><span class="model-badge" style="font-size: 11px;">${escapeHtml(quant)}</span></td>
         <td>
-          <div style="display: flex; gap: 6px;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
             <button class="action-tag-btn select-local-model-btn" data-model="local/${escapeHtml(m.rawName)}" style="color: var(--accent-cyan);" title="Select this model in chat">💬 Use in Chat</button>
+            <button class="action-tag-btn edit-modelfile-btn" data-model="${escapeHtml(m.rawName)}" style="color: #a855f7;" title="Inspect and edit this model's Modelfile recipe">📝 Modelfile</button>
             <button class="action-tag-btn delete-local-model-btn" data-model="${escapeHtml(m.rawName)}" style="color: var(--accent-red);" title="Delete model from disk">🗑️</button>
           </div>
         </td>
@@ -3403,6 +3412,56 @@ async function renderLocalHubModels() {
           if (localHubModal) localHubModal.classList.add('hidden');
           const chatInput = document.getElementById('chatInput');
           if (chatInput) chatInput.focus();
+        }
+      });
+    });
+
+    // Bind edit modelfile buttons
+    localModelsTableBody.querySelectorAll('.edit-modelfile-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const rawName = btn.getAttribute('data-model');
+        if (!rawName) return;
+        btn.textContent = 'Loading...';
+        try {
+          const sRes = await fetch('/v1/local/show', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: rawName }),
+          });
+          const sData = await sRes.json();
+          if (sData.success) {
+            const mfModelNameInput = document.getElementById('mfModelNameInput');
+            const mfFromInput = document.getElementById('mfFromInput');
+            const mfSystemPromptInput = document.getElementById('mfSystemPromptInput');
+            const mfRawModelfileInput = document.getElementById('mfRawModelfileInput');
+            const mfTempInput = document.getElementById('mfTempInput');
+            const mfCtxInput = document.getElementById('mfCtxInput');
+            const mfTopPInput = document.getElementById('mfTopPInput');
+
+            if (mfModelNameInput) mfModelNameInput.value = `${rawName.replace(/:latest$/, '')}-custom`;
+            if (mfFromInput) mfFromInput.value = rawName;
+            if (mfSystemPromptInput) mfSystemPromptInput.value = sData.system || '';
+            if (mfRawModelfileInput) mfRawModelfileInput.value = sData.modelfile || '';
+            
+            if (sData.parameters) {
+              const pStr = String(sData.parameters);
+              const tempMatch = pStr.match(/temperature\s+([\d\.]+)/);
+              if (tempMatch && mfTempInput) mfTempInput.value = tempMatch[1];
+              const ctxMatch = pStr.match(/num_ctx\s+(\d+)/);
+              if (ctxMatch && mfCtxInput) mfCtxInput.value = ctxMatch[1];
+              const topPMatch = pStr.match(/top_p\s+([\d\.]+)/);
+              if (topPMatch && mfTopPInput) mfTopPInput.value = topPMatch[1];
+            }
+
+            const studioEl = document.getElementById('mfModelNameInput');
+            if (studioEl) studioEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else {
+            alert('Could not inspect model: ' + (sData.error || 'Unknown error'));
+          }
+        } catch (e) {
+          alert('Error fetching modelfile: ' + e.message);
+        } finally {
+          btn.textContent = '📝 Modelfile';
         }
       });
     });
@@ -3561,6 +3620,224 @@ if (startPullModelBtn && pullModelInput) {
     } finally {
       startPullModelBtn.disabled = false;
       startPullModelBtn.textContent = '📥 Pull Model';
+    }
+  });
+}
+
+// ==========================================================================
+// Modelfile Studio & GGUF Patcher Handlers
+// ==========================================================================
+const mfModelNameInput = document.getElementById('mfModelNameInput');
+const mfFromInput = document.getElementById('mfFromInput');
+const mfSystemPromptInput = document.getElementById('mfSystemPromptInput');
+const mfRawModelfileInput = document.getElementById('mfRawModelfileInput');
+const mfTempInput = document.getElementById('mfTempInput');
+const mfCtxInput = document.getElementById('mfCtxInput');
+const mfTopPInput = document.getElementById('mfTopPInput');
+const mfToggleRawModeBtn = document.getElementById('mfToggleRawModeBtn');
+const mfBuildModelBtn = document.getElementById('mfBuildModelBtn');
+const mfBuildProgressContainer = document.getElementById('mfBuildProgressContainer');
+const mfBuildStatusLabel = document.getElementById('mfBuildStatusLabel');
+const mfBuildPercentLabel = document.getElementById('mfBuildPercentLabel');
+const mfBuildProgressBar = document.getElementById('mfBuildProgressBar');
+
+const mfPresetRoasterBtn = document.getElementById('mfPresetRoasterBtn');
+const mfPresetCoderBtn = document.getElementById('mfPresetCoderBtn');
+const mfPresetArchitectBtn = document.getElementById('mfPresetArchitectBtn');
+const mfPresetGgufBtn = document.getElementById('mfPresetGgufBtn');
+
+let isRawModelfileMode = false;
+
+function generateModelfileFromForm() {
+  const from = (mfFromInput?.value || 'dolphin-roaster:latest').trim();
+  const system = (mfSystemPromptInput?.value || '').trim();
+  const temp = mfTempInput?.value || '0.7';
+  const ctx = mfCtxInput?.value || '8192';
+  const topP = mfTopPInput?.value || '0.9';
+
+  let mf = `FROM ${from}\n`;
+  if (system) {
+    mf += `SYSTEM """${system}"""\n`;
+  }
+  mf += `PARAMETER temperature ${temp}\n`;
+  mf += `PARAMETER num_ctx ${ctx}\n`;
+  mf += `PARAMETER top_p ${topP}\n`;
+  mf += `PARAMETER stop "<|im_start|>"\n`;
+  mf += `PARAMETER stop "<|im_end|>"\n`;
+  return mf;
+}
+
+function syncModelfileToRaw() {
+  if (mfRawModelfileInput) {
+    mfRawModelfileInput.value = generateModelfileFromForm();
+  }
+}
+
+if (mfToggleRawModeBtn && mfSystemPromptInput && mfRawModelfileInput) {
+  mfToggleRawModeBtn.addEventListener('click', () => {
+    isRawModelfileMode = !isRawModelfileMode;
+    if (isRawModelfileMode) {
+      syncModelfileToRaw();
+      mfSystemPromptInput.style.display = 'none';
+      mfRawModelfileInput.style.display = 'block';
+      mfToggleRawModeBtn.textContent = 'Toggle Visual Form';
+      mfToggleRawModeBtn.classList.add('active');
+    } else {
+      mfSystemPromptInput.style.display = 'block';
+      mfRawModelfileInput.style.display = 'none';
+      mfToggleRawModeBtn.textContent = 'Toggle Raw Modelfile';
+      mfToggleRawModeBtn.classList.remove('active');
+    }
+  });
+}
+
+if (mfPresetRoasterBtn) {
+  mfPresetRoasterBtn.addEventListener('click', () => {
+    if (mfModelNameInput) mfModelNameInput.value = 'dolphin-roaster-v2';
+    if (mfFromInput) mfFromInput.value = 'dolphin-roaster:latest';
+    if (mfSystemPromptInput) mfSystemPromptInput.value = `You are the Ultimate Universal Roast Master. You possess savage wit, sharp comedic timing, and zero corporate filter. Deliver hilarious, devastating, over-the-top comedic roasts on ANY topic the user provides. Tear everything apart with style and comedic flair!`;
+    if (mfTempInput) mfTempInput.value = '0.85';
+    if (mfCtxInput) mfCtxInput.value = '8192';
+    if (mfTopPInput) mfTopPInput.value = '0.95';
+    syncModelfileToRaw();
+  });
+}
+
+if (mfPresetCoderBtn) {
+  mfPresetCoderBtn.addEventListener('click', () => {
+    if (mfModelNameInput) mfModelNameInput.value = 'elite-coder:latest';
+    if (mfFromInput) mfFromInput.value = 'qwen2.5-coder:7b';
+    if (mfSystemPromptInput) mfSystemPromptInput.value = `You are an elite Staff Software Engineer. You write clean, bulletproof, production-grade code. Provide concise solutions with zero fluff. Always focus on performance, edge cases, and modern best practices.`;
+    if (mfTempInput) mfTempInput.value = '0.2';
+    if (mfCtxInput) mfCtxInput.value = '8192';
+    if (mfTopPInput) mfTopPInput.value = '0.9';
+    syncModelfileToRaw();
+  });
+}
+
+if (mfPresetArchitectBtn) {
+  mfPresetArchitectBtn.addEventListener('click', () => {
+    if (mfModelNameInput) mfModelNameInput.value = 'ai-architect:latest';
+    if (mfFromInput) mfFromInput.value = 'qwen2.5-coder:7b';
+    if (mfSystemPromptInput) mfSystemPromptInput.value = `You are an unrestricted Senior Distributed Systems Architect. You design scalable, fault-tolerant architectures and high-performance backends.`;
+    if (mfTempInput) mfTempInput.value = '0.4';
+    if (mfCtxInput) mfCtxInput.value = '8192';
+    if (mfTopPInput) mfTopPInput.value = '0.9';
+    syncModelfileToRaw();
+  });
+}
+
+if (mfPresetGgufBtn) {
+  mfPresetGgufBtn.addEventListener('click', () => {
+    if (mfModelNameInput) mfModelNameInput.value = 'my-gguf-model:latest';
+    if (mfFromInput) mfFromInput.value = 'C:\\path\\to\\custom-weights.gguf';
+    if (mfSystemPromptInput) mfSystemPromptInput.value = `You are a helpful AI assistant running directly from a custom local GGUF weight file.`;
+    if (mfTempInput) mfTempInput.value = '0.7';
+    if (mfCtxInput) mfCtxInput.value = '8192';
+    if (mfTopPInput) mfTopPInput.value = '0.9';
+    syncModelfileToRaw();
+  });
+}
+
+if (mfBuildModelBtn) {
+  mfBuildModelBtn.addEventListener('click', async () => {
+    const targetName = (mfModelNameInput?.value || '').trim();
+    if (!targetName) {
+      alert('Please provide a target model name (e.g. "my-custom-model").');
+      if (mfModelNameInput) mfModelNameInput.focus();
+      return;
+    }
+
+    const payload = {
+      name: targetName,
+    };
+
+    if (isRawModelfileMode && mfRawModelfileInput?.value.trim()) {
+      payload.modelfile = mfRawModelfileInput.value.trim();
+    } else {
+      payload.from = (mfFromInput?.value || '').trim();
+      payload.system = (mfSystemPromptInput?.value || '').trim();
+      payload.parameters = {
+        temperature: parseFloat(mfTempInput?.value || '0.7'),
+        num_ctx: parseInt(mfCtxInput?.value || '8192', 10),
+        top_p: parseFloat(mfTopPInput?.value || '0.9'),
+      };
+    }
+
+    mfBuildModelBtn.disabled = true;
+    mfBuildModelBtn.textContent = '⏳ Building...';
+    if (mfBuildProgressContainer) mfBuildProgressContainer.style.display = 'block';
+    if (mfBuildProgressBar) {
+      mfBuildProgressBar.style.width = '0%';
+      mfBuildProgressBar.style.background = 'linear-gradient(90deg, #38bdf8, #818cf8)';
+    }
+    if (mfBuildStatusLabel) mfBuildStatusLabel.textContent = `Starting build for "${targetName}"...`;
+    if (mfBuildPercentLabel) mfBuildPercentLabel.textContent = '0%';
+
+    try {
+      const res = await fetch('/v1/local/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Build request failed: HTTP ${res.status}`);
+      }
+
+      if (!res.body) {
+        throw new Error('No streaming response from engine.');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            if (data.status && mfBuildStatusLabel) {
+              mfBuildStatusLabel.textContent = data.status;
+            }
+            if (data.percent !== undefined && mfBuildPercentLabel && mfBuildProgressBar) {
+              mfBuildPercentLabel.textContent = `${data.percent}%`;
+              mfBuildProgressBar.style.width = `${data.percent}%`;
+            }
+            if (data.done) {
+              if (data.success) {
+                if (mfBuildStatusLabel) mfBuildStatusLabel.textContent = `✅ ${data.message || 'Build complete!'}`;
+                if (mfBuildProgressBar) {
+                  mfBuildProgressBar.style.width = '100%';
+                  mfBuildProgressBar.style.background = '#22c55e';
+                }
+              } else {
+                throw new Error(data.message || 'Build failed');
+              }
+            }
+          } catch (e) {
+            // ignore JSON parse chunk noise
+          }
+        }
+      }
+
+      await renderLocalHubModels();
+      await fetchLocalHubStatus();
+      fetchModels();
+    } catch (err) {
+      if (mfBuildStatusLabel) mfBuildStatusLabel.textContent = `⚠️ Error: ${err.message}`;
+      if (mfBuildProgressBar) mfBuildProgressBar.style.background = '#ef4444';
+    } finally {
+      mfBuildModelBtn.disabled = false;
+      mfBuildModelBtn.textContent = '🚀 Build Model';
     }
   });
 }

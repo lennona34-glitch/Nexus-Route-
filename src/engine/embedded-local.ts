@@ -282,4 +282,104 @@ export class EmbeddedLocalEngine {
       return { success: false, message: `Error during model pull: ${err.message}` };
     }
   }
+
+  static async showModel(modelName: string): Promise<{ success: boolean; modelfile?: string; system?: string; parameters?: string; template?: string; details?: any; error?: string }> {
+    try {
+      const cleanName = modelName.replace(/^local\//, '');
+      const res = await fetch(`http://${this.host}:${this.port}/api/show`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cleanName }),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        return { success: false, error: errText || `Failed to fetch model info: HTTP ${res.status}` };
+      }
+
+      const data = await res.json() as any;
+      return {
+        success: true,
+        modelfile: data.modelfile || '',
+        system: data.system || '',
+        parameters: data.parameters || '',
+        template: data.template || '',
+        details: data.details,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async createModelStream(
+    options: { name: string; modelfile?: string; from?: string; system?: string; template?: string; parameters?: Record<string, unknown> },
+    onChunk: (chunk: { status: string; total?: number; completed?: number; percent?: number }) => void
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const cleanName = options.name.replace(/^local\//, '').trim();
+      const bodyPayload: Record<string, unknown> = {
+        name: cleanName,
+        stream: true,
+      };
+
+      if (options.modelfile && options.modelfile.trim()) {
+        bodyPayload.modelfile = options.modelfile.trim();
+      } else {
+        if (options.from) bodyPayload.from = options.from.trim();
+        if (options.system) bodyPayload.system = options.system.trim();
+        if (options.template) bodyPayload.template = options.template.trim();
+        if (options.parameters) bodyPayload.parameters = options.parameters;
+      }
+
+      const res = await fetch(`http://${this.host}:${this.port}/api/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        return { success: false, message: `Failed to build model: ${err}` };
+      }
+
+      if (!res.body) {
+        return { success: false, message: `No response stream received from engine daemon.` };
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed);
+            let percent: number | undefined;
+            if (parsed.total && parsed.completed) {
+              percent = Math.min(100, Math.round((parsed.completed / parsed.total) * 100));
+            }
+            onChunk({
+              status: parsed.status || 'building layer',
+              total: parsed.total,
+              completed: parsed.completed,
+              percent,
+            });
+          } catch {}
+        }
+      }
+
+      return { success: true, message: `Successfully built and registered model "${cleanName}"!` };
+    } catch (err: any) {
+      return { success: false, message: `Error during model creation: ${err.message}` };
+    }
+  }
 }

@@ -187,23 +187,25 @@ body {
 
 .inspector-open-tab {
   position: fixed;
-  right: 20px;
-  top: 74px;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 90;
-  background: var(--bg-card);
+  background: rgba(17, 24, 39, 0.95);
   border: 1px solid var(--accent-cyan);
-  border-radius: 20px;
-  padding: 7px 14px;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--accent-cyan);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.25);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: tabPulse 2s infinite;
 }
 
 @keyframes tabPulse {

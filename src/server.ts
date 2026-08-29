@@ -483,6 +483,40 @@ app.post('/v1/local/pull', async (req: FastifyRequest<{ Body: { name: string } }
   reply.raw.end();
 });
 
+app.post('/v1/local/show', async (req: FastifyRequest<{ Body: { name: string } }>, reply: FastifyReply) => {
+  const modelName = (req.body?.name || '').trim();
+  if (!modelName) {
+    return reply.status(400).send({ success: false, error: 'Model name is required' });
+  }
+  const res = await EmbeddedLocalEngine.showModel(modelName);
+  return reply.send(res);
+});
+
+app.post('/v1/local/create', async (req: FastifyRequest<{ Body: { name: string; modelfile?: string; from?: string; system?: string; template?: string; parameters?: Record<string, unknown> } }>, reply: FastifyReply) => {
+  const { name, modelfile, from, system, template, parameters } = req.body || {};
+  if (!name || !name.trim()) {
+    return reply.status(400).send({ success: false, error: 'Model name is required' });
+  }
+
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+    'Access-Control-Allow-Origin': '*',
+  });
+
+  const res = await EmbeddedLocalEngine.createModelStream(
+    { name, modelfile, from, system, template, parameters },
+    (chunk) => {
+      reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    }
+  );
+
+  reply.raw.write(`data: ${JSON.stringify({ done: true, ...res })}\n\n`);
+  reply.raw.end();
+});
+
 app.get('/v1/gpu/status', async () => {
   let gpuInfo = {
     name: 'NVIDIA GPU',
