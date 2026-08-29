@@ -1115,12 +1115,39 @@ export class ToolRegistry {
         const query = String(args.query || '').trim();
         if (!query) return 'Error: Empty query provided.';
         try {
-          const res = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+          // 1. Try DuckDuckGo HTML search for real headlines/snippets
+          const htmlRes = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            signal: AbortSignal.timeout(15000)
+          });
+          if (htmlRes.ok) {
+            const html = await htmlRes.text();
+            const results: string[] = [];
+            const snippetRe = /<a[^>]+class="result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+            let m;
+            while ((m = snippetRe.exec(html)) !== null && results.length < 10) {
+              const snippet = m[1].replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').trim();
+              if (snippet) results.push(snippet);
+            }
+            if (results.length > 0) {
+              return JSON.stringify({
+                query,
+                count: results.length,
+                results: results.map((r, i) => `${i + 1}. ${r}`).join('\n\n'),
+                summary: results.join(' ')
+              });
+            }
+          }
+
+          // 2. Fallback to DuckDuckGo instant answer
+          const res = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, { signal: AbortSignal.timeout(10000) });
           if (res.ok) {
             const data = (await res.json()) as { AbstractText?: string; Heading?: string; RelatedTopics?: Array<{ Text?: string }> };
             let summary = data.AbstractText || '';
             if (!summary && data.RelatedTopics && data.RelatedTopics.length > 0) {
-              summary = data.RelatedTopics.slice(0, 3).map(t => t.Text || '').filter(Boolean).join('\n\n');
+              summary = data.RelatedTopics.slice(0, 5).map(t => t.Text || '').filter(Boolean).join('\n\n');
             }
             if (summary) {
               return JSON.stringify({ query, summary });
@@ -1128,7 +1155,7 @@ export class ToolRegistry {
           }
           return JSON.stringify({
             query,
-            summary: `Web search for "${query}" completed. (Real-time index lookup successful).`,
+            summary: `Web search for "${query}" completed.`,
           });
         } catch (err: unknown) {
           return JSON.stringify({ query, error: (err as Error).message });

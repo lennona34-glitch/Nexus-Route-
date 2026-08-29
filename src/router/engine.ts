@@ -163,7 +163,7 @@ function autonomousTaskProfile(req: UniversalRequest): AutonomousTaskProfile {
     windowsPlugin: /\b(?:vst3?|juce|audio\s*plugin)\b/.test(text),
     nativeExecutable: filenames.some(filename => /\.(?:exe|cpp|c|rs|go)$/.test(filename)) || /\b(?:exe|executable|c\+\+|cpp|clang|gcc|g\+\+|compile|binary|pyinstaller)\b/.test(text),
     imageGeneration: /\b(?:generate|render|create|make|call|use)\b[\s\S]{0,80}\b(?:image|artwork|sprite|texture|prompt\s*forge|promptforge)\b/.test(text),
-    webResearch: /\b(?:web\s*search|search\s*(?:the\s*)?(?:web|internet)|look\s*up\s*online|latest\s+(?:docs|documentation|news))\b/.test(text),
+    webResearch: /\b(?:web\s*search|search\s*(?:the\s*)?(?:web|internet)|look\s*up\s*online|latest|headlines|news|current\s*events|today|trending|browse|google|gather|roast)\b/i.test(text),
   };
 }
 
@@ -176,7 +176,7 @@ function scopeAutonomousTools(req: UniversalRequest, tools: ToolDefinition[]): T
   // turn and again on every cascade candidate. Scope it by task profile instead
   // of shipping all of it on requests that will never touch most of the tools.
   const allowed = requestExpectsFileWrite(req)
-    ? new Set(['write_file', 'patch_file', 'read_file', 'list_workspace_files', 'execute_command'])
+    ? new Set(['write_file', 'patch_file', 'read_file', 'list_workspace_files', 'execute_command', 'web_search', 'fetch_webpage'])
     : new Set([
         'read_file',
         'list_workspace_files',
@@ -188,6 +188,8 @@ function scopeAutonomousTools(req: UniversalRequest, tools: ToolDefinition[]): T
         'remember_fact',
         'recall_memory',
         'take_desktop_screenshot',
+        'web_search',
+        'fetch_webpage',
       ]);
   if (req.messages.length > 6) allowed.add('recover_raw_context');
   if (profile.html) {
