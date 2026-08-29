@@ -4368,6 +4368,7 @@ if (modelSelect) {
   modelSelect.addEventListener('change', () => {
     updateModelPickerDisplay();
   });
+}
 // ==========================================
 // NVIDIA RTX 4060 AI Art Studio Controller
 // ==========================================
