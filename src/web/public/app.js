@@ -3163,15 +3163,17 @@ function formatMarkdown(str) {
       cleanSrc = `/v1/image-proxy?url=${encodeURIComponent(cleanSrc)}`;
     }
     const shortAlt = (alt || 'Generated Artwork').replace(/"/g, '&quot;');
-    return `<div class="generated-art-card" style="margin: 12px 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); padding: 10px; border-radius: 12px; display: inline-block; max-width: 100%;">
-      <div style="position: relative; min-height: 180px; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-        <img src="${cleanSrc}" alt="${shortAlt}" style="max-width: 100%; max-height: 520px; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.6); display: block; object-fit: contain;" onerror="let r = parseInt(this.dataset.retries || '0'); if (r < 5) { this.dataset.retries = r + 1; setTimeout(() => { this.src = '${cleanSrc}' + (cleanSrc.includes('?') ? '&' : '?') + 't=' + Date.now(); }, 1200); }">
+    return `<div class="generated-art-card" style="margin: 10px 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); padding: 8px; border-radius: 12px; display: inline-block; max-width: min(420px, 100%);">
+      <div style="position: relative; max-height: 260px; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <a href="${cleanSrc}" target="_blank" title="Click to view full size" style="display: block; cursor: zoom-in;">
+          <img src="${cleanSrc}" alt="${shortAlt}" style="max-width: 100%; max-height: 260px; width: auto; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); display: block; object-fit: contain;" onerror="let r = parseInt(this.dataset.retries || '0'); if (r < 5) { this.dataset.retries = r + 1; setTimeout(() => { this.src = '${cleanSrc}' + (cleanSrc.includes('?') ? '&' : '?') + 't=' + Date.now(); }, 1200); }">
+        </a>
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 12px; white-space: nowrap;">
-        <span style="color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: 340px; white-space: nowrap;">🎨 ${shortAlt}</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px; white-space: nowrap;">
+        <span style="color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: 280px; white-space: nowrap;">🎨 ${shortAlt}</span>
         <div style="display: flex; gap: 6px; align-items: center; white-space: nowrap; flex-shrink: 0;">
-          <a href="${cleanSrc}" download title="Download Artwork" class="action-tag-btn" style="text-decoration:none; padding: 4px 10px; font-size: 14px; font-weight: bold; white-space: nowrap;">⬇️</a>
-          <a href="${cleanSrc}" target="_blank" title="Open Full Resolution in New Tab" class="action-tag-btn" style="text-decoration:none; padding: 4px 10px; font-size: 14px; white-space: nowrap;">🔍</a>
+          <a href="${cleanSrc}" download title="Download Artwork" class="action-tag-btn" style="text-decoration:none; padding: 3px 8px; font-size: 13px; font-weight: bold; white-space: nowrap;">⬇️</a>
+          <a href="${cleanSrc}" target="_blank" title="Open Full Resolution in New Tab" class="action-tag-btn" style="text-decoration:none; padding: 3px 8px; font-size: 13px; white-space: nowrap;">🔍</a>
         </div>
       </div>
     </div>`;
