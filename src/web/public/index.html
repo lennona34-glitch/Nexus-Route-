@@ -48,6 +48,10 @@
           <span>📜</span> History <span id="historyCountBadge" class="history-count-badge">0</span>
         </button>
 
+        <button id="openLocalHubModalBtn" class="nav-action-btn" title="Standalone Local AI Engine & GGUF Model Hub">
+          <span>🖥️</span> Local AI
+        </button>
+
         <button id="openWorkspaceModalBtn" class="nav-action-btn" title="View files created by AI on your computer">
           <span>📁</span> Workspace
         </button>
@@ -912,6 +916,87 @@ console.log(res.choices[0].message.content);</code></pre>
     </div>
   </div>
 
+  <!-- Standalone Local AI Engine & Model Hub Modal -->
+  <div id="localHubModal" class="modal-overlay hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🖥️</span> Local AI Engine & Model Hub
+        </div>
+        <button id="closeLocalHubModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Engine Status Banner -->
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; padding: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: bold; display: flex; align-items: center; gap: 8px;">
+              <span id="localEngineStatusDot" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#22c55e;"></span>
+              <span id="localEngineStatusText">Standalone Portable Engine (Active)</span>
+            </div>
+            <div id="localEngineDetailsText" style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
+              GPU: NVIDIA GeForce RTX 4060 (8GB VRAM) · CUDA 12 · Port 11434
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button id="refreshLocalModelsBtn" class="action-tag-btn" style="padding: 6px 12px;" title="Refresh installed models">🔄 Refresh</button>
+            <button id="unloadGpuModelsBtn" class="action-tag-btn" style="padding: 6px 12px; color: #f59e0b;" title="Evict inactive models from GPU VRAM">🧹 Free VRAM</button>
+          </div>
+        </div>
+
+        <!-- 1-Click Model Downloader -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+          <h4 style="margin: 0 0 8px 0; font-size: 14px;">⬇️ 1-Click Local Model Puller</h4>
+          <p style="color: var(--text-muted); font-size: 12px; margin: 0 0 10px 0;">
+            Type any model name from Ollama/HuggingFace or click a quick suggestion to download directly onto your disk:
+          </p>
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <input type="text" id="pullModelInput" placeholder="e.g. qwen2.5-coder:7b, dolphin-roaster, llama3.2:3b" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary);" />
+            <button id="startPullModelBtn" class="primary-btn" style="padding: 8px 16px; white-space: nowrap;">📥 Pull Model</button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="quickModelPills">
+            <span class="action-tag-btn quick-pull-tag" data-model="qwen2.5-coder:7b" style="font-size: 11px;">+ qwen2.5-coder:7b (Coding)</span>
+            <span class="action-tag-btn quick-pull-tag" data-model="dolphin-roaster" style="font-size: 11px;">+ dolphin-roaster (Roasting)</span>
+            <span class="action-tag-btn quick-pull-tag" data-model="llama3.2:3b" style="font-size: 11px;">+ llama3.2:3b (Ultra Fast)</span>
+            <span class="action-tag-btn quick-pull-tag" data-model="deepseek-r1:8b" style="font-size: 11px;">+ deepseek-r1:8b (Reasoning)</span>
+            <span class="action-tag-btn quick-pull-tag" data-model="mistral:7b" style="font-size: 11px;">+ mistral:7b (General)</span>
+          </div>
+
+          <!-- Download Progress Bar -->
+          <div id="pullProgressContainer" style="display: none; margin-top: 14px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(56,189,248,0.3);">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span id="pullStatusLabel">Downloading model layers...</span>
+              <span id="pullPercentLabel" style="font-weight: bold; color: var(--accent-cyan);">0%</span>
+            </div>
+            <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+              <div id="pullProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Installed Local Models Table -->
+        <h4 style="margin: 0 0 8px 0; font-size: 14px;">📦 Installed Local Models (<span id="installedModelsCount">0</span>)</h4>
+        <div class="keys-table-container" style="max-height: 280px; overflow-y: auto;">
+          <table class="keys-table">
+            <thead>
+              <tr>
+                <th>Model Name</th>
+                <th>Size</th>
+                <th>Quantization</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="localModelsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; align-items: center;">
+        <button id="localHubDoneBtn" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Endless Forge Live Fullscreen Slideshow Theater -->
   <div id="efSlideshowModal" class="ef-slideshow-modal hidden">
     <div class="ef-slideshow-backdrop" id="efSlideshowBackdrop"></div>
@@ -954,6 +1039,6 @@ console.log(res.choices[0].message.content);</code></pre>
     </div>
   </div>
 
-  <script src="app.js?v=2.4.5"></script>
+  <script src="app.js?v=2.4.6"></script>
 </body>
 </html>

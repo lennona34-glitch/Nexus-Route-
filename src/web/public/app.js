@@ -3293,4 +3293,264 @@ if (exportChatBtn) {
   });
 }
 
+// ==========================================================================
+// Standalone Local AI Engine & Model Hub Manager
+// ==========================================================================
+const localHubModal = document.getElementById('localHubModal');
+const openLocalHubModalBtn = document.getElementById('openLocalHubModalBtn');
+const closeLocalHubModalBtn = document.getElementById('closeLocalHubModalBtn');
+const localHubDoneBtn = document.getElementById('localHubDoneBtn');
+const refreshLocalModelsBtn = document.getElementById('refreshLocalModelsBtn');
+const unloadGpuModelsBtn = document.getElementById('unloadGpuModelsBtn');
+const startPullModelBtn = document.getElementById('startPullModelBtn');
+const pullModelInput = document.getElementById('pullModelInput');
+const pullProgressContainer = document.getElementById('pullProgressContainer');
+const pullStatusLabel = document.getElementById('pullStatusLabel');
+const pullPercentLabel = document.getElementById('pullPercentLabel');
+const pullProgressBar = document.getElementById('pullProgressBar');
+const localModelsTableBody = document.getElementById('localModelsTableBody');
+const installedModelsCount = document.getElementById('installedModelsCount');
+const localEngineStatusDot = document.getElementById('localEngineStatusDot');
+const localEngineStatusText = document.getElementById('localEngineStatusText');
+const localEngineDetailsText = document.getElementById('localEngineDetailsText');
+
+async function fetchLocalHubStatus() {
+  try {
+    const res = await fetch('/v1/local/status');
+    if (!res.ok) throw new Error('Status request failed');
+    const data = await res.json();
+    if (localEngineStatusDot) {
+      localEngineStatusDot.style.background = data.running ? '#22c55e' : '#ef4444';
+    }
+    if (localEngineStatusText) {
+      localEngineStatusText.textContent = data.running
+        ? (data.embedded ? '🚀 Standalone Portable Engine (Active)' : '⚡ System Local Engine (Active)')
+        : '⚠️ Engine Inactive (Spawning on demand)';
+    }
+    if (localEngineDetailsText) {
+      localEngineDetailsText.textContent = `GPU: ${data.gpuName || 'RTX 4060'} · CUDA 12 · Models: ${data.modelsCount || 0} (${data.modelsPath})`;
+    }
+    return data;
+  } catch (err) {
+    if (localEngineStatusText) localEngineStatusText.textContent = 'Offline';
+    return null;
+  }
+}
+
+async function renderLocalHubModels() {
+  if (!localModelsTableBody) return;
+  localModelsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">Loading installed models...</td></tr>';
+  
+  try {
+    const res = await fetch('/v1/local/models');
+    const data = await res.json();
+    const models = data.models || [];
+    if (installedModelsCount) installedModelsCount.textContent = String(models.length);
+    
+    if (models.length === 0) {
+      localModelsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">No local models downloaded yet. Use the 1-Click Puller above to install your first model!</td></tr>';
+      return;
+    }
+
+    localModelsTableBody.innerHTML = '';
+    for (const m of models) {
+      const tr = document.createElement('tr');
+      const quant = m.quantization || m.parameterSize || 'Standard';
+      tr.innerHTML = `
+        <td>
+          <div style="font-weight: 600; color: var(--text-primary); font-family: monospace;">${escapeHtml(m.rawName || m.id)}</div>
+          <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(m.family || 'llm')} · modified ${new Date(m.modifiedAt).toLocaleDateString()}</div>
+        </td>
+        <td><span style="font-weight: 500;">${escapeHtml(m.sizeFormatted || m.sizeGb || 'Unknown')}</span></td>
+        <td><span class="model-badge" style="font-size: 11px;">${escapeHtml(quant)}</span></td>
+        <td>
+          <div style="display: flex; gap: 6px;">
+            <button class="action-tag-btn select-local-model-btn" data-model="local/${escapeHtml(m.rawName)}" style="color: var(--accent-cyan);" title="Select this model in chat">💬 Use in Chat</button>
+            <button class="action-tag-btn delete-local-model-btn" data-model="${escapeHtml(m.rawName)}" style="color: var(--accent-red);" title="Delete model from disk">🗑️</button>
+          </div>
+        </td>
+      `;
+      localModelsTableBody.appendChild(tr);
+    }
+
+    // Bind chat select buttons
+    localModelsTableBody.querySelectorAll('.select-local-model-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const modelId = btn.getAttribute('data-model');
+        if (modelSelect && modelId) {
+          // Check if option exists or add it
+          let opt = Array.from(modelSelect.options).find(o => o.value === modelId);
+          if (!opt) {
+            opt = document.createElement('option');
+            opt.value = modelId;
+            opt.textContent = `💻 ${modelId}`;
+            modelSelect.appendChild(opt);
+          }
+          modelSelect.value = modelId;
+          if (localHubModal) localHubModal.classList.add('hidden');
+          const chatInput = document.getElementById('chatInput');
+          if (chatInput) chatInput.focus();
+        }
+      });
+    });
+
+    // Bind delete buttons
+    localModelsTableBody.querySelectorAll('.delete-local-model-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const modelName = btn.getAttribute('data-model');
+        if (!modelName) return;
+        if (!confirm(`Are you sure you want to permanently delete local model "${modelName}" from your disk?`)) return;
+        btn.textContent = 'Deleting...';
+        try {
+          const dRes = await fetch('/v1/local/models', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: modelName }),
+          });
+          const dData = await dRes.json();
+          if (dData.success) {
+            await renderLocalHubModels();
+            await fetchLocalHubStatus();
+            fetchModels();
+          } else {
+            alert('Delete failed: ' + dData.message);
+          }
+        } catch (e) {
+          alert('Delete error: ' + e.message);
+        }
+      });
+    });
+  } catch (err) {
+    localModelsTableBody.innerHTML = `<tr><td colspan="4" style="color: var(--accent-red); padding: 14px;">Error loading local models: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+if (openLocalHubModalBtn && localHubModal) {
+  openLocalHubModalBtn.addEventListener('click', async () => {
+    localHubModal.classList.remove('hidden');
+    await fetchLocalHubStatus();
+    await renderLocalHubModels();
+  });
+}
+
+if (closeLocalHubModalBtn && localHubModal) {
+  closeLocalHubModalBtn.addEventListener('click', () => localHubModal.classList.add('hidden'));
+}
+if (localHubDoneBtn && localHubModal) {
+  localHubDoneBtn.addEventListener('click', () => localHubModal.classList.add('hidden'));
+}
+
+if (refreshLocalModelsBtn) {
+  refreshLocalModelsBtn.addEventListener('click', async () => {
+    refreshLocalModelsBtn.textContent = '⏳...';
+    await fetchLocalHubStatus();
+    await renderLocalHubModels();
+    refreshLocalModelsBtn.textContent = '🔄 Refresh';
+  });
+}
+
+if (unloadGpuModelsBtn) {
+  unloadGpuModelsBtn.addEventListener('click', async () => {
+    unloadGpuModelsBtn.textContent = '🧹 Freeing...';
+    try {
+      const res = await fetch('/v1/gpu/unload', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message || 'GPU VRAM evicted successfully!');
+      await fetchLocalHubStatus();
+    } catch (e) {
+      alert('Failed to unload GPU models: ' + e.message);
+    } finally {
+      unloadGpuModelsBtn.textContent = '🧹 Free VRAM';
+    }
+  });
+}
+
+// Quick pull pill clicks
+document.querySelectorAll('.quick-pull-tag').forEach(tag => {
+  tag.addEventListener('click', () => {
+    const model = tag.getAttribute('data-model');
+    if (pullModelInput && model) {
+      pullModelInput.value = model;
+      if (startPullModelBtn) startPullModelBtn.click();
+    }
+  });
+});
+
+// Start Model Pull
+if (startPullModelBtn && pullModelInput) {
+  startPullModelBtn.addEventListener('click', async () => {
+    const modelName = pullModelInput.value.trim();
+    if (!modelName) {
+      alert('Please enter a model name to pull (e.g. qwen2.5-coder:7b)');
+      return;
+    }
+
+    startPullModelBtn.disabled = true;
+    startPullModelBtn.textContent = '⏳ Pulling...';
+    if (pullProgressContainer) pullProgressContainer.style.display = 'block';
+    if (pullStatusLabel) pullStatusLabel.textContent = `Connecting & initializing download for "${modelName}"...`;
+    if (pullProgressBar) pullProgressBar.style.width = '2%';
+    if (pullPercentLabel) pullPercentLabel.textContent = '0%';
+
+    try {
+      const response = await fetch('/v1/local/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const chunk = JSON.parse(jsonStr);
+            if (chunk.done) {
+              if (pullStatusLabel) pullStatusLabel.textContent = `🎉 ${chunk.message || 'Model downloaded and ready!'}`;
+              if (pullProgressBar) pullProgressBar.style.width = '100%';
+              if (pullPercentLabel) pullPercentLabel.textContent = '100%';
+            } else {
+              const statusText = chunk.status || 'downloading';
+              const percent = chunk.percent !== undefined ? chunk.percent : null;
+              if (pullStatusLabel) pullStatusLabel.textContent = `${statusText} ${chunk.digest ? `(${chunk.digest.slice(0, 12)})` : ''}`;
+              if (percent !== null) {
+                if (pullProgressBar) pullProgressBar.style.width = `${percent}%`;
+                if (pullPercentLabel) pullPercentLabel.textContent = `${percent}%`;
+              }
+            }
+          } catch {}
+        }
+      }
+
+      await renderLocalHubModels();
+      await fetchLocalHubStatus();
+      fetchModels();
+    } catch (err) {
+      if (pullStatusLabel) pullStatusLabel.textContent = `⚠️ Error: ${err.message}`;
+      if (pullProgressBar) pullProgressBar.style.background = '#ef4444';
+    } finally {
+      startPullModelBtn.disabled = false;
+      startPullModelBtn.textContent = '📥 Pull Model';
+    }
+  });
+}
+
 init();
+

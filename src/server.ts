@@ -24,6 +24,7 @@ import { FREE_PROVIDER_CATALOG, type QuotaUnit, type ResetInterval } from './pro
 import { getCompressionStats, listRawContexts, recoverRawContext } from './context/compression.js';
 import { getMcpInfo, handleMcpMessage, type JsonRpcRequest } from './mcp/handler.js';
 import { ProviderModelDiscovery } from './providers/model-discovery.js';
+import { EmbeddedLocalEngine } from './engine/embedded-local.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -421,14 +422,16 @@ app.post<{ Body: JsonRpcRequest }>('/mcp', async (req, reply) => {
 });
 
 // ============================================================================
-// Local GPU Hardware Status, Dynamic Offline Models & VRAM Eviction Endpoints
+// Embedded Local Engine & Local Models Hub Endpoints
 // ============================================================================
+app.get('/v1/local/status', async () => {
+  return await EmbeddedLocalEngine.getStatus();
+});
+
 app.get('/v1/local/models', async () => {
   try {
-    const res = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(2500) });
-    if (!res.ok) return { success: false, models: [] };
-    const data = (await res.json()) as { models?: Array<{ name: string; size: number; modified_at: string; details?: any }> };
-    const models = (data.models || []).map((m) => {
+    const modelsList = await EmbeddedLocalEngine.listModels();
+    const models = modelsList.map((m) => {
       const gb = (m.size / (1024 * 1024 * 1024)).toFixed(2);
       const cleanName = m.name.replace(/:latest$/, '');
       return {
@@ -436,6 +439,7 @@ app.get('/v1/local/models', async () => {
         rawName: m.name,
         cleanName,
         sizeGb: `${gb} GB`,
+        sizeFormatted: m.sizeFormatted,
         modifiedAt: m.modified_at,
         family: m.details?.family || 'llm',
         parameterSize: m.details?.parameter_size || '',
@@ -446,6 +450,37 @@ app.get('/v1/local/models', async () => {
   } catch (err: any) {
     return { success: false, models: [], error: err.message };
   }
+});
+
+app.delete('/v1/local/models', async (req: FastifyRequest<{ Body: { name: string } }>, reply: FastifyReply) => {
+  const modelName = (req.body?.name || '').trim();
+  if (!modelName) {
+    return reply.status(400).send({ success: false, error: 'Model name is required' });
+  }
+  const res = await EmbeddedLocalEngine.deleteModel(modelName);
+  return reply.send(res);
+});
+
+app.post('/v1/local/pull', async (req: FastifyRequest<{ Body: { name: string } }>, reply: FastifyReply) => {
+  const modelName = (req.body?.name || '').trim();
+  if (!modelName) {
+    return reply.status(400).send({ success: false, error: 'Model name is required' });
+  }
+
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+    'Access-Control-Allow-Origin': '*',
+  });
+
+  const res = await EmbeddedLocalEngine.pullModelStream(modelName, (chunk) => {
+    reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
+  });
+
+  reply.raw.write(`data: ${JSON.stringify({ done: true, ...res })}\n\n`);
+  reply.raw.end();
 });
 
 app.get('/v1/gpu/status', async () => {
@@ -1129,6 +1164,13 @@ const HOST = process.env.HOST || '127.0.0.1'; // Secure local loopback default
 
 export async function startServer() {
   try {
+    // 1. Boot Embedded Local AI Engine in the background
+    try {
+      await EmbeddedLocalEngine.start();
+    } catch (e: any) {
+      console.warn(`[EmbeddedLocalEngine] Startup warning: ${e.message}`);
+    }
+
     await app.listen({ port: PORT, host: HOST });
     console.log(`\n======================================================`);
     console.log(`🚀 NexusRoute Gateway is running!`);
@@ -1136,6 +1178,7 @@ export async function startServer() {
     console.log(`📡 OpenAI Chat API:     http://${HOST}:${PORT}/v1/chat/completions`);
     console.log(`📋 Models Endpoint:    http://${HOST}:${PORT}/v1/models`);
     console.log(`🔑 Key Status:          http://${HOST}:${PORT}/v1/keys/status`);
+    console.log(`🖥️ Local AI Engine:    Embedded & GPU Accelerated (Port 11434)`);
     console.log(`🔒 Bound Interface:    ${HOST} (Localhost Secure Mode)`);
     console.log(`======================================================\n`);
     // Resolved routing config, so "which build is actually serving me" is
@@ -1152,6 +1195,18 @@ export async function startServer() {
     process.exit(1);
   }
 }
+
+process.on('SIGINT', () => {
+  EmbeddedLocalEngine.stop();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  EmbeddedLocalEngine.stop();
+  process.exit(0);
+});
+process.on('exit', () => {
+  EmbeddedLocalEngine.stop();
+});
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);

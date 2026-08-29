@@ -36,6 +36,7 @@ venv/
 *.log
 logs/
 workspace/screenshots/
+bin/engine/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
