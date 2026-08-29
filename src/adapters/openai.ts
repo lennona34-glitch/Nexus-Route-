@@ -256,8 +256,8 @@ export class OpenAIAdapter implements ProviderAdapter {
     if (req.tool_choice !== undefined) payload.tool_choice = req.tool_choice;
     if (req.response_format !== undefined) payload.response_format = req.response_format;
     if (this.baseUrl.includes('11434') || this.baseUrl.includes('localhost')) {
-      payload.keep_alive = '5m';
-      (payload as any).options = { num_ctx: 65536 };
+      payload.keep_alive = '15m';
+      (payload as any).options = { num_ctx: 8192 };
     }
     if (this.baseUrl.includes('deepseek.com') || targetModel.includes('deepseek')) {
       if (req.max_tokens === undefined) {
