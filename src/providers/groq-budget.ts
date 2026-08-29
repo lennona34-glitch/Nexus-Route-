@@ -1,8 +1,8 @@
 import type { UniversalRequest } from '../ir/types.js';
 
-const DEFAULT_GROQ_TPM_LIMIT = 8_000;
-const DEFAULT_SAFETY_RATIO = 0.88;
-const MIN_USEFUL_COMPLETION_TOKENS = 384;
+const DEFAULT_GROQ_TPM_LIMIT = 30_000;
+const DEFAULT_SAFETY_RATIO = 0.95;
+const MIN_USEFUL_COMPLETION_TOKENS = 512;
 
 export interface GroqRequestBudget {
   limit: number;
@@ -36,13 +36,13 @@ export function estimateGroqPromptTokens(req: UniversalRequest): number {
 export function getGroqRequestBudget(req: UniversalRequest): GroqRequestBudget {
   const limit = Math.floor(positiveNumber(process.env.GROQ_TPM_LIMIT, DEFAULT_GROQ_TPM_LIMIT));
   const ratio = Math.min(0.98, positiveNumber(process.env.GROQ_TPM_SAFETY_RATIO, DEFAULT_SAFETY_RATIO));
-  const safetyLimit = Math.max(1_000, Math.floor(limit * ratio));
+  const safetyLimit = Math.max(2_000, Math.floor(limit * ratio));
   const estimatedPromptTokens = estimateGroqPromptTokens(req);
-  const requestedCompletionTokens = Math.max(1, req.max_tokens || 4_096);
+  const requestedCompletionTokens = Math.max(1, req.max_tokens || 8_192);
   const availableCompletionTokens = safetyLimit - estimatedPromptTokens;
-  const maxCompletionTokens = Math.max(0, Math.min(requestedCompletionTokens, availableCompletionTokens));
+  const maxCompletionTokens = Math.max(1024, Math.min(requestedCompletionTokens, Math.min(8192, availableCompletionTokens)));
   const minimumRequired = Math.min(requestedCompletionTokens, MIN_USEFUL_COMPLETION_TOKENS);
-  const allowed = maxCompletionTokens >= minimumRequired;
+  const allowed = availableCompletionTokens >= minimumRequired || maxCompletionTokens >= minimumRequired;
 
   return {
     limit,

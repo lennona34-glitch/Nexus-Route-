@@ -241,7 +241,7 @@ export class OpenAIAdapter implements ProviderAdapter {
       if (!budget.allowed) {
         throw new AdapterError(budget.reason || 'Groq request exceeds its configured TPM safety budget.', 'groq', 413, false);
       }
-      payload.max_tokens = budget.maxCompletionTokens;
+      payload.max_tokens = Math.min(8192, Math.max(req.max_tokens || 8192, budget.maxCompletionTokens));
     } else if (req.max_tokens !== undefined) {
       payload.max_tokens = req.max_tokens;
     } else if (targetModel.toLowerCase().includes('qwen') || this.baseUrl.includes('aliyuncs.com') || targetModel.toLowerCase().includes('coder')) {
