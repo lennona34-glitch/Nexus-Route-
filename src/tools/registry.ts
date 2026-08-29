@@ -410,7 +410,7 @@ public class MainActivity extends Activity {
   }
 
   try {
-    execSync(`"${JAVAC}" -source 17 -target 17 -encoding UTF-8 -d "${binDir}" -cp "${ANDROID_JAR}" ${javaFiles.join(' ')}`, { stdio: 'pipe' });
+    execSync(`"${JAVAC}" -source 8 -target 8 -parameters -encoding UTF-8 -d "${binDir}" -cp "${ANDROID_JAR}" ${javaFiles.join(' ')}`, { stdio: 'pipe' });
   } catch (javacErr: any) {
     const errorLog = javacErr.stderr?.toString() || javacErr.stdout?.toString() || javacErr.message;
     throw new Error(`Java compilation failed: ${errorLog}`);
@@ -430,7 +430,7 @@ public class MainActivity extends Activity {
 
   if (classFiles.length === 0) {
     fs.writeFileSync(mainActivityPath, defaultActivity, 'utf8');
-    execSync(`"${JAVAC}" -source 17 -target 17 -encoding UTF-8 -d "${binDir}" -cp "${ANDROID_JAR}" "${mainActivityPath}"`, { stdio: 'pipe' });
+    execSync(`"${JAVAC}" -source 8 -target 8 -parameters -encoding UTF-8 -d "${binDir}" -cp "${ANDROID_JAR}" "${mainActivityPath}"`, { stdio: 'pipe' });
     collectClasses(binDir);
   }
 
