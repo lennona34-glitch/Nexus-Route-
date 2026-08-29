@@ -3368,9 +3368,61 @@ async function renderLocalHubModels() {
     const models = data.models || [];
     if (installedModelsCount) installedModelsCount.textContent = String(models.length);
     
-    if (models.length === 0) {
-      localModelsTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">No local models downloaded yet. Use the 1-Click Puller above to install your first model!</td></tr>';
-      return;
+    // Update Modelfile Studio Base Model dropdown (mfFromSelect)
+    const mfFromSelect = document.getElementById('mfFromSelect');
+    if (mfFromSelect) {
+      const currentVal = mfFromSelect.value;
+      mfFromSelect.innerHTML = '';
+      
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = '-- Choose Base Model --';
+      mfFromSelect.appendChild(defaultOpt);
+
+      if (models.length > 0) {
+        const instGroup = document.createElement('optgroup');
+        instGroup.label = '📦 Installed On Local GPU';
+        for (const m of models) {
+          const opt = document.createElement('option');
+          opt.value = m.rawName || m.id;
+          opt.textContent = `💻 ${m.rawName} (${m.sizeFormatted || m.sizeGb})`;
+          instGroup.appendChild(opt);
+        }
+        mfFromSelect.appendChild(instGroup);
+      }
+
+      const libGroup = document.createElement('optgroup');
+      libGroup.label = '🌟 Popular Base Models';
+      const commonBases = [
+        'qwen2.5-coder:7b',
+        'llama3.2:3b',
+        'dolphin-roaster:latest',
+        'deepseek-r1:8b',
+        'mistral:7b',
+        'phi3.5:latest',
+      ];
+      for (const b of commonBases) {
+        if (!models.some(m => m.rawName === b)) {
+          const opt = document.createElement('option');
+          opt.value = b;
+          opt.textContent = `📥 ${b}`;
+          libGroup.appendChild(opt);
+        }
+      }
+      mfFromSelect.appendChild(libGroup);
+
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = '✏️ Custom .GGUF File Path / HuggingFace ID...';
+      mfFromSelect.appendChild(customOpt);
+
+      if (currentVal && Array.from(mfFromSelect.options).some(o => o.value === currentVal)) {
+        mfFromSelect.value = currentVal;
+      } else if (models.length > 0) {
+        mfFromSelect.value = models[0].rawName;
+        const mfFromInputEl = document.getElementById('mfFromInput');
+        if (mfFromInputEl) mfFromInputEl.value = models[0].rawName;
+      }
     }
 
     localModelsTableBody.innerHTML = '';
@@ -3625,10 +3677,13 @@ if (startPullModelBtn && pullModelInput) {
 }
 
 // ==========================================================================
+// ==========================================================================
 // Modelfile Studio & GGUF Patcher Handlers
 // ==========================================================================
 const mfModelNameInput = document.getElementById('mfModelNameInput');
+const mfFromSelect = document.getElementById('mfFromSelect');
 const mfFromInput = document.getElementById('mfFromInput');
+const mfCustomPathToggleBtn = document.getElementById('mfCustomPathToggleBtn');
 const mfSystemPromptInput = document.getElementById('mfSystemPromptInput');
 const mfRawModelfileInput = document.getElementById('mfRawModelfileInput');
 const mfTempInput = document.getElementById('mfTempInput');
@@ -3641,6 +3696,24 @@ const mfBuildStatusLabel = document.getElementById('mfBuildStatusLabel');
 const mfBuildPercentLabel = document.getElementById('mfBuildPercentLabel');
 const mfBuildProgressBar = document.getElementById('mfBuildProgressBar');
 
+// Hugging Face Hub Elements
+const mfToggleHfHubBtn = document.getElementById('mfToggleHfHubBtn');
+const mfHfHubPanel = document.getElementById('mfHfHubPanel');
+const mfHfKeyBadge = document.getElementById('mfHfKeyBadge');
+const mfHfTokenInput = document.getElementById('mfHfTokenInput');
+const mfSaveHfTokenBtn = document.getElementById('mfSaveHfTokenBtn');
+const mfHfSearchInput = document.getElementById('mfHfSearchInput');
+const mfSearchHfBtn = document.getElementById('mfSearchHfBtn');
+const mfHfSearchResults = document.getElementById('mfHfSearchResults');
+
+// Avatar Generator Elements
+const mfAvatarEngineSelect = document.getElementById('mfAvatarEngineSelect');
+const mfAvatarPreviewImg = document.getElementById('mfAvatarPreviewImg');
+const mfAvatarPlaceholder = document.getElementById('mfAvatarPlaceholder');
+const mfAvatarPromptInput = document.getElementById('mfAvatarPromptInput');
+const mfAvatarStatus = document.getElementById('mfAvatarStatus');
+const mfGenerateAvatarBtn = document.getElementById('mfGenerateAvatarBtn');
+
 const mfPresetRoasterBtn = document.getElementById('mfPresetRoasterBtn');
 const mfPresetCoderBtn = document.getElementById('mfPresetCoderBtn');
 const mfPresetArchitectBtn = document.getElementById('mfPresetArchitectBtn');
@@ -3648,8 +3721,76 @@ const mfPresetGgufBtn = document.getElementById('mfPresetGgufBtn');
 
 let isRawModelfileMode = false;
 
+function getEffectiveFromModel() {
+  if (mfFromInput && mfFromInput.style.display !== 'none' && mfFromInput.value.trim()) {
+    return mfFromInput.value.trim();
+  }
+  if (mfFromSelect && mfFromSelect.value && mfFromSelect.value !== '__custom__') {
+    return mfFromSelect.value;
+  }
+  return mfFromInput?.value.trim() || 'dolphin-roaster:latest';
+}
+
+function setEffectiveFromModel(modelName) {
+  if (!modelName) return;
+  if (mfFromSelect) {
+    const matchingOpt = Array.from(mfFromSelect.options).find(o => o.value === modelName);
+    if (matchingOpt) {
+      mfFromSelect.value = modelName;
+      if (mfFromInput) mfFromInput.style.display = 'none';
+      if (mfCustomPathToggleBtn) mfCustomPathToggleBtn.textContent = '✏️ Custom Path';
+    } else {
+      mfFromSelect.value = '__custom__';
+      if (mfFromInput) {
+        mfFromInput.style.display = 'block';
+        mfFromInput.value = modelName;
+      }
+      if (mfCustomPathToggleBtn) mfCustomPathToggleBtn.textContent = '📋 Pick List';
+    }
+  } else if (mfFromInput) {
+    mfFromInput.value = modelName;
+  }
+}
+
+if (mfFromSelect) {
+  mfFromSelect.addEventListener('change', () => {
+    if (mfFromSelect.value === '__custom__') {
+      if (mfFromInput) {
+        mfFromInput.style.display = 'block';
+        mfFromInput.value = '';
+        mfFromInput.focus();
+      }
+      if (mfCustomPathToggleBtn) mfCustomPathToggleBtn.textContent = '📋 Pick List';
+    } else if (mfFromSelect.value) {
+      if (mfFromInput) {
+        mfFromInput.style.display = 'none';
+        mfFromInput.value = mfFromSelect.value;
+      }
+      if (mfCustomPathToggleBtn) mfCustomPathToggleBtn.textContent = '✏️ Custom Path';
+    }
+    syncModelfileToRaw();
+  });
+}
+
+if (mfCustomPathToggleBtn && mfFromInput && mfFromSelect) {
+  mfCustomPathToggleBtn.addEventListener('click', () => {
+    if (mfFromInput.style.display === 'none') {
+      mfFromInput.style.display = 'block';
+      mfFromInput.focus();
+      mfFromSelect.value = '__custom__';
+      mfCustomPathToggleBtn.textContent = '📋 Pick List';
+    } else {
+      mfFromInput.style.display = 'none';
+      if (mfFromSelect.options.length > 1) mfFromSelect.selectedIndex = 1;
+      if (mfFromInput) mfFromInput.value = mfFromSelect.value;
+      mfCustomPathToggleBtn.textContent = '✏️ Custom Path';
+    }
+    syncModelfileToRaw();
+  });
+}
+
 function generateModelfileFromForm() {
-  const from = (mfFromInput?.value || 'dolphin-roaster:latest').trim();
+  const from = getEffectiveFromModel();
   const system = (mfSystemPromptInput?.value || '').trim();
   const temp = mfTempInput?.value || '0.7';
   const ctx = mfCtxInput?.value || '8192';
@@ -3691,14 +3832,16 @@ if (mfToggleRawModeBtn && mfSystemPromptInput && mfRawModelfileInput) {
   });
 }
 
+// Preset Handlers with Avatar Prompt Autocomplete
 if (mfPresetRoasterBtn) {
   mfPresetRoasterBtn.addEventListener('click', () => {
     if (mfModelNameInput) mfModelNameInput.value = 'dolphin-roaster-v2';
-    if (mfFromInput) mfFromInput.value = 'dolphin-roaster:latest';
+    setEffectiveFromModel('dolphin-roaster:latest');
     if (mfSystemPromptInput) mfSystemPromptInput.value = `You are the Ultimate Universal Roast Master. You possess savage wit, sharp comedic timing, and zero corporate filter. Deliver hilarious, devastating, over-the-top comedic roasts on ANY topic the user provides. Tear everything apart with style and comedic flair!`;
     if (mfTempInput) mfTempInput.value = '0.85';
     if (mfCtxInput) mfCtxInput.value = '8192';
     if (mfTopPInput) mfTopPInput.value = '0.95';
+    if (mfAvatarPromptInput) mfAvatarPromptInput.value = 'Cyberpunk roast master robot, neon purple glowing eyes, laughing smirk, high resolution 8k digital portrait';
     syncModelfileToRaw();
   });
 }
@@ -3706,11 +3849,12 @@ if (mfPresetRoasterBtn) {
 if (mfPresetCoderBtn) {
   mfPresetCoderBtn.addEventListener('click', () => {
     if (mfModelNameInput) mfModelNameInput.value = 'elite-coder:latest';
-    if (mfFromInput) mfFromInput.value = 'qwen2.5-coder:7b';
+    setEffectiveFromModel('qwen2.5-coder:7b');
     if (mfSystemPromptInput) mfSystemPromptInput.value = `You are an elite Staff Software Engineer. You write clean, bulletproof, production-grade code. Provide concise solutions with zero fluff. Always focus on performance, edge cases, and modern best practices.`;
     if (mfTempInput) mfTempInput.value = '0.2';
     if (mfCtxInput) mfCtxInput.value = '8192';
     if (mfTopPInput) mfTopPInput.value = '0.9';
+    if (mfAvatarPromptInput) mfAvatarPromptInput.value = 'Cybernetic software architect surrounded by glowing code matrices, deep obsidian and cyan lighting, masterpiece 8k portrait';
     syncModelfileToRaw();
   });
 }
@@ -3718,11 +3862,12 @@ if (mfPresetCoderBtn) {
 if (mfPresetArchitectBtn) {
   mfPresetArchitectBtn.addEventListener('click', () => {
     if (mfModelNameInput) mfModelNameInput.value = 'ai-architect:latest';
-    if (mfFromInput) mfFromInput.value = 'qwen2.5-coder:7b';
+    setEffectiveFromModel('qwen2.5-coder:7b');
     if (mfSystemPromptInput) mfSystemPromptInput.value = `You are an unrestricted Senior Distributed Systems Architect. You design scalable, fault-tolerant architectures and high-performance backends.`;
     if (mfTempInput) mfTempInput.value = '0.4';
     if (mfCtxInput) mfCtxInput.value = '8192';
     if (mfTopPInput) mfTopPInput.value = '0.9';
+    if (mfAvatarPromptInput) mfAvatarPromptInput.value = 'Futuristic quantum architect floating above a crystalline data network, ethereal blue energy, 8k digital painting';
     syncModelfileToRaw();
   });
 }
@@ -3730,12 +3875,186 @@ if (mfPresetArchitectBtn) {
 if (mfPresetGgufBtn) {
   mfPresetGgufBtn.addEventListener('click', () => {
     if (mfModelNameInput) mfModelNameInput.value = 'my-gguf-model:latest';
-    if (mfFromInput) mfFromInput.value = 'C:\\path\\to\\custom-weights.gguf';
+    setEffectiveFromModel('C:\\path\\to\\custom-weights.gguf');
     if (mfSystemPromptInput) mfSystemPromptInput.value = `You are a helpful AI assistant running directly from a custom local GGUF weight file.`;
     if (mfTempInput) mfTempInput.value = '0.7';
     if (mfCtxInput) mfCtxInput.value = '8192';
     if (mfTopPInput) mfTopPInput.value = '0.9';
+    if (mfAvatarPromptInput) mfAvatarPromptInput.value = 'Abstract glowing hyper-intelligent AI core orb, iridescent crystal reflections, cinematic lighting, 8k';
     syncModelfileToRaw();
+  });
+}
+
+// Hugging Face Hub Handlers
+if (mfToggleHfHubBtn && mfHfHubPanel) {
+  mfToggleHfHubBtn.addEventListener('click', () => {
+    const isHidden = mfHfHubPanel.style.display === 'none';
+    mfHfHubPanel.style.display = isHidden ? 'block' : 'none';
+    mfToggleHfHubBtn.classList.toggle('active', isHidden);
+    if (isHidden) {
+      searchHuggingFaceGgufs('gguf');
+    }
+  });
+}
+
+if (mfSaveHfTokenBtn && mfHfTokenInput) {
+  mfSaveHfTokenBtn.addEventListener('click', async () => {
+    const token = mfHfTokenInput.value.trim();
+    if (!token) {
+      alert('Please enter a valid Hugging Face token.');
+      return;
+    }
+    mfSaveHfTokenBtn.textContent = 'Saving...';
+    try {
+      const res = await fetch('/v1/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+        body: JSON.stringify({ provider: 'huggingface', apiKey: token }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (mfHfKeyBadge) {
+          mfHfKeyBadge.textContent = '✅ Token Saved & Active';
+          mfHfKeyBadge.style.color = '#22c55e';
+        }
+        mfHfTokenInput.value = '';
+        alert('Hugging Face API token saved! Hugging Face FLUX.1 image generation and GGUF Hub search are now fully authenticated.');
+        searchHuggingFaceGgufs(mfHfSearchInput?.value || 'gguf');
+      }
+    } catch (err) {
+      alert('Failed to save HF token: ' + err.message);
+    } finally {
+      mfSaveHfTokenBtn.textContent = 'Save Token';
+    }
+  });
+}
+
+async function searchHuggingFaceGgufs(query = 'gguf') {
+  if (!mfHfSearchResults) return;
+  mfHfSearchResults.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 12px;">Searching Hugging Face GGUF Hub...</div>';
+  try {
+    const res = await fetch(`/v1/hf/models?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (!data.success || !data.models || data.models.length === 0) {
+      mfHfSearchResults.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 12px;">No GGUF models found for query.</div>';
+      return;
+    }
+
+    if (mfHfKeyBadge) {
+      mfHfKeyBadge.textContent = data.hfKeyConfigured ? '✅ Token Configured' : '⚠️ No HF Token (Unauthenticated Limits)';
+      mfHfKeyBadge.style.color = data.hfKeyConfigured ? '#22c55e' : '#f59e0b';
+    }
+
+    mfHfSearchResults.innerHTML = '';
+    for (const m of data.models) {
+      const div = document.createElement('div');
+      div.style.cssText = 'background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+      div.innerHTML = `
+        <div style="min-width: 0; flex: 1;">
+          <div style="font-weight: 600; color: #f59e0b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.name)}</div>
+          <div style="font-size: 10px; color: var(--text-muted); display: flex; gap: 10px; margin-top: 2px;">
+            <span>⬇️ ${Number(m.downloads || 0).toLocaleString()}</span>
+            <span>❤️ ${Number(m.likes || 0).toLocaleString()}</span>
+            <span><code>${escapeHtml(m.ollamaPullRef)}</code></span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button class="action-tag-btn hf-use-base-btn" data-ref="${escapeHtml(m.ollamaPullRef)}" style="font-size: 10px; padding: 3px 6px;" title="Use as FROM Base in Modelfile">📋 Use Base</button>
+          <button class="primary-btn hf-pull-btn" data-ref="${escapeHtml(m.ollamaPullRef)}" style="font-size: 10px; padding: 3px 8px; white-space: nowrap;">📥 Pull</button>
+        </div>
+      `;
+      mfHfSearchResults.appendChild(div);
+    }
+
+    mfHfSearchResults.querySelectorAll('.hf-use-base-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const ref = b.getAttribute('data-ref');
+        if (ref) {
+          setEffectiveFromModel(ref);
+          if (mfModelNameInput && !mfModelNameInput.value) {
+            mfModelNameInput.value = ref.split('/').pop() || 'hf-model';
+          }
+          syncModelfileToRaw();
+          const studioEl = document.getElementById('mfModelNameInput');
+          if (studioEl) studioEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    });
+
+    mfHfSearchResults.querySelectorAll('.hf-pull-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const ref = b.getAttribute('data-ref');
+        const pullInput = document.getElementById('pullModelInput');
+        const pullBtn = document.getElementById('startPullModelBtn');
+        if (pullInput && pullBtn && ref) {
+          pullInput.value = ref;
+          pullBtn.click();
+          pullInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    });
+  } catch (err) {
+    mfHfSearchResults.innerHTML = `<div style="color: var(--accent-red); padding: 8px;">Error: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+if (mfSearchHfBtn && mfHfSearchInput) {
+  mfSearchHfBtn.addEventListener('click', () => {
+    searchHuggingFaceGgufs(mfHfSearchInput.value || 'gguf');
+  });
+  mfHfSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      mfSearchHfBtn.click();
+    }
+  });
+}
+
+// Model Avatar Generator
+if (mfGenerateAvatarBtn && mfAvatarPromptInput) {
+  mfGenerateAvatarBtn.addEventListener('click', async () => {
+    const prompt = (mfAvatarPromptInput.value || '').trim();
+    if (!prompt) {
+      alert('Please enter a description prompt for the avatar.');
+      mfAvatarPromptInput.focus();
+      return;
+    }
+
+    const engine = mfAvatarEngineSelect?.value || 'auto';
+    mfGenerateAvatarBtn.disabled = true;
+    mfGenerateAvatarBtn.textContent = '⏳ Painting...';
+    if (mfAvatarStatus) mfAvatarStatus.textContent = `Generating via ${engine === 'huggingface' ? '🤗 Hugging Face FLUX.1' : '⚡ Cloud FLUX.1 HD'}...`;
+
+    try {
+      const res = await fetch('/v1/art/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, engine }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.url) {
+        if (mfAvatarPreviewImg) {
+          mfAvatarPreviewImg.src = data.url;
+          mfAvatarPreviewImg.style.display = 'block';
+        }
+        if (mfAvatarPlaceholder) mfAvatarPlaceholder.style.display = 'none';
+        if (mfAvatarStatus) {
+          mfAvatarStatus.textContent = `✅ Saved ${data.filename || 'avatar'} (${data.engine || 'FLUX.1'})`;
+          mfAvatarStatus.style.color = '#22c55e';
+        }
+      } else {
+        throw new Error(data.error || 'Avatar generation failed');
+      }
+    } catch (err) {
+      if (mfAvatarStatus) {
+        mfAvatarStatus.textContent = `⚠️ ${err.message}`;
+        mfAvatarStatus.style.color = 'var(--accent-red)';
+      }
+    } finally {
+      mfGenerateAvatarBtn.disabled = false;
+      mfGenerateAvatarBtn.textContent = '✨ Generate Avatar';
+    }
   });
 }
 

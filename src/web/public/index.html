@@ -1020,11 +1020,31 @@ console.log(res.choices[0].message.content);</code></pre>
               <button type="button" id="mfPresetCoderBtn" class="action-tag-btn" style="font-size: 11px;">💻 Senior Coder</button>
               <button type="button" id="mfPresetArchitectBtn" class="action-tag-btn" style="font-size: 11px;">🧙 Architect</button>
               <button type="button" id="mfPresetGgufBtn" class="action-tag-btn" style="font-size: 11px;">📁 Raw GGUF</button>
+              <button type="button" id="mfToggleHfHubBtn" class="action-tag-btn" style="font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);">🤗 Hugging Face Hub</button>
             </div>
           </div>
           <p style="color: var(--text-muted); font-size: 12px; margin: 0 0 12px 0;">
-            Customize local models, create new personas, tune temperature &amp; context buffers, or import raw <code>.gguf</code> files directly from disk into GPU memory.
+            Customize local models, create new personas, tune temperature &amp; context buffers, generate custom model avatars, or pull GGUFs directly from Hugging Face.
           </p>
+
+          <!-- Hugging Face GGUF Hub & Key Integrator (Collapsible) -->
+          <div id="mfHfHubPanel" style="display: none; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 600; font-size: 12px; color: #f59e0b;">🤗 Hugging Face GGUF Hub &amp; Key Settings</span>
+              <span id="mfHfKeyBadge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1);">Checking Key...</span>
+            </div>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+              <input type="password" id="mfHfTokenInput" placeholder="Paste your Hugging Face Token (hf_...)" style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11.5px;" />
+              <button type="button" id="mfSaveHfTokenBtn" class="action-tag-btn" style="padding: 6px 12px; font-size: 11.5px; color: #f59e0b;">Save Token</button>
+            </div>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+              <input type="text" id="mfHfSearchInput" placeholder="Search trending GGUFs (e.g. Qwen2.5, Llama-3.3, Dolphin, Coder)..." style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11.5px;" />
+              <button type="button" id="mfSearchHfBtn" class="primary-btn" style="padding: 6px 12px; font-size: 11.5px;">🔍 Search GGUFs</button>
+            </div>
+            <div id="mfHfSearchResults" style="max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 11px;">
+              <div style="color: var(--text-muted); text-align: center; padding: 8px;">Search Hugging Face above to discover and pull thousands of GGUF models directly to your GPU.</div>
+            </div>
+          </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
             <div>
@@ -1032,8 +1052,38 @@ console.log(res.choices[0].message.content);</code></pre>
               <input type="text" id="mfModelNameInput" placeholder="e.g. dolphin-custom, my-coder:latest" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 12px;" />
             </div>
             <div>
-              <label style="font-size: 11px; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 4px;">Base Model / GGUF File Path (FROM)</label>
-              <input type="text" id="mfFromInput" placeholder="e.g. dolphin-roaster:latest or C:\models\model.gguf" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 12px;" />
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Base Model / GGUF (FROM)</label>
+                <button type="button" id="mfCustomPathToggleBtn" class="action-tag-btn" style="font-size: 10px; padding: 2px 6px;" title="Switch between dropdown and manual path">✏️ Custom Path</button>
+              </div>
+              <select id="mfFromSelect" style="width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: #111827; color: var(--text-primary); font-size: 12px; font-weight: 500;">
+                <option value="">-- Select Installed Base Model --</option>
+              </select>
+              <input type="text" id="mfFromInput" placeholder="e.g. dolphin-roaster:latest or C:\models\model.gguf" style="display: none; width: 100%; margin-top: 4px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 12px;" />
+            </div>
+          </div>
+
+          <!-- Model Avatar & Portrait Generator Panel -->
+          <div style="background: rgba(168, 85, 247, 0.06); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 600; font-size: 12px; color: #c084fc;">🎨 Persona Avatar &amp; GPU Picture Studio</span>
+              <select id="mfAvatarEngineSelect" style="padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.4); background: #111827; color: var(--text-primary); font-size: 11px;">
+                <option value="huggingface">🤗 Hugging Face FLUX.1 Schnell</option>
+                <option value="cloud">⚡ Cloud FLUX.1 HD</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <div id="mfAvatarPreviewWrap" style="width: 68px; height: 68px; min-width: 68px; border-radius: 8px; border: 1px solid rgba(168, 85, 247, 0.4); overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center;">
+                <img id="mfAvatarPreviewImg" src="" alt="Avatar" style="display: none; width: 100%; height: 100%; object-fit: cover;" />
+                <span id="mfAvatarPlaceholder" style="font-size: 26px;">🎭</span>
+              </div>
+              <div style="flex: 1;">
+                <input type="text" id="mfAvatarPromptInput" placeholder="Avatar prompt (e.g. Cyberpunk roast master robot, neon synthwave, 8k portrait)..." style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11.5px; margin-bottom: 6px;" />
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span id="mfAvatarStatus" style="font-size: 11px; color: var(--text-muted);">Ready to generate art</span>
+                  <button type="button" id="mfGenerateAvatarBtn" class="action-tag-btn" style="color: #c084fc; border-color: rgba(168, 85, 247, 0.4); font-size: 11px; padding: 4px 10px;">✨ Generate Avatar</button>
+                </div>
+              </div>
             </div>
           </div>
 
