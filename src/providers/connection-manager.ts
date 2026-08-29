@@ -60,7 +60,6 @@ const ENV_KEYS: Partial<Record<ProviderType, string[]>> = {
   xai: ['XAI_API_KEY'],
   openrouter: ['OPENROUTER_API_KEY'],
   github: ['GITHUB_TOKEN', 'GH_TOKEN'],
-  together: ['TOGETHER_API_KEY'],
   huggingface: ['HUGGINGFACE_API_KEY', 'HF_TOKEN'],
   qwen: ['QWEN_API_KEY', 'DASHSCOPE_API_KEY'],
 };
@@ -72,7 +71,6 @@ export const FREE_PROVIDER_CATALOG = [
   { provider: 'openrouter', name: 'OpenRouter', note: 'Includes a changing catalogue of :free models.', signupUrl: 'https://openrouter.ai/settings/keys' },
   { provider: 'huggingface', name: 'Hugging Face', note: 'Small recurring serverless inference allowance.', signupUrl: 'https://huggingface.co/settings/tokens' },
   { provider: 'mistral', name: 'Mistral', note: 'Developer/API promotions may be available.', signupUrl: 'https://console.mistral.ai/api-keys' },
-  { provider: 'together', name: 'Together AI', note: 'Promotional credits may be available for new accounts.', signupUrl: 'https://api.together.ai/settings/api-keys' },
 ] as const;
 
 function nextReset(interval: ResetInterval, from = Date.now()): number | undefined {

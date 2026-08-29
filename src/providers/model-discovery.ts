@@ -163,24 +163,6 @@ function parseOpenRouter(payload: unknown): RawModel[] {
     });
 }
 
-function parseTogether(payload: unknown): RawModel[] {
-  const root = asRecord(payload);
-  const data = Array.isArray(payload) ? payload : root.data;
-  return asArray(data)
-    .map(item => asRecord(item))
-    .filter(item => typeof item.id === 'string' && ['chat', 'language', 'code'].includes(String(item.type || 'chat')))
-    .map(item => {
-      const pricing = asRecord(item.pricing);
-      return {
-        id: item.id,
-        name: item.display_name,
-        ownedBy: item.organization,
-        contextLength: finiteNumber(item.context_length),
-        free: isZeroPrice(pricing.input) && isZeroPrice(pricing.output),
-      };
-    });
-}
-
 function parseHuggingFace(payload: unknown): RawModel[] {
   return asArray(asRecord(payload).data)
     .map(item => asRecord(item))
@@ -236,7 +218,6 @@ const DEFINITIONS: ProviderDefinition[] = [
   { provider: 'mistral', displayName: 'Mistral', url: 'https://api.mistral.ai/v1/models', headers: bearerHeaders, parse: parseMistral },
   { provider: 'xai', displayName: 'xAI Grok', url: 'https://api.x.ai/v1/language-models', headers: bearerHeaders, parse: parseXAI },
   { provider: 'openrouter', displayName: 'OpenRouter', url: 'https://openrouter.ai/api/v1/models?output_modalities=text', headers: bearerHeaders, parse: parseOpenRouter },
-  { provider: 'together', displayName: 'Together AI', url: 'https://api.together.xyz/v1/models', headers: bearerHeaders, parse: parseTogether },
   { provider: 'huggingface', displayName: 'Hugging Face', url: 'https://router.huggingface.co/v1/models', headers: bearerHeaders, parse: parseHuggingFace },
   {
     provider: 'qwen',

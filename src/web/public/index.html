@@ -162,7 +162,7 @@
               <select id="artEngineSelect" title="Art Generation Engine">
                 <option value="promptforge" selected>🎨 PromptForge RTX Studio (Animagine-XL / SDXL Local)</option>
                 <option value="gpu">⚡ RTX 4060 GPU Turbo (Local)</option>
-                <option value="together">🚀 Together AI FLUX.1 Pro (Cloud)</option>
+                <option value="wan">✨ Alibaba Qwen Wan 2.7 Studio (Subscription)</option>
                 <option value="huggingface">🤗 Hugging Face FLUX.1 (Cloud)</option>
                 <option value="openai">🌟 OpenAI DALL-E 3 HD (Cloud)</option>
                 <option value="imagen">🎨 Google Cloud Imagen 3 (Cloud)</option>
@@ -616,21 +616,6 @@
           </div>
         </div>
 
-        <!-- Together AI Row -->
-        <div class="key-input-row">
-          <div class="key-label">
-            <div class="provider-info-group">
-              <strong>Together AI (FLUX.1 Pro Art)</strong>
-              <a href="https://api.together.ai/settings/api-keys" target="_blank" rel="noopener" class="get-key-link">Get API Key ↗</a>
-            </div>
-            <span id="badge-together" class="provider-pill unconfigured">⚠️ Needs Key</span>
-          </div>
-          <div class="key-field-group">
-            <input type="password" id="key-together" placeholder="Paste Together AI key here" autocomplete="off">
-            <button class="save-key-btn" data-provider="together">Save</button>
-          </div>
-        </div>
-
         <!-- Hugging Face Row -->
         <div class="key-input-row">
           <div class="key-label">
@@ -698,7 +683,6 @@
             <option value="openrouter">OpenRouter</option>
             <option value="huggingface">Hugging Face</option>
             <option value="mistral">Mistral</option>
-            <option value="together">Together AI</option>
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic</option>
             <option value="deepseek">DeepSeek</option>
@@ -970,6 +954,6 @@ console.log(res.choices[0].message.content);</code></pre>
     </div>
   </div>
 
-  <script src="app.js?v=2.4.4"></script>
+  <script src="app.js?v=2.4.5"></script>
 </body>
 </html>

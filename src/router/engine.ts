@@ -972,7 +972,6 @@ export class RoutingEngine {
             if (k === 'XAI_API_KEY' && v) this.configuredKeys.set('xai', v);
             if (k === 'OPENROUTER_API_KEY' && v) this.configuredKeys.set('openrouter', v);
             if (k === 'GITHUB_TOKEN' && v) this.configuredKeys.set('github', v);
-            if (k === 'TOGETHER_API_KEY' && v) this.configuredKeys.set('together', v);
             if ((k === 'HUGGINGFACE_API_KEY' || k === 'HF_TOKEN') && v) this.configuredKeys.set('huggingface', v);
             if ((k === 'QWEN_API_KEY' || k === 'DASHSCOPE_API_KEY') && v) this.configuredKeys.set('qwen', v);
           }
@@ -989,7 +988,6 @@ export class RoutingEngine {
     if (process.env.XAI_API_KEY && !this.configuredKeys.has('xai')) this.configuredKeys.set('xai', process.env.XAI_API_KEY);
     if (process.env.OPENROUTER_API_KEY && !this.configuredKeys.has('openrouter')) this.configuredKeys.set('openrouter', process.env.OPENROUTER_API_KEY);
     if ((process.env.GITHUB_TOKEN || process.env.GH_TOKEN) && !this.configuredKeys.has('github')) this.configuredKeys.set('github', (process.env.GITHUB_TOKEN || process.env.GH_TOKEN)!);
-    if (process.env.TOGETHER_API_KEY && !this.configuredKeys.has('together')) this.configuredKeys.set('together', process.env.TOGETHER_API_KEY);
     if ((process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN) && !this.configuredKeys.has('huggingface')) this.configuredKeys.set('huggingface', (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN)!);
     if ((process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY) && !this.configuredKeys.has('qwen')) this.configuredKeys.set('qwen', (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY)!);
 
@@ -1042,11 +1040,6 @@ export class RoutingEngine {
       apiKey: this.configuredKeys.get('openrouter'),
     }));
     this.adapters.set('github', new GitHubAdapter({ apiKey: this.configuredKeys.get('github') }));
-    this.adapters.set('together', new OpenAIAdapter({
-      provider: 'together',
-      baseUrl: 'https://api.together.xyz/v1',
-      apiKey: this.configuredKeys.get('together'),
-    }));
     this.adapters.set('huggingface', new OpenAIAdapter({
       provider: 'huggingface',
       baseUrl: 'https://router.huggingface.co/v1',
@@ -1070,7 +1063,6 @@ export class RoutingEngine {
       case 'github': return new GitHubAdapter({ apiKey });
       case 'qwen': return new QwenAdapter({ apiKey });
       case 'openrouter': return new OpenAIAdapter({ provider, baseUrl: 'https://openrouter.ai/api/v1', apiKey });
-      case 'together': return new OpenAIAdapter({ provider, baseUrl: 'https://api.together.xyz/v1', apiKey });
       case 'huggingface': return new OpenAIAdapter({ provider, baseUrl: 'https://router.huggingface.co/v1', apiKey });
       default: return this.adapters.get(provider) || new MockAdapter();
     }
@@ -1138,7 +1130,7 @@ export class RoutingEngine {
   }
 
   getProviderStatus(): Record<string, { configured: boolean; enabled: boolean; maskedKey?: string; connections?: number; usableConnections?: number; cooldownConnections?: number; exhaustedConnections?: number }> {
-    const providers: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'qwen', 'local', 'ollama', 'mock'];
+    const providers: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'huggingface', 'qwen', 'local', 'ollama', 'mock'];
     const result: Record<string, { configured: boolean; enabled: boolean; maskedKey?: string; connections?: number; usableConnections?: number; cooldownConnections?: number; exhaustedConnections?: number }> = {};
     const poolSummary = this.connectionManager.getProviderSummary();
 
@@ -1194,7 +1186,6 @@ export class RoutingEngine {
     const hasXAI = isProvActive('xai');
     const hasOpenRouter = isProvActive('openrouter');
     const hasGitHub = isProvActive('github');
-    const hasTogether = isProvActive('together');
     const hasHuggingFace = isProvActive('huggingface');
     const hasQwen = isProvActive('qwen');
     const hasLocal = !this.disabledProviders.has('local');
@@ -1280,7 +1271,7 @@ export class RoutingEngine {
     }
 
     // 1. If user requested explicit "provider/model" syntax
-    const knownProviders: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'together', 'huggingface', 'qwen', 'local', 'ollama', 'mock'];
+    const knownProviders: ProviderType[] = ['openai', 'anthropic', 'gemini', 'groq', 'deepseek', 'mistral', 'xai', 'openrouter', 'github', 'huggingface', 'qwen', 'local', 'ollama', 'mock'];
     for (const prov of knownProviders) {
       if (requested.startsWith(`${prov}/`) || requested.startsWith(`${prov}::`)) {
         const hasKey = prov === 'local' || prov === 'ollama' || prov === 'mock' || !!this.configuredKeys.get(prov) || this.connectionManager.hasUsable(prov);
