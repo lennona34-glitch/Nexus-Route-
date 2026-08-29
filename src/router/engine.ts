@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { exec, spawn } from 'child_process';
 import { UniversalRequest, UniversalResponse, UniversalStreamChunk, UniversalMessage, ProviderType, RouteMetadata, ToolCall, ToolDefinition } from '../ir/types.js';
 import { ProviderAdapter, AdapterError } from '../adapters/base.js';
 import { OpenAIAdapter } from '../adapters/openai.js';
@@ -972,6 +973,101 @@ function htmlRuntimeCorrection(
     || 'the interactive HTML file';
   const previous = verification.attempted ? ` The previous runtime test failed: ${verification.detail}` : '';
   return `NexusRoute interactive verification: opening ${target} or seeing its loading screen is not sufficient.${previous} Call test_html_app for the HTML file so it genuinely clicks Start/Play, sends gameplay input, checks animation and browser errors, and captures the post-click screen. If the test fails, inspect its exact runtime error, repair the game, and run test_html_app again before claiming completion.`;
+}
+
+function extractAndAutoSaveCodeBlocks(
+  text: string,
+  expectedFileTargets: string[],
+  observedWrites: VerifiedFileWrite[],
+  wsDir: string
+): { savedFiles: Array<{ filename: string; bytes: number }>; message?: string } {
+  if (!text || text.length < 40) return { savedFiles: [] };
+
+  const codeBlockRegex = /```([a-zA-Z0-9_\-\+\#]*)\s*(?:<!--\s*([a-zA-Z0-9_\-\.\/\\ ]+)\s*-->|\/\/\s*([a-zA-Z0-9_\-\.\/\\ ]+)|#\s*([a-zA-Z0-9_\-\.\/\\ ]+))?\n([\s\S]*?)```/g;
+  const savedFiles: Array<{ filename: string; bytes: number }> = [];
+
+  let match;
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    const lang = (match[1] || '').trim().toLowerCase();
+    const headerFilename = (match[2] || match[3] || match[4] || '').trim();
+    const code = match[5].trim();
+
+    if (code.length < 30 || lang === 'bash' || lang === 'sh' || lang === 'cmd' || lang === 'powershell') {
+      continue;
+    }
+
+    let targetFilename = '';
+    if (headerFilename && !headerFilename.includes(' ') && (headerFilename.includes('.') || headerFilename.includes('/'))) {
+      targetFilename = headerFilename.replace(/^[/\\]+/, '');
+    } else if (expectedFileTargets.length > 0) {
+      const matchingExpected = expectedFileTargets.find(t => {
+        const ext = path.extname(t).toLowerCase().replace('.', '');
+        if (lang === 'html' || lang === 'htm') return ext === 'html' || ext === 'htm';
+        if (lang === 'javascript' || lang === 'js') return ext === 'js' || ext === 'mjs' || ext === 'cjs';
+        if (lang === 'typescript' || lang === 'ts') return ext === 'ts';
+        if (lang === 'python' || lang === 'py') return ext === 'py';
+        if (lang === 'css') return ext === 'css';
+        if (lang === 'cpp' || lang === 'c++') return ext === 'cpp' || ext === 'h';
+        return false;
+      });
+      targetFilename = matchingExpected || expectedFileTargets[0];
+    } else {
+      if (lang === 'html' || lang === 'htm' || code.includes('<!DOCTYPE html>') || code.includes('<html') || code.includes('<canvas')) {
+        targetFilename = 'index.html';
+      } else if (lang === 'python' || lang === 'py') {
+        targetFilename = 'app.py';
+      } else if (lang === 'javascript' || lang === 'js') {
+        targetFilename = 'script.js';
+      } else if (lang === 'typescript' || lang === 'ts') {
+        targetFilename = 'index.ts';
+      } else if (lang === 'css') {
+        targetFilename = 'style.css';
+      }
+    }
+
+    if (targetFilename) {
+      try {
+        const safePath = path.isAbsolute(targetFilename) ? targetFilename : path.resolve(wsDir, targetFilename);
+        const parentDir = path.dirname(safePath);
+        if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+        fs.writeFileSync(safePath, code, 'utf8');
+        const stats = fs.statSync(safePath);
+
+        savedFiles.push({ filename: targetFilename, bytes: stats.size });
+        observedWrites.push({
+          filename: targetFilename,
+          full_path: safePath,
+          bytes_written: stats.size,
+        });
+
+        if (targetFilename.toLowerCase().endsWith('.html') || targetFilename.toLowerCase().endsWith('.htm')) {
+          const relPath = path.relative(wsDir, safePath).replace(/\\/g, '/');
+          const fileHttpUrl = `http://127.0.0.1:3000/v1/workspace/files/${encodeURIComponent(relPath)}`;
+          try {
+            if (process.platform === 'win32') {
+              exec(`start "" "${fileHttpUrl}"`);
+            } else if (process.platform === 'darwin') {
+              spawn('open', [fileHttpUrl], { detached: true, stdio: 'ignore' });
+            } else {
+              spawn('xdg-open', [fileHttpUrl], { detached: true, stdio: 'ignore' });
+            }
+          } catch {}
+        }
+      } catch (err: any) {
+        console.warn('[extractAndAutoSaveCodeBlocks write error]:', err.message);
+      }
+    }
+  }
+
+  if (savedFiles.length > 0) {
+    const summary = savedFiles.map(f => `\`${f.filename}\` (${f.bytes.toLocaleString()} bytes)`).join(', ');
+    return {
+      savedFiles,
+      message: `\n\n✅ **Auto-Saved to Workspace**: Code block extracted and saved to ${summary}. 🚀`,
+    };
+  }
+
+  return { savedFiles: [] };
 }
 
 export class RoutingEngine {
@@ -1956,6 +2052,16 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               currentResponse = await runTurn(currentMessages, currentTools);
               continue;
             }
+
+            if (verifiedWrites.length === 0 && choice?.message?.content) {
+              const autoSave = extractAndAutoSaveCodeBlocks(choice.message.content, expectedFileTargets, observedWrites, ToolRegistry.getWorkspaceDir());
+              if (autoSave.savedFiles.length > 0) {
+                verifiedWrites = reassessVerifiedFileWrites(req, observedWrites, expectedFileTargets, rejectedWrites);
+                if (autoSave.message) {
+                  choice.message.content += autoSave.message;
+                }
+              }
+            }
             finishedCleanly = true;
             break;
           }
@@ -2856,6 +2962,29 @@ CRITICAL FOLDER & PROJECT STRUCTURE RULES:
               ];
               currentTools = effectiveReq.tools;
               continue;
+            }
+
+            if (verifiedWrites.length === 0 && turnContent) {
+              const autoSave = extractAndAutoSaveCodeBlocks(turnContent, expectedFileTargets, observedWrites, ToolRegistry.getWorkspaceDir());
+              if (autoSave.savedFiles.length > 0) {
+                verifiedWrites = reassessVerifiedFileWrites(req, observedWrites, expectedFileTargets, rejectedWrites);
+                if (autoSave.message) {
+                  const autoSaveChunk: UniversalStreamChunk = {
+                    id: `chatcmpl-${Date.now()}`,
+                    object: 'chat.completion.chunk',
+                    created: Math.floor(Date.now() / 1000),
+                    model,
+                    choices: [{
+                      index: 0,
+                      delta: { content: autoSave.message },
+                      finish_reason: null,
+                    }],
+                  };
+                  markStreamStarted();
+                  recordedChunks.push(autoSaveChunk);
+                  yield autoSaveChunk;
+                }
+              }
             }
 
             // A missing write is only worth reporting if the files the model
