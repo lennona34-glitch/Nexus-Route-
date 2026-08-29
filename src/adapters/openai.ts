@@ -250,10 +250,11 @@ export class OpenAIAdapter implements ProviderAdapter {
       payload.max_tokens = 8192;
     }
 
-    if (req.tools !== undefined && Array.isArray(req.tools) && req.tools.length > 0) {
+    const isGroqCompound = this.provider === 'groq' && targetModel.toLowerCase().includes('compound');
+    if (!isGroqCompound && req.tools !== undefined && Array.isArray(req.tools) && req.tools.length > 0) {
       payload.tools = req.tools;
     }
-    if (req.tool_choice !== undefined) payload.tool_choice = req.tool_choice;
+    if (!isGroqCompound && req.tool_choice !== undefined) payload.tool_choice = req.tool_choice;
     if (req.response_format !== undefined) payload.response_format = req.response_format;
     if (this.baseUrl.includes('11434') || this.baseUrl.includes('localhost')) {
       payload.keep_alive = '15m';

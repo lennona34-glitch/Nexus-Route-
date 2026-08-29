@@ -1505,7 +1505,9 @@ export class RoutingEngine {
           { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
         );
       }
-      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/groq/compound' });
+      if (hasGroq) {
+        liveCandidates.push({ provider: 'groq', model: req.tools && req.tools.length > 0 ? 'groq/openai/gpt-oss-120b' : 'groq/groq/compound' });
+      }
     } else if (effectiveTier === 'fast') {
       if (hasQwen) {
         liveCandidates.push(
