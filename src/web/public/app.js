@@ -3585,6 +3585,14 @@ function updateModelPickerDisplay() {
 function renderFoldedModelPicker(filterText = '') {
   if (!modelSelect || !modelPickerAccordionList) return;
   const query = filterText.toLowerCase().trim();
+
+  // Preserve user's opened groups and scroll position during background refreshes
+  const currentlyOpenGroups = new Set(
+    Array.from(modelPickerAccordionList.querySelectorAll('.provider-accordion.open .provider-accordion-header .provider-header-left span'))
+      .map(el => el.textContent.trim())
+  );
+  const currentScrollTop = modelPickerAccordionList.scrollTop;
+
   modelPickerAccordionList.innerHTML = '';
 
   const optgroups = Array.from(modelSelect.querySelectorAll('optgroup'));
@@ -3610,9 +3618,10 @@ function renderFoldedModelPicker(filterText = '') {
     if (query && matchingOptions.length === 0) continue;
     totalMatches += matchingOptions.length;
 
-    // By default, ALL providers are folded down (collapsed). They only expand on user click or active search query.
+    // Retain opened state if user had it open or if searching
+    const shouldBeOpen = query.length > 0 || currentlyOpenGroups.has(groupLabel.trim());
     const accordion = document.createElement('div');
-    accordion.className = `provider-accordion ${query ? 'open' : ''}`;
+    accordion.className = `provider-accordion ${shouldBeOpen ? 'open' : ''}`;
 
     const isSelectedInGroup = options.some(opt => opt.value === modelSelect.value);
 
@@ -3675,6 +3684,10 @@ function renderFoldedModelPicker(filterText = '') {
   if (totalMatches === 0) {
     modelPickerAccordionList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 11.5px;">No matching models found.</div>';
   }
+
+  if (currentScrollTop > 0) {
+    modelPickerAccordionList.scrollTop = currentScrollTop;
+  }
 }
 
 if (modelPickerTrigger && modelPickerDropdown) {
@@ -3690,6 +3703,11 @@ if (modelPickerTrigger && modelPickerDropdown) {
     } else {
       modelPickerDropdown.classList.add('hidden');
     }
+  });
+
+  // Stop clicks inside the dropdown from closing it
+  modelPickerDropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
   });
 
   document.addEventListener('click', (e) => {

@@ -25,19 +25,93 @@ function textArg(value: unknown): string {
   return String(value);
 }
 
+function repairAndParseToolArguments(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.raw === 'string') {
+      return repairAndParseToolArguments(obj.raw);
+    }
+    return obj;
+  }
+
+  let text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return {};
+
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (typeof (parsed as any).raw === 'string') {
+        return repairAndParseToolArguments((parsed as any).raw);
+      }
+      return parsed as Record<string, unknown>;
+    }
+  } catch {}
+
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (codeBlockMatch) {
+    try {
+      const parsed = JSON.parse(codeBlockMatch[1]);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {}
+    text = codeBlockMatch[1].trim();
+  }
+
+  try {
+    let repaired = text;
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closeBraces = (repaired.match(/\}/g) || []).length;
+    const quotes = (repaired.match(/(?<!\\)"/g) || []).length;
+
+    if (quotes % 2 !== 0) repaired += '"';
+    if (openBraces > closeBraces) repaired += '}'.repeat(openBraces - closeBraces);
+
+    const parsed = JSON.parse(repaired);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch {}
+
+  const extracted: Record<string, unknown> = {};
+
+  const fileMatch = text.match(/["']?(?:filename|filePath|file_path|path|target_file|TargetFile|file)["']?\s*[:=]\s*["']([^"'\r\n]+)["']/i)
+    || text.match(/(?:^|\n)(?:filename|file|path)\s*:\s*([^\r\n]+)/i);
+  if (fileMatch) {
+    extracted.filename = fileMatch[1].trim();
+  }
+
+  const contentMatch = text.match(/["']?(?:content|code|body|text|contents|CodeContent|fileContent)["']?\s*[:=]\s*"([\s\S]*)$/i)
+    || text.match(/["']?(?:content|code|body|text|contents|CodeContent|fileContent)["']?\s*[:=]\s*`([\s\S]*)`?/i);
+  if (contentMatch) {
+    let rawContent = contentMatch[1];
+    rawContent = rawContent.replace(/["\s\}]+$/, '');
+    if (rawContent.includes('\\n') || rawContent.includes('\\"') || rawContent.includes('\\t')) {
+      try {
+        rawContent = JSON.parse(`"${rawContent.replace(/"/g, '\\"')}"`);
+      } catch {
+        rawContent = rawContent.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
+    }
+    extracted.content = rawContent;
+  }
+
+  if (extracted.filename || extracted.content) {
+    return extracted;
+  }
+
+  return { raw: text };
+}
+
 function unwrapToolArgs(raw: Record<string, unknown>): Record<string, unknown> {
   if (!raw || typeof raw !== 'object') return {};
   let args = { ...raw };
+  if (typeof args.raw === 'string') {
+    const recovered = repairAndParseToolArguments(args.raw);
+    args = { ...args, ...recovered };
+  }
   for (const wrapperKey of ['input', 'params', 'parameters', 'arguments', 'properties', 'args', 'data']) {
     if (args[wrapperKey] && typeof args[wrapperKey] === 'object' && !Array.isArray(args[wrapperKey])) {
       args = { ...args, ...(args[wrapperKey] as Record<string, unknown>) };
     } else if (typeof args[wrapperKey] === 'string') {
-      try {
-        const parsed = JSON.parse(args[wrapperKey] as string);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          args = { ...args, ...parsed };
-        }
-      } catch {}
+      const recovered = repairAndParseToolArguments(args[wrapperKey]);
+      args = { ...args, ...recovered };
     }
   }
   return args;
@@ -920,11 +994,7 @@ export class ToolRegistry {
     if (typeof argsInput === 'object' && argsInput !== null) {
       args = argsInput as Record<string, unknown>;
     } else {
-      try {
-        args = JSON.parse(String(argsInput || '{}'));
-      } catch {
-        return `Error: Invalid JSON arguments: ${argsInput}`;
-      }
+      args = repairAndParseToolArguments(argsInput);
     }
 
     const ws = this.getWorkspaceDir();

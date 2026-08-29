@@ -239,6 +239,8 @@ export class OpenAIAdapter implements ProviderAdapter {
       payload.max_tokens = budget.maxCompletionTokens;
     } else if (req.max_tokens !== undefined) {
       payload.max_tokens = req.max_tokens;
+    } else if (targetModel.toLowerCase().includes('qwen') || this.baseUrl.includes('aliyuncs.com') || targetModel.toLowerCase().includes('coder')) {
+      payload.max_tokens = 16384;
     } else {
       payload.max_tokens = 8192;
     }

@@ -263,18 +263,93 @@ function compactAutonomousPrompt(req: UniversalRequest, workspace: string): stri
   return rules.join('\n');
 }
 
-function normalizeToolArguments(value: unknown): string {
-  if (value && typeof value === 'object' && !Array.isArray(value)) return JSON.stringify(value);
-  const text = typeof value === 'string' ? value.trim() : '';
-  if (!text) return '{}';
+function repairAndParseToolArguments(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.raw === 'string') {
+      return repairAndParseToolArguments(obj.raw);
+    }
+    return obj;
+  }
+
+  let text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return {};
+
+  // 1. Try standard JSON.parse first
   try {
     const parsed = JSON.parse(text);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? JSON.stringify(parsed)
-      : '{}';
-  } catch {
-    return JSON.stringify({ raw: text });
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (typeof (parsed as any).raw === 'string') {
+        return repairAndParseToolArguments((parsed as any).raw);
+      }
+      return parsed as Record<string, unknown>;
+    }
+  } catch {}
+
+  // 2. Extract code block json if wrapped in ```json ... ```
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (codeBlockMatch) {
+    try {
+      const parsed = JSON.parse(codeBlockMatch[1]);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {}
+    text = codeBlockMatch[1].trim();
   }
+
+  // 3. Auto-repair truncated JSON (e.g. unclosed strings, missing braces from cutoff streams)
+  try {
+    let repaired = text;
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closeBraces = (repaired.match(/\}/g) || []).length;
+    const quotes = (repaired.match(/(?<!\\)"/g) || []).length;
+
+    if (quotes % 2 !== 0) {
+      repaired += '"';
+    }
+    if (openBraces > closeBraces) {
+      repaired += '}'.repeat(openBraces - closeBraces);
+    }
+
+    const parsed = JSON.parse(repaired);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {}
+
+  // 4. Regex extraction fallback for filename/target and content/code
+  const extracted: Record<string, unknown> = {};
+
+  const fileMatch = text.match(/["']?(?:filename|filePath|file_path|path|target_file|TargetFile|file)["']?\s*[:=]\s*["']([^"'\r\n]+)["']/i)
+    || text.match(/(?:^|\n)(?:filename|file|path)\s*:\s*([^\r\n]+)/i);
+  if (fileMatch) {
+    extracted.filename = fileMatch[1].trim();
+  }
+
+  const contentMatch = text.match(/["']?(?:content|code|body|text|contents|CodeContent|fileContent)["']?\s*[:=]\s*"([\s\S]*)$/i)
+    || text.match(/["']?(?:content|code|body|text|contents|CodeContent|fileContent)["']?\s*[:=]\s*`([\s\S]*)`?/i);
+  if (contentMatch) {
+    let rawContent = contentMatch[1];
+    rawContent = rawContent.replace(/["\s\}]+$/, '');
+    if (rawContent.includes('\\n') || rawContent.includes('\\"') || rawContent.includes('\\t')) {
+      try {
+        rawContent = JSON.parse(`"${rawContent.replace(/"/g, '\\"')}"`);
+      } catch {
+        rawContent = rawContent.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
+    }
+    extracted.content = rawContent;
+  }
+
+  if (extracted.filename || extracted.content) {
+    return extracted;
+  }
+
+  return { raw: text };
+}
+
+function normalizeToolArguments(value: unknown): string {
+  const parsed = repairAndParseToolArguments(value);
+  return JSON.stringify(parsed);
 }
 
 function normalizeToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] | undefined {
