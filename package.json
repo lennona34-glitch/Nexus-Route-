@@ -8,7 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "art:server": "python scripts/local_art_server.py",
-    "build": "tsc && node -e \"fs.cpSync('src/web', 'dist/web', {recursive: true})\"",
+    "build": "tsc && node -e \"fs.cpSync('src/web', 'dist/web', {recursive: true}); if (fs.existsSync('src/engine/gpu-art.py')) fs.cpSync('src/engine/gpu-art.py', 'dist/engine/gpu-art.py')\"",
     "test": "vitest run"
   },
   "keywords": [

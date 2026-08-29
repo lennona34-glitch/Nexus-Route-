@@ -11,6 +11,7 @@ import { MemoryStore } from './memory.js';
 import { unloadOllamaModels } from '../gpu/ollama.js';
 import { recoverRawContext } from '../context/compression.js';
 import { testHtmlRuntime } from './html-runtime.js';
+import { LocalGpuArtEngine } from '../engine/gpu-art.js';
 
 const execAsync = promisify(exec);
 
@@ -1746,6 +1747,36 @@ export class ToolRegistry {
         const finalNegativePrompt = customNegativePrompt
           ? `${customNegativePrompt}, ${baseNegativePrompt}`
           : baseNegativePrompt;
+
+        // ==========================================
+        // 0. NATIVE LOCAL RTX 4060 GPU DIFFUSION
+        // ==========================================
+        if (requestedEngine === 'local-gpu' || requestedEngine === 'rtx4060' || requestedEngine === 'gpu' || requestedEngine === 'local' || requestedEngine === 'auto') {
+          try {
+            const gpuRes = await LocalGpuArtEngine.generateImage({
+              prompt: enrichedPrompt,
+              outputPath: outPath,
+              width: Math.min(width, 1024),
+              height: Math.min(height, 1024),
+              steps: args.steps ? Number(args.steps) : 1,
+            }, ws);
+
+            if (gpuRes.success) {
+              const relPath = path.relative(ws, outPath).replace(/\\/g, '/');
+              return JSON.stringify({
+                success: true,
+                message: `Rendered ${width}x${height} image on NVIDIA GeForce RTX 4060 in ${gpuRes.elapsedSeconds}s.`,
+                filename: relPath,
+                fullPath: outPath,
+                url: `/v1/workspace/files/${encodeURIComponent(relPath)}`,
+                engine: gpuRes.engine || 'NVIDIA GeForce RTX 4060 (SD-Turbo Realtime)',
+                prompt: cleanPrompt,
+              });
+            }
+          } catch (e: any) {
+            console.warn('[LocalGpuArtEngine tool error]:', e.message);
+          }
+        }
 
         // ==========================================
         // 1. PROMPTFORGE RTX LOCAL GPU ENGINE (Port 17861)

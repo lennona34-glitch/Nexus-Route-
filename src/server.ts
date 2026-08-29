@@ -25,6 +25,7 @@ import { getCompressionStats, listRawContexts, recoverRawContext } from './conte
 import { getMcpInfo, handleMcpMessage, type JsonRpcRequest } from './mcp/handler.js';
 import { ProviderModelDiscovery } from './providers/model-discovery.js';
 import { EmbeddedLocalEngine } from './engine/embedded-local.js';
+import { LocalGpuArtEngine } from './engine/gpu-art.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -863,22 +864,47 @@ app.get<{ Querystring: { url?: string; prompt?: string } }>('/v1/image-proxy', a
 });
 
 // Dedicated Art & Avatar Generation Endpoint for Modelfile Studio & Chat
-app.post<{ Body: { prompt: string; engine?: string; width?: number; height?: number } }>('/v1/art/generate', async (req, reply) => {
-  const { prompt, engine = 'auto', width = 1024, height = 1024 } = req.body || {};
+app.post<{ Body: { prompt: string; engine?: string; width?: number; height?: number; steps?: number; seed?: number } }>('/v1/art/generate', async (req, reply) => {
+  const { prompt, engine = 'local-gpu', width = 512, height = 512, steps = 1, seed } = req.body || {};
   if (!prompt || !prompt.trim()) {
     return reply.status(400).send({ success: false, error: 'Prompt is required' });
   }
 
   const cleanPrompt = prompt.trim();
-  const filename = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.png`;
   const wsDir = ToolRegistry.getWorkspaceDir();
   const artDir = path.join(wsDir, 'art');
   if (!fs.existsSync(artDir)) fs.mkdirSync(artDir, { recursive: true });
-  const outPath = path.join(artDir, filename);
 
+  // 1. Local NVIDIA RTX 4060 GPU Generation (Real-Time Diffusion)
+  if (engine === 'local-gpu' || engine === 'local' || engine === 'rtx4060' || engine === 'gpu' || engine === 'auto') {
+    try {
+      const gpuResult = await LocalGpuArtEngine.generateImage({
+        prompt: cleanPrompt,
+        width: Math.min(width, 1024),
+        height: Math.min(height, 1024),
+        steps,
+        seed,
+      }, wsDir);
+
+      if (gpuResult.success) {
+        return reply.send(gpuResult);
+      }
+      if (engine === 'local-gpu' || engine === 'rtx4060' || engine === 'local') {
+        return reply.status(500).send(gpuResult);
+      }
+    } catch (err: any) {
+      console.warn('[Local GPU Art error]:', err.message);
+      if (engine === 'local-gpu' || engine === 'rtx4060' || engine === 'local') {
+        return reply.status(500).send({ success: false, error: err.message });
+      }
+    }
+  }
+
+  const filename = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.png`;
+  const outPath = path.join(artDir, filename);
   const hfKey = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN;
 
-  // 1. Hugging Face Serverless FLUX.1 Schnell
+  // 2. Hugging Face Serverless FLUX.1 Schnell
   if (hfKey && !hfKey.startsWith('mock-') && (engine === 'huggingface' || engine === 'flux' || engine === 'auto')) {
     try {
       const hfRes = await fetch('https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell', {
@@ -910,10 +936,10 @@ app.post<{ Body: { prompt: string; engine?: string; width?: number; height?: num
     }
   }
 
-  // 2. Cloud FLUX.1 HD Fallback
+  // 3. Cloud FLUX.1 HD Fallback
   try {
-    const seed = Math.floor(Math.random() * 1000000);
-    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${width}&height=${height}&model=flux&nologo=true&seed=${seed}`;
+    const genSeed = seed || Math.floor(Math.random() * 1000000);
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${width}&height=${height}&model=flux&nologo=true&seed=${genSeed}`;
     const pRes = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(45000) });
     if (pRes.ok) {
       const arrayBuffer = await pRes.arrayBuffer();
@@ -934,6 +960,12 @@ app.post<{ Body: { prompt: string; engine?: string; width?: number; height?: num
   }
 
   return reply.status(500).send({ success: false, error: 'Failed to generate image with available engines' });
+});
+
+// GPU Art Engine Status
+app.get('/v1/art/gpu-status', async (req, reply) => {
+  const status = await LocalGpuArtEngine.checkGpuStatus();
+  return reply.send(status);
 });
 
 // Hugging Face Trending GGUF Models Search Endpoint

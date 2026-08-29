@@ -4035,16 +4035,24 @@ if (mfGenerateAvatarBtn && mfAvatarPromptInput) {
       return;
     }
 
-    const engine = mfAvatarEngineSelect?.value || 'auto';
+    const engine = mfAvatarEngineSelect?.value || 'local-gpu';
     mfGenerateAvatarBtn.disabled = true;
-    mfGenerateAvatarBtn.textContent = '⏳ Painting...';
-    if (mfAvatarStatus) mfAvatarStatus.textContent = `Generating via ${engine === 'huggingface' ? '🤗 Hugging Face FLUX.1' : '⚡ Cloud FLUX.1 HD'}...`;
+    mfGenerateAvatarBtn.textContent = '⏳ Rendering...';
+    
+    let engineLabel = '🎮 NVIDIA GeForce RTX 4060';
+    if (engine === 'huggingface') engineLabel = '🤗 Hugging Face FLUX.1';
+    else if (engine === 'cloud') engineLabel = '⚡ Cloud FLUX.1 HD';
+
+    if (mfAvatarStatus) {
+      mfAvatarStatus.textContent = `Generating via ${engineLabel}...`;
+      mfAvatarStatus.style.color = 'var(--accent-cyan)';
+    }
 
     try {
       const res = await fetch('/v1/art/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, engine }),
+        body: JSON.stringify({ prompt, engine, width: 512, height: 512, steps: 1 }),
       });
 
       const data = await res.json();
@@ -4055,7 +4063,7 @@ if (mfGenerateAvatarBtn && mfAvatarPromptInput) {
         }
         if (mfAvatarPlaceholder) mfAvatarPlaceholder.style.display = 'none';
         if (mfAvatarStatus) {
-          mfAvatarStatus.textContent = `✅ Saved ${data.filename || 'avatar'} (${data.engine || 'FLUX.1'})`;
+          mfAvatarStatus.textContent = `✅ ${data.message || `Rendered on ${data.engine || 'RTX 4060'}`}`;
           mfAvatarStatus.style.color = '#22c55e';
         }
       } else {
@@ -4072,6 +4080,28 @@ if (mfGenerateAvatarBtn && mfAvatarPromptInput) {
     }
   });
 }
+
+async function checkGpuArtStatus() {
+  const badge = document.getElementById('mfGpuBadge');
+  if (!badge) return;
+  try {
+    const res = await fetch('/v1/art/gpu-status');
+    const data = await res.json();
+    if (data.cudaAvailable) {
+      badge.textContent = `🎮 ${data.deviceName || 'RTX 4060'} Active`;
+      badge.style.background = 'rgba(34, 197, 94, 0.15)';
+      badge.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+      badge.style.color = '#22c55e';
+    } else {
+      badge.textContent = '⚡ Cloud Fallback';
+      badge.style.background = 'rgba(245, 158, 11, 0.15)';
+      badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      badge.style.color = '#f59e0b';
+    }
+  } catch {}
+}
+
+checkGpuArtStatus();
 
 if (mfBuildModelBtn) {
   mfBuildModelBtn.addEventListener('click', async () => {
@@ -4337,6 +4367,141 @@ if (modelPickerSearch) {
 if (modelSelect) {
   modelSelect.addEventListener('change', () => {
     updateModelPickerDisplay();
+  });
+// ==========================================
+// NVIDIA RTX 4060 AI Art Studio Controller
+// ==========================================
+const openArtStudioModalBtn = document.getElementById('openArtStudioModalBtn');
+const closeArtStudioModalBtn = document.getElementById('closeArtStudioModalBtn');
+const artStudioModal = document.getElementById('artStudioModal');
+const studioArtPromptInput = document.getElementById('studioArtPromptInput');
+const studioArtEngineSelect = document.getElementById('studioArtEngineSelect');
+const studioArtResolutionSelect = document.getElementById('studioArtResolutionSelect');
+const studioArtGenerateBtn = document.getElementById('studioArtGenerateBtn');
+const studioArtStatus = document.getElementById('studioArtStatus');
+const studioArtPreviewImg = document.getElementById('studioArtPreviewImg');
+const studioArtPlaceholder = document.getElementById('studioArtPlaceholder');
+const studioArtActions = document.getElementById('studioArtActions');
+const studioArtDownloadBtn = document.getElementById('studioArtDownloadBtn');
+const studioArtSetAvatarBtn = document.getElementById('studioArtSetAvatarBtn');
+const studioArtOpenWorkspaceBtn = document.getElementById('studioArtOpenWorkspaceBtn');
+
+let lastGeneratedArtUrl = '';
+let lastGeneratedArtFilename = '';
+
+if (openArtStudioModalBtn && artStudioModal) {
+  openArtStudioModalBtn.addEventListener('click', () => {
+    artStudioModal.classList.remove('hidden');
+    if (studioArtPromptInput) studioArtPromptInput.focus();
+  });
+}
+
+if (closeArtStudioModalBtn && artStudioModal) {
+  closeArtStudioModalBtn.addEventListener('click', () => {
+    artStudioModal.classList.add('hidden');
+  });
+}
+
+document.querySelectorAll('.studio-preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const style = btn.getAttribute('data-style');
+    if (!studioArtPromptInput) return;
+    if (studioArtPromptInput.value.trim()) {
+      studioArtPromptInput.value = `${studioArtPromptInput.value.trim()}, ${style}`;
+    } else {
+      studioArtPromptInput.value = style;
+    }
+  });
+});
+
+if (studioArtGenerateBtn) {
+  studioArtGenerateBtn.addEventListener('click', async () => {
+    const prompt = (studioArtPromptInput?.value || '').trim();
+    if (!prompt) {
+      alert('Please enter a prompt to generate artwork on your RTX 4060 GPU.');
+      if (studioArtPromptInput) studioArtPromptInput.focus();
+      return;
+    }
+
+    const engine = studioArtEngineSelect?.value || 'local-gpu';
+    const resValue = studioArtResolutionSelect?.value || '512x512';
+    const [wStr, hStr] = resValue.split('x');
+    const width = parseInt(wStr, 10) || 512;
+    const height = parseInt(hStr, 10) || 512;
+    const steps = 1;
+
+    studioArtGenerateBtn.disabled = true;
+    studioArtGenerateBtn.innerHTML = '<span>⏳ Rendering on RTX 4060...</span>';
+    if (studioArtStatus) {
+      studioArtStatus.textContent = '⚡ Running CUDA Tensor Cores on NVIDIA RTX 4060...';
+      studioArtStatus.style.color = 'var(--accent-cyan)';
+    }
+
+    try {
+      const res = await fetch('/v1/art/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, engine, width, height, steps }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.url) {
+        lastGeneratedArtUrl = data.url;
+        lastGeneratedArtFilename = data.filename || 'gpu_art.png';
+
+        if (studioArtPreviewImg) {
+          studioArtPreviewImg.src = data.url;
+          studioArtPreviewImg.style.display = 'block';
+        }
+        if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'none';
+        if (studioArtActions) studioArtActions.style.display = 'flex';
+        if (studioArtDownloadBtn) studioArtDownloadBtn.href = data.url;
+
+        if (studioArtStatus) {
+          studioArtStatus.textContent = `✅ ${data.message || `Rendered on ${data.engine || 'RTX 4060'}`}`;
+          studioArtStatus.style.color = '#22c55e';
+        }
+      } else {
+        throw new Error(data.error || 'Art generation failed');
+      }
+    } catch (err) {
+      if (studioArtStatus) {
+        studioArtStatus.textContent = `⚠️ ${err.message}`;
+        studioArtStatus.style.color = 'var(--accent-red)';
+      }
+    } finally {
+      studioArtGenerateBtn.disabled = false;
+      studioArtGenerateBtn.innerHTML = '<span>✨ Render on RTX 4060 GPU</span>';
+    }
+  });
+}
+
+if (studioArtSetAvatarBtn) {
+  studioArtSetAvatarBtn.addEventListener('click', () => {
+    if (!lastGeneratedArtUrl) return;
+    const avatarImg = document.getElementById('mfAvatarPreviewImg');
+    const avatarPlaceholder = document.getElementById('mfAvatarPlaceholder');
+    const avatarStatus = document.getElementById('mfAvatarStatus');
+    if (avatarImg) {
+      avatarImg.src = lastGeneratedArtUrl;
+      avatarImg.style.display = 'block';
+    }
+    if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
+    if (avatarStatus) {
+      avatarStatus.textContent = `✅ Avatar updated with GPU artwork!`;
+      avatarStatus.style.color = '#22c55e';
+    }
+    if (artStudioModal) artStudioModal.classList.add('hidden');
+    const localHubModal = document.getElementById('localHubModal');
+    if (localHubModal) localHubModal.classList.remove('hidden');
+  });
+}
+
+if (studioArtOpenWorkspaceBtn) {
+  studioArtOpenWorkspaceBtn.addEventListener('click', () => {
+    if (lastGeneratedArtUrl) {
+      window.open(lastGeneratedArtUrl, '_blank');
+    }
   });
 }
 
