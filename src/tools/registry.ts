@@ -1925,6 +1925,9 @@ export class ToolRegistry {
                   }
                 }
               }
+            } else {
+              const errBody = await wanRes.text();
+              console.warn(`[Qwen Wan Image Generator]: Upstream returned HTTP ${wanRes.status}: ${errBody}`);
             }
           } catch (wanErr) {
             console.warn('[Qwen Wan Image Generator error]:', (wanErr as Error).message);
