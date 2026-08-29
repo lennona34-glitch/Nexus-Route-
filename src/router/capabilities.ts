@@ -205,31 +205,44 @@ export const MODEL_CATALOG: Record<string, ModelCapability> = {
   },
 
   // Groq Ultra-Fast Models
-  'llama-3.3-70b-versatile': {
-    id: 'llama-3.3-70b-versatile',
+  'qwen/qwen3.8-27b': {
+    id: 'qwen/qwen3.8-27b',
     provider: 'groq',
-    displayName: 'Groq Llama 3.3 70B (Ultra-Fast)',
+    displayName: 'Groq Qwen 3.8 27B (Ultra-Fast)',
     contextWindow: 128000,
     supportsVision: false,
     supportsTools: true,
     supportsJsonMode: true,
     supportsStreaming: true,
-    supportsReasoning: false,
+    supportsReasoning: true,
     inputCostPerMillion: 0.59,
     outputCostPerMillion: 0.79,
   },
-  'deepseek-r1-distill-llama-70b': {
-    id: 'deepseek-r1-distill-llama-70b',
+  'groq/compound': {
+    id: 'groq/compound',
     provider: 'groq',
-    displayName: 'Groq DeepSeek-R1 Distill 70B',
+    displayName: 'Groq Compound (Agentic Reasoning)',
     contextWindow: 128000,
     supportsVision: false,
-    supportsTools: false,
+    supportsTools: true,
     supportsJsonMode: true,
     supportsStreaming: true,
     supportsReasoning: true,
     inputCostPerMillion: 0.59,
     outputCostPerMillion: 0.79,
+  },
+  'groq/compound-mini': {
+    id: 'groq/compound-mini',
+    provider: 'groq',
+    displayName: 'Groq Compound Mini (Fast)',
+    contextWindow: 128000,
+    supportsVision: false,
+    supportsTools: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    supportsReasoning: true,
+    inputCostPerMillion: 0.29,
+    outputCostPerMillion: 0.49,
   },
 
   // xAI direct model. Additional models available to the user's account are

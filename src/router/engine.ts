@@ -1292,8 +1292,9 @@ export class RoutingEngine {
           }
         }
       }
-      if (hasGroq && excludeModel !== 'groq/llama-3.3-70b-versatile') {
-        list.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+      if (hasGroq && excludeModel !== 'groq/qwen/qwen3.8-27b') {
+        list.push({ provider: 'groq', model: 'groq/qwen/qwen3.8-27b' });
+        list.push({ provider: 'groq', model: 'groq/openai/gpt-oss-120b' });
       }
       list.push({ provider: 'mock', model: 'mock-gpt-4o' });
       return list;
@@ -1315,7 +1316,8 @@ export class RoutingEngine {
         list.push({ provider: 'openrouter', model: 'openrouter::minimax/minimax-m3:free' });
       }
       if (hasGroq && excludeProv !== 'groq') {
-        list.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+        list.push({ provider: 'groq', model: 'groq/qwen/qwen3.8-27b' });
+        list.push({ provider: 'groq', model: 'groq/groq/compound' });
       }
       // NOTE: Paid pay-as-you-go providers (xAI, DeepSeek direct, OpenAI, Anthropic)
       // are deliberately NOT in default cloud fallbacks to prevent unintended spend.
@@ -1488,7 +1490,7 @@ export class RoutingEngine {
           { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
         );
       }
-      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/qwen/qwen3.8-27b' });
     } else if (effectiveTier === 'reasoning') {
       if (hasQwen) {
         liveCandidates.push(
@@ -1503,7 +1505,7 @@ export class RoutingEngine {
           { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
         );
       }
-      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/groq/compound' });
     } else if (effectiveTier === 'fast') {
       if (hasQwen) {
         liveCandidates.push(
@@ -1518,7 +1520,7 @@ export class RoutingEngine {
           { provider: 'openrouter', model: 'openrouter::minimax/minimax-m3:free', timeout_ms: 90_000 },
         );
       }
-      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/qwen/qwen3.6-27b' });
     } else {
       // General balanced / auto
       if (hasQwen) {
@@ -1533,7 +1535,7 @@ export class RoutingEngine {
           { provider: 'openrouter', model: 'openrouter::nvidia/nemotron-3.5-lightning:free', timeout_ms: 120_000 },
         );
       }
-      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/llama-3.3-70b-versatile' });
+      if (hasGroq) liveCandidates.push({ provider: 'groq', model: 'groq/qwen/qwen3.8-27b' });
     }
 
 
