@@ -448,6 +448,15 @@ async function loadDynamicLocalModels() {
   }
 }
 
+// Unified model fetcher used across Modelfile Studio and Hub views
+async function fetchModels(force = false) {
+  try {
+    await Promise.allSettled([loadProviderModels(force), loadDynamicLocalModels()]);
+  } catch (e) {
+    console.warn('fetchModels error:', e);
+  }
+}
+
 // Load tools list
 async function loadToolsList() {
   try {
@@ -3232,6 +3241,12 @@ function formatMarkdown(str) {
     const match = cleanPath.match(/workspace[/\\](.+)$/i) || cleanPath.match(/([^/\\]+\.html)$/i);
     const fname = match ? match[1].replace(/\\/g, '/') : (cleanPath.split(/[/\\]/).pop() || cleanPath);
     return `<a href="/v1/workspace/files/${encodeURIComponent(fname)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(37, 99, 235, 0.25)); border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 8px; color: #38bdf8; font-weight: 700; font-size: 12px; text-decoration: none; margin: 4px 0;">🚀 ${fname} <span style="font-size: 10px; opacity: 0.85; font-weight: 500;">(Launch Web App)</span></a>`;
+  });
+
+  // Auto-detect any referenced .html filenames mentioned in plain text or backticks
+  escaped = escaped.replace(/(?<![="'>/\w])`?([a-zA-Z0-9_\-\.]+\.html)`?(?![="'>/\w])/gi, (full, fname) => {
+    if (fname.startsWith('http') || fname.includes('/')) return full;
+    return `<a href="/v1/workspace/files/${encodeURIComponent(fname)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(37, 99, 235, 0.35)); border: 1px solid rgba(56, 189, 248, 0.6); border-radius: 6px; color: #38bdf8; font-weight: 700; font-size: 11px; text-decoration: none; margin: 2px 2px; cursor: pointer;">🚀 ${fname} <span style="font-size: 9px; opacity: 0.85; font-weight: 500;">(Open App)</span></a>`;
   });
 
   // Inline code

@@ -25,6 +25,20 @@ function textArg(value: unknown): string {
   return String(value);
 }
 
+function openInDefaultApp(target: string): void {
+  try {
+    if (process.platform === 'win32') {
+      exec(`start "" "${target}"`);
+    } else if (process.platform === 'darwin') {
+      spawn('open', [target], { detached: true, stdio: 'ignore' });
+    } else {
+      spawn('xdg-open', [target], { detached: true, stdio: 'ignore' });
+    }
+  } catch (err) {
+    console.warn('[openInDefaultApp error]:', err);
+  }
+}
+
 function repairAndParseToolArguments(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>;
@@ -1069,9 +1083,7 @@ export class ToolRegistry {
           if (isHtml) {
             const relPath = path.relative(ws, safePath).replace(/\\/g, '/');
             const fileHttpUrl = `http://127.0.0.1:3000/v1/workspace/files/${encodeURIComponent(relPath)}`;
-            try {
-              spawn('cmd.exe', ['/c', 'start', '', fileHttpUrl], { detached: true, stdio: 'ignore' });
-            } catch {}
+            openInDefaultApp(fileHttpUrl);
           }
 
           return JSON.stringify({
@@ -1607,23 +1619,31 @@ export class ToolRegistry {
           }
 
           if (isUrl) {
-            spawn('cmd.exe', ['/c', 'start', '', targetPath], { detached: true, stdio: 'ignore' });
+            openInDefaultApp(targetPath);
           } else if (fs.existsSync(targetPath)) {
             const isDir = fs.statSync(targetPath).isDirectory();
             if (isDir) {
-              spawn('explorer.exe', [targetPath], { detached: true, stdio: 'ignore' });
+              if (process.platform === 'win32') {
+                spawn('explorer.exe', [targetPath], { detached: true, stdio: 'ignore' });
+              } else {
+                openInDefaultApp(targetPath);
+              }
             } else if (targetPath.toLowerCase().endsWith('.exe')) {
               spawn(targetPath, [], { detached: true, stdio: 'ignore' });
             } else if (targetPath.toLowerCase().endsWith('.html') || targetPath.toLowerCase().endsWith('.htm')) {
               const relPath = path.relative(ws, targetPath).replace(/\\/g, '/');
               const fileHttpUrl = `http://127.0.0.1:3000/v1/workspace/files/${encodeURIComponent(relPath)}`;
-              spawn('cmd.exe', ['/c', 'start', '', fileHttpUrl], { detached: true, stdio: 'ignore' });
+              openInDefaultApp(fileHttpUrl);
             } else {
               // Real Windows launch in default application (Photo viewer for images, Media player for audio)
-              spawn('cmd.exe', ['/c', 'start', '', targetPath], { detached: true, stdio: 'ignore' });
+              openInDefaultApp(targetPath);
             }
           } else {
-            spawn('explorer.exe', [ws], { detached: true, stdio: 'ignore' });
+            if (process.platform === 'win32') {
+              spawn('explorer.exe', [ws], { detached: true, stdio: 'ignore' });
+            } else {
+              openInDefaultApp(ws);
+            }
           }
 
           return JSON.stringify({
