@@ -1,4 +1,4 @@
-import { OpenAIAdapter } from './openai.js';
+﻿import { OpenAIAdapter } from './openai.js';
 
 export function resolveQwenBaseUrl(apiKey?: string, explicitUrl?: string): string {
   if (explicitUrl) return explicitUrl;
@@ -6,7 +6,7 @@ export function resolveQwenBaseUrl(apiKey?: string, explicitUrl?: string): strin
   if (process.env.DASHSCOPE_BASE_URL) return process.env.DASHSCOPE_BASE_URL;
   const key = apiKey || process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || '';
   if (key.startsWith('sk-sp-')) {
-    // Qwen Token Plan endpoint (home.qwencloud.com)
+    // Qwen Token Plan endpoint (home.qwencloud.com / aliyun)
     return 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1';
   }
   // Standard Pay-as-you-go DashScope endpoint

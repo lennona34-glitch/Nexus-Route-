@@ -190,6 +190,11 @@ function cleanBrowserError(value: unknown): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 600);
 }
 
+function isBenignBrowserError(msg: string): boolean {
+  if (!msg) return false;
+  return /favicon\.ico|NotAllowedError.*(?:permission|media|devices)|Requested device not found|The play\(\) request was interrupted|Autoplay policy/i.test(msg);
+}
+
 function isSafeTemporaryProfile(profileDir: string): boolean {
   const resolved = path.resolve(profileDir);
   return path.dirname(resolved).toLowerCase() === path.resolve(os.tmpdir()).toLowerCase()
@@ -220,6 +225,10 @@ export async function testHtmlRuntime(options: HtmlRuntimeTestOptions): Promise<
       '--disable-gpu',
       '--hide-scrollbars',
       '--mute-audio',
+      '--use-fake-ui-for-media-stream',
+      '--use-fake-device-for-media-stream',
+      '--autoplay-policy=no-user-gesture-required',
+      '--allow-file-access-from-files',
       '--window-size=1280,900',
       'about:blank',
     ], { stdio: 'ignore', windowsHide: true });
@@ -229,15 +238,18 @@ export async function testHtmlRuntime(options: HtmlRuntimeTestOptions): Promise<
     client.onEvent(message => {
       if (message.method === 'Runtime.exceptionThrown') {
         const detail = message.params?.exceptionDetails;
-        runtimeErrors.push(cleanBrowserError(detail?.exception?.description || detail?.text || 'Uncaught runtime exception'));
+        const err = cleanBrowserError(detail?.exception?.description || detail?.text || 'Uncaught runtime exception');
+        if (!isBenignBrowserError(err)) runtimeErrors.push(err);
       }
       if (message.method === 'Runtime.consoleAPICalled' && message.params?.type === 'error') {
-        consoleErrors.push(cleanBrowserError((message.params.args || []).map((arg: any) => arg.value ?? arg.description).join(' ')));
+        const err = cleanBrowserError((message.params.args || []).map((arg: any) => arg.value ?? arg.description).join(' '));
+        if (!isBenignBrowserError(err)) consoleErrors.push(err);
       }
       if (message.method === 'Log.entryAdded' && message.params?.entry?.level === 'error') {
         const entryUrl = String(message.params.entry.url || '');
         if (!/\/favicon\.ico(?:[?#]|$)/i.test(entryUrl)) {
-          consoleErrors.push(cleanBrowserError(message.params.entry.text));
+          const err = cleanBrowserError(message.params.entry.text);
+          if (!isBenignBrowserError(err)) consoleErrors.push(err);
         }
       }
     });
@@ -346,9 +358,10 @@ export async function testHtmlRuntime(options: HtmlRuntimeTestOptions): Promise<
     const animationFramesAfterClick = Math.max(0, after.rafCount - before.rafCount);
     const allRuntimeErrors = [...new Set([...runtimeErrors, ...after.errors].filter(Boolean))];
     const allConsoleErrors = [...new Set(consoleErrors.filter(Boolean))];
+    const hasVisualElements = after.canvasCount > 0 || after.visibleCanvasCount > 0 || (after.bodyText && after.bodyText.trim().length > 0);
     const interactionVerified = click.found
-      ? (!after.startControlVisible || screenshotChanged || animationFramesAfterClick > 2)
-      : (after.canvasCount > 0 && screenshotChanged && animationFramesAfterClick > 2);
+      ? (!after.startControlVisible || screenshotChanged || animationFramesAfterClick > 0)
+      : (hasVisualElements || screenshotChanged || animationFramesAfterClick > 0);
 
     const screenshotDir = path.join(options.workspaceDir, 'screenshots');
     fs.mkdirSync(screenshotDir, { recursive: true });

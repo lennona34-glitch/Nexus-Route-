@@ -22,14 +22,25 @@ def load_pipeline():
     global pipeline
     if pipeline is not None:
         return pipeline
-    print(f"[*] Loading {MODEL_ID} directly into VRAM on {DEVICE} (float16)...")
+    print(f"[*] Loading {MODEL_ID} on {DEVICE} (float16)...")
     try:
         if DEVICE == "cuda":
-            pipeline = AutoPipelineForText2Image.from_pretrained(
-                MODEL_ID,
-                torch_dtype=torch.float16,
-                variant="fp16"
-            ).to("cuda")
+            for lfo in [True, False]:
+                try:
+                    pipeline = AutoPipelineForText2Image.from_pretrained(
+                        MODEL_ID,
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        local_files_only=lfo
+                    )
+                    break
+                except Exception:
+                    if not lfo:
+                        raise
+            try:
+                pipeline.enable_model_cpu_offload()
+            except Exception:
+                pipeline.to("cuda")
             try:
                 pipeline.enable_vae_tiling()
                 pipeline.enable_vae_slicing()
@@ -37,7 +48,7 @@ def load_pipeline():
                 pass
         else:
             pipeline = AutoPipelineForText2Image.from_pretrained(MODEL_ID)
-        print(f"[+] Model loaded into RTX 4060 VRAM successfully on {DEVICE}!")
+        print(f"[+] Model loaded successfully on {DEVICE}!")
         return pipeline
     except Exception as e:
         print(f"[-] Error loading model: {e}")

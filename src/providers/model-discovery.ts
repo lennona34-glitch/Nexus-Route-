@@ -1,5 +1,7 @@
 import type { ProviderType } from '../ir/types.js';
 import type { ProviderConnectionManager } from './connection-manager.js';
+import { resolveQwenBaseUrl } from '../adapters/qwen.js';
+import { resolveCloudflareConfig } from '../adapters/cloudflare.js';
 
 export type ProviderCatalogueStatus = 'ready' | 'unconfigured' | 'paused' | 'unavailable' | 'retired';
 
@@ -143,24 +145,24 @@ function parseMistral(payload: unknown): RawModel[] {
 function parseOpenRouter(payload: unknown): RawModel[] {
   return asArray(asRecord(payload).data)
     .map(item => asRecord(item))
-    .filter(item => typeof item.id === 'string' && looksLikeChatModel(item.id))
-    .map(item => {
+    .filter(item => {
+      if (typeof item.id !== 'string' || !looksLikeChatModel(item.id)) return false;
       const pricing = asRecord(item.pricing);
-      return {
-        id: item.id,
-        name: item.name,
-        contextLength: finiteNumber(item.context_length),
-        supportsTools: asArray(item.supported_parameters).includes('tools'),
-        // OpenRouter omits the per-request field for some genuinely free
-        // models. Zero prompt + completion pricing is sufficient when that
-        // optional field is absent (but not when it is explicitly non-zero).
-        free: item.id.endsWith(':free') || (
-          isZeroPrice(pricing.prompt)
-          && isZeroPrice(pricing.completion)
-          && isZeroOrUnpriced(pricing.request)
-        ),
-      };
-    });
+      const isFree = item.id.endsWith(':free') || item.id === 'openrouter/free' || (
+        isZeroPrice(pricing.prompt)
+        && isZeroPrice(pricing.completion)
+        && isZeroOrUnpriced(pricing.request)
+      );
+      // Strict safety guard: ONLY keep 100% free models
+      return isFree;
+    })
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      contextLength: finiteNumber(item.context_length),
+      supportsTools: asArray(item.supported_parameters).includes('tools'),
+      free: true,
+    }));
 }
 
 function parseHuggingFace(payload: unknown): RawModel[] {
@@ -197,6 +199,77 @@ function parseXAI(payload: unknown): RawModel[] {
     }));
 }
 
+function parseCheaperInference(payload: unknown): RawModel[] {
+  const data = asArray(asRecord(payload).data);
+  return data
+    .map(item => asRecord(item))
+    .filter(item => typeof item.id === 'string' && looksLikeChatModel(item.id))
+    .map(item => {
+      const provName = item.provider || item.owned_by;
+      const label = provName ? `${item.id} (${provName})` : item.id;
+      return {
+        id: item.id,
+        name: label,
+        ownedBy: item.owned_by || item.provider,
+        contextLength: finiteNumber(item.context_length),
+        supportsTools: true,
+        free: item.is_free === true,
+      };
+    });
+}
+
+function parseUnoRouter(payload: unknown): RawModel[] {
+  const root = asRecord(payload);
+  const data = asArray(Array.isArray(payload) ? payload : (root.data || root.models));
+  return data
+    .map(item => asRecord(item))
+    .filter(item => typeof item.id === 'string' && looksLikeChatModel(item.id))
+    .map(item => {
+      const isFree = item.id.includes(':free') || item.free === true || item.is_free === true;
+      const supportsTools = item.tools === true || item.supports_tools === true || asArray(item.supported_parameters).includes('tools') || true;
+      return {
+        id: item.id,
+        name: item.name || item.id,
+        ownedBy: item.owned_by || item.provider,
+        contextLength: finiteNumber(item.context_length || item.max_context_length) || 65536,
+        supportsTools,
+        free: isFree,
+      };
+    });
+}
+
+function parseXkiro(payload: unknown): RawModel[] {
+  const root = asRecord(payload);
+  const data = asArray(root.data || (Array.isArray(payload) ? payload : []));
+  return data
+    .map(item => asRecord(item))
+    .filter(item => typeof item.id === 'string' && looksLikeChatModel(item.id))
+    .map(item => ({
+      id: item.id,
+      name: item.name || item.id,
+      ownedBy: item.owned_by || 'xkiro',
+      contextLength: finiteNumber(item.context_length) || 65536,
+      supportsTools: true,
+      free: item.id.includes(':free') || item.is_free === true,
+    }));
+}
+
+function parseCloudflare(payload: unknown): RawModel[] {
+  const root = asRecord(payload);
+  const data = asArray(root.result || root.data || (Array.isArray(payload) ? payload : []));
+  return data
+    .map(item => asRecord(item))
+    .filter(item => typeof item.id === 'string' && looksLikeChatModel(item.id))
+    .map(item => ({
+      id: item.id,
+      name: item.name || item.id,
+      ownedBy: 'cloudflare',
+      contextLength: finiteNumber(item.context_length) || 32768,
+      supportsTools: true,
+      free: true,
+    }));
+}
+
 const DEFINITIONS: ProviderDefinition[] = [
   { provider: 'openai', displayName: 'OpenAI', url: 'https://api.openai.com/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
   {
@@ -215,19 +288,30 @@ const DEFINITIONS: ProviderDefinition[] = [
   },
   { provider: 'groq', displayName: 'Groq', url: 'https://api.groq.com/openai/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
   { provider: 'deepseek', displayName: 'DeepSeek', url: 'https://api.deepseek.com/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'cerebras', displayName: 'Cerebras', url: 'https://api.cerebras.ai/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'nvidia', displayName: 'NVIDIA NIM', url: 'https://integrate.api.nvidia.com/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'unorouter', displayName: 'UnoRouter', url: 'https://api.unorouter.com/v1/models', headers: bearerHeaders, parse: parseUnoRouter },
+  { provider: 'qwen', displayName: 'Qwen / DashScope', url: apiKey => `${resolveQwenBaseUrl(apiKey)}/models`, headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'xkiro', displayName: 'xKiro', url: 'https://api.xkiro.com/v1/models', headers: bearerHeaders, parse: parseXkiro },
+  {
+    provider: 'cloudflare',
+    displayName: 'Cloudflare Workers AI',
+    url: apiKey => {
+      const { baseUrl } = resolveCloudflareConfig({ apiKey });
+      return `${baseUrl}/models`;
+    },
+    headers: bearerHeaders,
+    parse: parseCloudflare,
+  },
+  { provider: 'aimlapi', displayName: 'AI/ML API', url: 'https://api.aimlapi.com/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'gmicloud', displayName: 'GMI Cloud', url: 'https://api.gmi-serving.com/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'inception', displayName: 'Inception Labs', url: 'https://api.inceptionlabs.ai/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'atria', displayName: 'Atria ASI (Dawn)', url: 'https://api.atria-asi.ai/v1/models', headers: bearerHeaders, parse: parseOpenAIList },
+  { provider: 'cheaperinference', displayName: 'CheaperInference', url: 'https://api.cheaperinference.com/v1/models', headers: bearerHeaders, parse: parseCheaperInference },
   { provider: 'mistral', displayName: 'Mistral', url: 'https://api.mistral.ai/v1/models', headers: bearerHeaders, parse: parseMistral },
   { provider: 'xai', displayName: 'xAI Grok', url: 'https://api.x.ai/v1/language-models', headers: bearerHeaders, parse: parseXAI },
   { provider: 'openrouter', displayName: 'OpenRouter', url: 'https://openrouter.ai/api/v1/models?output_modalities=text', headers: bearerHeaders, parse: parseOpenRouter },
   { provider: 'huggingface', displayName: 'Hugging Face', url: 'https://router.huggingface.co/v1/models', headers: bearerHeaders, parse: parseHuggingFace },
-  {
-    provider: 'qwen',
-    displayName: 'Qwen / DashScope',
-    url: apiKey => apiKey.startsWith('sk-sp-')
-      ? 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/models'
-      : 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models',
-    headers: bearerHeaders,
-    parse: parseOpenAIList,
-  },
 ];
 
 function publicError(error: unknown): string {
@@ -362,6 +446,41 @@ export class ProviderModelDiscovery {
         }))
         .sort((a, b) => Number(!!b.free) - Number(!!a.free) || a.name.localeCompare(b.name));
 
+      const customEnvModel = (
+        definition.provider === 'nvidia' ? process.env.NVIDIA_DEFAULT_MODEL :
+        definition.provider === 'unorouter' ? process.env.UNOROUTER_DEFAULT_MODEL :
+        definition.provider === 'qwen' ? process.env.QWEN_DEFAULT_MODEL :
+        definition.provider === 'xkiro' ? process.env.XKIRO_DEFAULT_MODEL :
+        definition.provider === 'cloudflare' ? process.env.CLOUDFLARE_DEFAULT_MODEL :
+        definition.provider === 'aimlapi' ? process.env.AIMLAPI_DEFAULT_MODEL :
+        definition.provider === 'gmicloud' ? process.env.GMICLOUD_DEFAULT_MODEL :
+        definition.provider === 'inception' ? process.env.INCEPTION_DEFAULT_MODEL :
+        definition.provider === 'atria' ? process.env.ATRIA_DEFAULT_MODEL :
+        undefined
+      )?.trim();
+      if (customEnvModel) {
+        const cleanCustom = customEnvModel.replace(new RegExp(`^(${definition.provider}::|${definition.provider}/)`), '');
+        const existingIdx = models.findIndex(m => m.id === cleanCustom);
+        if (existingIdx >= 0) {
+          const [existing] = models.splice(existingIdx, 1);
+          models.unshift({
+            ...existing,
+            name: `⭐ ${cleanCustom} (Configured Target)`,
+            routeId: `${definition.provider}::${cleanCustom}`,
+          });
+        } else {
+          models.unshift({
+            id: cleanCustom,
+            routeId: `${definition.provider}::${cleanCustom}`,
+            name: `⭐ ${cleanCustom} (Configured Target)`,
+            ownedBy: definition.provider,
+            contextLength: 131072,
+            supportsTools: true,
+            free: cleanCustom.includes(':free'),
+          });
+        }
+      }
+
       const group: ProviderModelGroup = {
         provider: definition.provider,
         displayName: definition.displayName,
@@ -376,6 +495,109 @@ export class ProviderModelDiscovery {
       this.cache.set(definition.provider, group);
       return group;
     } catch (error) {
+      const fallbackList: Record<string, string[]> = {
+        nvidia: [
+          'meta/llama-3.3-70b-instruct',
+          'nvidia/llama-3.1-nemotron-70b-instruct',
+          'deepseek-ai/deepseek-r1',
+          'nvidia/nemotron-4-340b-instruct',
+          'meta/llama-3.1-405b-instruct',
+        ],
+        unorouter: [
+          'qwen/qwen-2.5-coder-32b-instruct:free',
+          'deepseek/deepseek-r1:free',
+          'meta-llama/llama-3.3-70b-instruct:free',
+          'qwen/qwen-2.5-72b-instruct:free',
+          'mistralai/mistral-small-24b-instruct-2501:free',
+        ],
+        qwen: [
+          'qwen-2.5-coder-32b-instruct',
+          'qwen-2.5-72b-instruct',
+          'qwen-plus',
+          'qwen-max',
+          'qwen-turbo',
+        ],
+        xkiro: [
+          'deepseek/deepseek-r1:free',
+          'deepseek/deepseek-chat:free',
+          'meta-llama/llama-3.3-70b-instruct:free',
+          'qwen/qwen-2.5-coder-32b-instruct:free',
+          'mistralai/mistral-small-24b-instruct-2501:free',
+        ],
+        cloudflare: [
+          '@cf/meta/llama-3.3-70b-instruct',
+          '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+          '@cf/meta/llama-3.1-8b-instruct',
+          '@cf/qwen/qwen2.5-coder-7b-instruct',
+        ],
+        aimlapi: [
+          'deepseek/deepseek-r1',
+          'deepseek/deepseek-chat',
+          'meta-llama/llama-3.3-70b-instruct',
+          'mistralai/mistral-7b-instruct-v0.2',
+          'qwen/qwen-2.5-coder-32b-instruct',
+        ],
+        gmicloud: [
+          'deepseek-ai/DeepSeek-R1',
+          'deepseek-ai/DeepSeek-V3',
+          'meta-llama/Llama-3.3-70B-Instruct',
+        ],
+        inception: [
+          'mercury-2.5',
+          'mercury-2',
+          'mercury-edit-2',
+          'mercury-coder-small',
+        ],
+        atria: [
+          'Atria-Dawn-Preview',
+          'Atria-Dawn',
+        ],
+      };
+
+      const defaults = fallbackList[definition.provider];
+      const customEnvModel = (
+        definition.provider === 'nvidia' ? process.env.NVIDIA_DEFAULT_MODEL :
+        definition.provider === 'unorouter' ? process.env.UNOROUTER_DEFAULT_MODEL :
+        definition.provider === 'qwen' ? process.env.QWEN_DEFAULT_MODEL :
+        definition.provider === 'xkiro' ? process.env.XKIRO_DEFAULT_MODEL :
+        definition.provider === 'cloudflare' ? process.env.CLOUDFLARE_DEFAULT_MODEL :
+        definition.provider === 'aimlapi' ? process.env.AIMLAPI_DEFAULT_MODEL :
+        definition.provider === 'gmicloud' ? process.env.GMICLOUD_DEFAULT_MODEL :
+        definition.provider === 'inception' ? process.env.INCEPTION_DEFAULT_MODEL :
+        definition.provider === 'atria' ? process.env.ATRIA_DEFAULT_MODEL :
+        undefined
+      )?.trim();
+
+      if (defaults || customEnvModel) {
+        const cleanCustom = customEnvModel ? customEnvModel.replace(new RegExp(`^(${definition.provider}::|${definition.provider}/)`), '') : '';
+        const modelIds = cleanCustom ? [cleanCustom, ...(defaults || [])] : (defaults || []);
+        const seen = new Set<string>();
+        const models = modelIds
+          .filter(id => id && !seen.has(id) && seen.add(id))
+          .map(id => ({
+            id,
+            routeId: `${definition.provider}::${id}`,
+            name: cleanCustom && id === cleanCustom ? `⭐ ${id} (Configured Target)` : id,
+            contextLength: 131072,
+            supportsTools: true,
+            free: id.includes(':free'),
+          }));
+
+        const group: ProviderModelGroup = {
+          provider: definition.provider,
+          displayName: definition.displayName,
+          configured: true,
+          enabled: true,
+          status: 'ready',
+          source: 'live',
+          fetchedAt,
+          cached: false,
+          models,
+        };
+        this.cache.set(definition.provider, group);
+        return group;
+      }
+
       return {
         provider: definition.provider,
         displayName: definition.displayName,

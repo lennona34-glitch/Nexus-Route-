@@ -23,14 +23,83 @@ interface AnthropicMessage {
   content: string | AnthropicContentBlock[];
 }
 
+function normalizeAnthropicMessages(raw: AnthropicMessage[]): AnthropicMessage[] {
+  // 1. Sanitize content for each message
+  const sanitized: AnthropicMessage[] = [];
+  for (const m of raw) {
+    if (typeof m.content === 'string') {
+      const trimmed = m.content.trim();
+      sanitized.push({
+        role: m.role,
+        content: trimmed.length > 0 ? trimmed : '(empty message)',
+      });
+    } else if (Array.isArray(m.content)) {
+      const cleanBlocks: AnthropicContentBlock[] = [];
+      for (const b of m.content) {
+        if (b.type === 'text') {
+          const t = (b.text || '').trim();
+          if (t.length > 0) {
+            cleanBlocks.push({ ...b, text: t });
+          }
+        } else {
+          cleanBlocks.push(b);
+        }
+      }
+      if (cleanBlocks.length === 0) {
+        cleanBlocks.push({ type: 'text', text: '(empty message)' });
+      }
+      sanitized.push({
+        role: m.role,
+        content: cleanBlocks,
+      });
+    }
+  }
+
+  // 2. Auto-merge consecutive same-role messages
+  const merged: AnthropicMessage[] = [];
+  for (const m of sanitized) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.role === m.role) {
+      if (typeof prev.content === 'string' && typeof m.content === 'string') {
+        prev.content = `${prev.content}\n\n${m.content}`;
+      } else {
+        const prevBlocks: AnthropicContentBlock[] = typeof prev.content === 'string'
+          ? [{ type: 'text', text: prev.content }]
+          : prev.content;
+        const currBlocks: AnthropicContentBlock[] = typeof m.content === 'string'
+          ? [{ type: 'text', text: m.content }]
+          : m.content;
+        prev.content = [...prevBlocks, ...currBlocks];
+      }
+    } else {
+      merged.push(m);
+    }
+  }
+
+  // 3. Ensure conversation begins with a user turn
+  if (merged.length === 0) {
+    merged.push({ role: 'user', content: 'Hello' });
+  } else if (merged[0].role !== 'user') {
+    merged.unshift({ role: 'user', content: '(Initiate session)' });
+  }
+
+  return merged;
+}
+
 export class AnthropicAdapter implements ProviderAdapter {
   readonly provider: ProviderType = 'anthropic';
-  private baseUrl: string;
-  private apiKey?: string;
+  private config?: { baseUrl?: string; apiKey?: string };
 
   constructor(config?: { baseUrl?: string; apiKey?: string }) {
-    this.baseUrl = config?.baseUrl || process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1';
-    this.apiKey = config?.apiKey || process.env.ANTHROPIC_API_KEY;
+    this.config = config;
+  }
+
+  private get baseUrl(): string {
+    return this.config?.baseUrl || process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1';
+  }
+
+  private get apiKey(): string | undefined {
+    return this.config?.apiKey || process.env.ANTHROPIC_API_KEY;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -141,7 +210,9 @@ export class AnthropicAdapter implements ProviderAdapter {
     };
     const modelToUse = normalizeMap[cleanModel] || cleanModel;
 
-    const hasToolHistory = anthropicMessages.some(m =>
+    const normalizedMessages = normalizeAnthropicMessages(anthropicMessages);
+
+    const hasToolHistory = normalizedMessages.some(m =>
       Array.isArray(m.content) && m.content.some(b => b.type === 'tool_use' || b.type === 'tool_result')
     );
     const availableTools = (req.tools && req.tools.length > 0)
@@ -156,7 +227,7 @@ export class AnthropicAdapter implements ProviderAdapter {
 
     return {
       model: modelToUse,
-      messages: anthropicMessages,
+      messages: normalizedMessages,
       system: systemPrompt,
       tools: anthropicTools,
       max_tokens: req.max_tokens || 8192,
@@ -168,6 +239,7 @@ export class AnthropicAdapter implements ProviderAdapter {
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'User-Agent': 'NexusRoute/1.3.0 (+https://github.com/nexusroute/nexus-route)',
       'anthropic-version': '2023-06-01',
     };
     if (this.apiKey) {
@@ -196,11 +268,21 @@ export class AnthropicAdapter implements ProviderAdapter {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
+      const retryAfterHeader = res.headers.get('retry-after');
+      let retryAfterMs: number | undefined;
+      if (retryAfterHeader) {
+        const secs = Number(retryAfterHeader);
+        if (Number.isFinite(secs) && secs >= 0) {
+          retryAfterMs = Math.round(secs * 1000);
+        }
+      }
       throw new AdapterError(
         `Anthropic error (${res.status}): ${errText}`,
         'anthropic',
         res.status,
-        res.status === 429 || res.status >= 500
+        res.status === 429 || res.status === 529 || res.status >= 500,
+        undefined,
+        retryAfterMs
       );
     }
 
@@ -274,11 +356,21 @@ export class AnthropicAdapter implements ProviderAdapter {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
+      const retryAfterHeader = res.headers.get('retry-after');
+      let retryAfterMs: number | undefined;
+      if (retryAfterHeader) {
+        const secs = Number(retryAfterHeader);
+        if (Number.isFinite(secs) && secs >= 0) {
+          retryAfterMs = Math.round(secs * 1000);
+        }
+      }
       throw new AdapterError(
         `Anthropic stream error (${res.status}): ${errText}`,
         'anthropic',
         res.status,
-        res.status === 429 || res.status >= 500
+        res.status === 429 || res.status === 529 || res.status >= 500,
+        undefined,
+        retryAfterMs
       );
     }
 

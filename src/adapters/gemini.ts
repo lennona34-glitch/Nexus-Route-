@@ -100,7 +100,7 @@ export class GeminiAdapter implements ProviderAdapter {
         systemText = (systemText ? systemText + '\n\n' : '') + extractTextFromContent(msg.content);
       } else if (msg.role === 'assistant') {
         const parts: GeminiPart[] = [];
-        const textContent = typeof msg.content === 'string' ? msg.content : (msg.content ? extractTextFromContent(msg.content) : '');
+        const textContent = (typeof msg.content === 'string' ? msg.content : (msg.content ? extractTextFromContent(msg.content) : '')).trim();
         if (textContent) {
           parts.push({ text: textContent });
         }
@@ -112,9 +112,10 @@ export class GeminiAdapter implements ProviderAdapter {
           contents.push({ role: 'model', parts });
         }
       } else if (msg.role === 'tool') {
+        const toolResultText = extractTextFromContent(msg.content).trim() || 'Success';
         contents.push({
           role: 'user',
-          parts: [{ text: `[Tool Result for ${msg.name || 'tool'}]: ${extractTextFromContent(msg.content)}` }],
+          parts: [{ text: `[Tool Result for ${msg.name || 'tool'}]: ${toolResultText}` }],
         });
       } else {
         const parts: GeminiPart[] = [];
@@ -127,13 +128,13 @@ export class GeminiAdapter implements ProviderAdapter {
             }
             const cleanText = msg.content.replace(mdImgMatch[0], '').trim();
             if (cleanText) parts.push({ text: cleanText });
-          } else {
-            parts.push({ text: msg.content });
+          } else if (msg.content.trim()) {
+            parts.push({ text: msg.content.trim() });
           }
         } else if (Array.isArray(msg.content)) {
           for (const part of msg.content as ContentPart[]) {
-            if (part.type === 'text') {
-              parts.push({ text: part.text });
+            if (part.type === 'text' && part.text?.trim()) {
+              parts.push({ text: part.text.trim() });
             } else if (part.type === 'image_url') {
               const imgData = await resolveImageInlineData(part.image_url.url);
               if (imgData) {
@@ -142,10 +143,25 @@ export class GeminiAdapter implements ProviderAdapter {
             }
           }
         }
-        if (parts.length > 0) {
-          contents.push({ role: 'user', parts });
+        if (parts.length === 0) {
+          parts.push({ text: 'Hello' });
         }
+        contents.push({ role: 'user', parts });
       }
+    }
+
+    // Strict turn alternation enforcement for Gemini: merge consecutive same-role messages
+    const mergedContents: GeminiContent[] = [];
+    for (const c of contents) {
+      if (mergedContents.length > 0 && mergedContents[mergedContents.length - 1].role === c.role) {
+        mergedContents[mergedContents.length - 1].parts.push(...c.parts);
+      } else {
+        mergedContents.push({ role: c.role, parts: [...c.parts] });
+      }
+    }
+
+    if (mergedContents.length === 0) {
+      mergedContents.push({ role: 'user', parts: [{ text: 'Hello' }] });
     }
 
     const geminiTools = (!fallbackToText && req.tools && req.tools.length > 0) ? [
@@ -159,7 +175,7 @@ export class GeminiAdapter implements ProviderAdapter {
     ] : undefined;
 
     return {
-      contents,
+      contents: mergedContents,
       systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined,
       tools: geminiTools,
       generationConfig: {
@@ -171,15 +187,18 @@ export class GeminiAdapter implements ProviderAdapter {
   }
 
   private resolveModelName(targetModel: string): string {
-    const m = targetModel.replace(/^gemini::/, '').replace(/^gemini\//, '');
-    if (m === 'gemini-pro') return 'gemini-pro-latest';
-    if (m === 'gemini-flash') return 'gemini-flash-latest';
-    // Retired 1.x/2.0 aliases should follow Google's maintained aliases instead of
-    // being pinned to a preview model that may disappear independently.
-    if (m === 'gemini-1.5-pro') return 'gemini-pro-latest';
-    if (m === 'gemini-1.5-flash' || m === 'gemini-2.0-flash') return 'gemini-flash-latest';
-    if (!m.startsWith('gemini-')) return 'gemini-flash-latest';
-    return m;
+    const m = targetModel.replace(/^gemini::/, '').replace(/^gemini\//, '').trim();
+    if (m === 'gemini-flash' || m === 'gemini-2.5-flash' || m === 'gemini-2.0-flash') return 'gemini-3.6-flash';
+    if (m === 'gemini-pro' || m === 'gemini-2.5-pro') return 'gemini-pro-latest';
+    if (m === 'gemini-flash-lite' || m === 'gemini-2.5-flash-lite') return 'gemini-3.1-flash-lite';
+    return m || 'gemini-3.6-flash';
+  }
+
+  private getHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'User-Agent': 'NexusRoute/1.3.0 (+https://github.com/nexusroute/nexus-route)',
+    };
   }
 
   async chatCompletion(req: UniversalRequest, targetModel: string): Promise<UniversalResponse> {
@@ -187,24 +206,62 @@ export class GeminiAdapter implements ProviderAdapter {
       throw new AdapterError('Gemini API key not configured', 'gemini', 401, false);
     }
 
-    const modelName = this.resolveModelName(targetModel);
-    const url = `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`;
-
+    let modelName = this.resolveModelName(targetModel);
+    let url = `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`;
     let payload = await this.formatPayload(req, false);
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } catch (err: unknown) {
-      throw new AdapterError(`Network error reaching Gemini: ${(err as Error).message}`, 'gemini', 503, true, err);
+    let res: Response | undefined;
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload),
+        });
+      } catch (err: unknown) {
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+          continue;
+        }
+        throw new AdapterError(`Network error reaching Gemini: ${(err as Error).message}`, 'gemini', 503, true, err);
+      }
+
+      if (res.status === 429 || res.status >= 500) {
+        const errText = await res.text().catch(() => '');
+        const delayMatch = errText.match(/retry in ([0-9.]+)s/i) || errText.match(/"retryDelay":\s*"([0-9.]+)s"/i);
+        const parsedWaitMs = delayMatch ? Math.ceil(parseFloat(delayMatch[1]) * 1000) : 2500;
+        if (parsedWaitMs > 3000 || attempt >= maxRetries) {
+          throw new AdapterError(`Gemini rate-limited (429): ${errText}`, 'gemini', 429, true, undefined, parsedWaitMs);
+        }
+        await new Promise(r => setTimeout(r, parsedWaitMs));
+        continue;
+      }
+      break;
     }
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      if (res.status === 400 && (errText.includes('thought_signature') || errText.includes('INVALID_ARGUMENT'))) {
+    if (!res || !res.ok) {
+      const errText = await res?.text().catch(() => '') || '';
+      const status = res?.status || 500;
+      if (status === 404 && (errText.includes('no longer available') || errText.includes('NOT_FOUND'))) {
+        const nextFallback = (modelName === 'gemini-3.6-flash') ? 'gemini-flash-latest' : 'gemini-3.6-flash';
+        modelName = nextFallback;
+        url = `${this.baseUrl}/models/${modelName}:generateContent?key=${this.apiKey}`;
+        try {
+          res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const retryErr = await res.text().catch(() => '');
+            throw new AdapterError(`Gemini error (${res.status}): ${retryErr}`, 'gemini', res.status, false);
+          }
+        } catch (e) {
+          if (e instanceof AdapterError) throw e;
+          throw new AdapterError(`Gemini error (${status}): ${errText}`, 'gemini', status, false);
+        }
+      } else if (status === 400 && (errText.includes('thought_signature') || errText.includes('INVALID_ARGUMENT'))) {
         payload = await this.formatPayload(req, true);
         try {
           const retryRes = await fetch(url, {
@@ -220,14 +277,21 @@ export class GeminiAdapter implements ProviderAdapter {
           }
         } catch (e) {
           if (e instanceof AdapterError) throw e;
-          throw new AdapterError(`Gemini error (${res.status}): ${errText}`, 'gemini', res.status, false);
+          throw new AdapterError(`Gemini error (${status}): ${errText}`, 'gemini', status, false);
         }
       } else {
+        let retryAfterMs = 4500;
+        const delayMatch = errText.match(/retry in ([0-9.]+)s/i) || errText.match(/"retryDelay":\s*"([0-9.]+)s"/i);
+        if (delayMatch) {
+          retryAfterMs = Math.max(1000, Math.ceil(parseFloat(delayMatch[1]) * 1000));
+        }
         throw new AdapterError(
-          `Gemini error (${res.status}): ${errText}`,
+          `Gemini error (${status}): ${errText}`,
           'gemini',
-          res.status,
-          res.status === 429 || res.status >= 500
+          status,
+          status === 429 || status >= 500,
+          undefined,
+          retryAfterMs
         );
       }
     }
@@ -294,24 +358,62 @@ export class GeminiAdapter implements ProviderAdapter {
       throw new AdapterError('Gemini API key not configured', 'gemini', 401, false);
     }
 
-    const modelName = this.resolveModelName(targetModel);
-    const url = `${this.baseUrl}/models/${modelName}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
-
+    let modelName = this.resolveModelName(targetModel);
+    let url = `${this.baseUrl}/models/${modelName}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
     let payload = await this.formatPayload(req, false);
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } catch (err: unknown) {
-      throw new AdapterError(`Network error reaching Gemini: ${(err as Error).message}`, 'gemini', 503, true, err);
+    let res: Response | undefined;
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload),
+        });
+      } catch (err: unknown) {
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+          continue;
+        }
+        throw new AdapterError(`Network error reaching Gemini: ${(err as Error).message}`, 'gemini', 503, true, err);
+      }
+
+      if (res.status === 429 || res.status >= 500) {
+        const errText = await res.text().catch(() => '');
+        const delayMatch = errText.match(/retry in ([0-9.]+)s/i) || errText.match(/"retryDelay":\s*"([0-9.]+)s"/i);
+        const parsedWaitMs = delayMatch ? Math.ceil(parseFloat(delayMatch[1]) * 1000) : 2500;
+        if (parsedWaitMs > 3000 || attempt >= maxRetries) {
+          throw new AdapterError(`Gemini stream rate-limited (429): ${errText}`, 'gemini', 429, true, undefined, parsedWaitMs);
+        }
+        await new Promise(r => setTimeout(r, parsedWaitMs));
+        continue;
+      }
+      break;
     }
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      if (res.status === 400 && (errText.includes('thought_signature') || errText.includes('INVALID_ARGUMENT'))) {
+    if (!res || !res.ok) {
+      const errText = await res?.text().catch(() => '') || '';
+      const status = res?.status || 500;
+      if (status === 404 && (errText.includes('no longer available') || errText.includes('NOT_FOUND'))) {
+        const nextFallback = (modelName === 'gemini-3.6-flash') ? 'gemini-flash-latest' : 'gemini-3.6-flash';
+        modelName = nextFallback;
+        url = `${this.baseUrl}/models/${modelName}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+        try {
+          res = await fetch(url, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const retryErr = await res.text().catch(() => '');
+            throw new AdapterError(`Gemini stream error (${res.status}): ${retryErr}`, 'gemini', res.status, false);
+          }
+        } catch (e) {
+          if (e instanceof AdapterError) throw e;
+          throw new AdapterError(`Gemini stream error (${status}): ${errText}`, 'gemini', status, false);
+        }
+      } else if (status === 400 && (errText.includes('thought_signature') || errText.includes('INVALID_ARGUMENT'))) {
         payload = await this.formatPayload(req, true);
         try {
           const retryRes = await fetch(url, {
@@ -327,14 +429,21 @@ export class GeminiAdapter implements ProviderAdapter {
           }
         } catch (e) {
           if (e instanceof AdapterError) throw e;
-          throw new AdapterError(`Gemini stream error (${res.status}): ${errText}`, 'gemini', res.status, false);
+          throw new AdapterError(`Gemini stream error (${status}): ${errText}`, 'gemini', status, false);
         }
       } else {
+        let retryAfterMs = 4500;
+        const delayMatch = errText.match(/retry in ([0-9.]+)s/i) || errText.match(/"retryDelay":\s*"([0-9.]+)s"/i);
+        if (delayMatch) {
+          retryAfterMs = Math.max(1000, Math.ceil(parseFloat(delayMatch[1]) * 1000));
+        }
         throw new AdapterError(
-          `Gemini stream error (${res.status}): ${errText}`,
+          `Gemini stream error (${status}): ${errText}`,
           'gemini',
-          res.status,
-          res.status === 429 || res.status >= 500
+          status,
+          status === 429 || status >= 500,
+          undefined,
+          retryAfterMs
         );
       }
     }
@@ -372,7 +481,16 @@ export class GeminiAdapter implements ProviderAdapter {
               finishReason?: string;
             }>;
             usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+            error?: { code?: number; message?: string };
+            promptFeedback?: { blockReason?: string };
           };
+
+          if (chunk.error) {
+            throw new AdapterError(`Gemini stream error (${chunk.error.code || 500}): ${chunk.error.message || 'Unknown error'}`, 'gemini', chunk.error.code || 500, chunk.error.code === 429 || (chunk.error.code !== undefined && chunk.error.code >= 500));
+          }
+          if (chunk.promptFeedback?.blockReason) {
+            throw new AdapterError(`Gemini response blocked by safety policy: ${chunk.promptFeedback.blockReason}`, 'gemini', 400, false);
+          }
 
           if (chunk.usageMetadata) {
             promptTokens = chunk.usageMetadata.promptTokenCount || promptTokens;

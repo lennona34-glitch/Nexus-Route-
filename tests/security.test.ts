@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
+import os from 'os';
 import { isInsideDir, sanitizeWorkspacePath } from '../src/security/path.js';
 import { validatePublicHttpUrl } from '../src/security/ssrf.js';
 import { AdminAuthService } from '../src/security/auth.js';
@@ -32,6 +33,43 @@ describe('Security Utilities & Defense-in-Depth', () => {
 
     it('should throw an error on malicious traversal in sanitizeWorkspacePath', () => {
       expect(() => sanitizeWorkspacePath('../../windows/system32/cmd.exe', parentDir)).toThrow();
+    });
+
+    it('should block Desktop targets by default in sandboxed mode', () => {
+      const userProfile = process.env.USERPROFILE || os.homedir();
+      const desktopTarget = path.resolve(userProfile, 'Desktop', 'rogue_file.txt');
+      expect(() => sanitizeWorkspacePath(desktopTarget, parentDir, { fullAccess: false, blockDesktop: true })).toThrow(/Writing to Desktop is prohibited/);
+    });
+
+    it('should block paths outside workspace in sandboxed mode', () => {
+      const userProfile = process.env.USERPROFILE || os.homedir();
+      const outsideTarget = path.resolve(userProfile, 'Documents', 'other.txt');
+      expect(() => sanitizeWorkspacePath(outsideTarget, parentDir, { fullAccess: false })).toThrow(/resolves outside designated workspace/);
+    });
+
+    it('should permit user directory in trusted mode while still shielding Desktop if blockDesktop is true', () => {
+      const userProfile = process.env.USERPROFILE || os.homedir();
+      const userDoc = path.resolve(userProfile, 'Documents', 'project.txt');
+      const desktopTarget = path.resolve(userProfile, 'Desktop', 'app.txt');
+
+      // Allowed in trusted mode
+      const sanitized = sanitizeWorkspacePath(userDoc, parentDir, { fullAccess: true, blockDesktop: true });
+      expect(sanitized).toBe(userDoc);
+
+      // Desktop still blocked because blockDesktop is true
+      expect(() => sanitizeWorkspacePath(desktopTarget, parentDir, { fullAccess: true, blockDesktop: true })).toThrow(/Writing to Desktop is prohibited/);
+    });
+
+    it('should permit Desktop only when fullAccess is true and blockDesktop is false', () => {
+      const userProfile = process.env.USERPROFILE || os.homedir();
+      const desktopTarget = path.resolve(userProfile, 'Desktop', 'allowed.txt');
+      const sanitized = sanitizeWorkspacePath(desktopTarget, parentDir, { fullAccess: true, blockDesktop: false });
+      expect(sanitized).toBe(desktopTarget);
+    });
+
+    it('should always reject Windows system directory even in trusted mode', () => {
+      const winTarget = 'C:\\Windows\\System32\\bad.dll';
+      expect(() => sanitizeWorkspacePath(winTarget, parentDir, { fullAccess: true, blockDesktop: false })).toThrow(/system directory/);
     });
   });
 

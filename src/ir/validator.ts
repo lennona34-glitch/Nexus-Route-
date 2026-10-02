@@ -71,6 +71,15 @@ export function validateAndNormalizeRequest(payload: unknown): UniversalRequest 
     metadata: typeof raw.metadata === 'object' && raw.metadata !== null ? (raw.metadata as Record<string, unknown>) : undefined,
     art_engine: typeof raw.art_engine === 'string' ? raw.art_engine : undefined,
     enable_tools: typeof raw.enable_tools === 'boolean' ? raw.enable_tools : undefined,
+    ui_origin: typeof raw.ui_origin === 'string' ? (raw.ui_origin as UniversalRequest['ui_origin']) : undefined,
+    reasoning_effort: ['none', 'low', 'medium', 'high'].includes(String(raw.reasoning_effort))
+      ? (raw.reasoning_effort as UniversalRequest['reasoning_effort'])
+      : undefined,
+    caveman_mode: typeof raw.caveman_mode === 'boolean' ? raw.caveman_mode : undefined,
+    routing_mode: ['smart_failover', 'fixed'].includes(String(raw.routing_mode))
+      ? (raw.routing_mode as UniversalRequest['routing_mode'])
+      : undefined,
+    fixed_provider_mode: typeof raw.fixed_provider_mode === 'boolean' ? raw.fixed_provider_mode : undefined,
     timeout_ms: typeof raw.timeout_ms === 'number' ? raw.timeout_ms : undefined,
   };
 }

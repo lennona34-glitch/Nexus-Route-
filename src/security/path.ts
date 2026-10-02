@@ -1,4 +1,5 @@
 import path from 'path';
+import os from 'os';
 
 export class SecurityError extends Error {
   constructor(message: string) {
@@ -21,50 +22,89 @@ export function isInsideDir(childPath: string, parentDir: string): boolean {
   return !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
+export interface FileSystemSecurityPolicy {
+  fullAccess: boolean; // default: false (sandboxed workspace mode)
+  blockDesktop: boolean; // default: true (block direct desktop writes)
+  allowedWorkspaceDir?: string;
+}
+
+let activePolicy: FileSystemSecurityPolicy = {
+  fullAccess: false,
+  blockDesktop: true,
+};
+
+export function setFileSystemPolicy(policy: Partial<FileSystemSecurityPolicy>): void {
+  activePolicy = { ...activePolicy, ...policy };
+}
+
+export function getFileSystemPolicy(): FileSystemSecurityPolicy {
+  return { ...activePolicy };
+}
+
+export function resetFileSystemPolicy(): void {
+  activePolicy = {
+    fullAccess: false,
+    blockDesktop: true,
+  };
+}
+
 /**
- * Resolves and validates that a raw target path is within the designated parent directory or user profile.
- * If safe, returns the canonical absolute path.
- * If outside boundaries or targeting Windows system directories, throws a SecurityError.
+ * Resolves and validates that a raw target path is within the designated workspace directory.
+ * In Sandboxed mode (default): models cannot write outside the designated workspace or to Desktop.
+ * In Trusted Full Access mode: models can access user project paths, but Desktop remains protected unless explicitly unblocked.
+ * System directories (e.g. C:\Windows) are always strictly forbidden.
  */
-export function sanitizeWorkspacePath(rawPath: string, parentDir: string): string {
+export function sanitizeWorkspacePath(
+  rawPath: string,
+  parentDir: string,
+  overridePolicy?: Partial<FileSystemSecurityPolicy>
+): string {
   if (!rawPath || typeof rawPath !== 'string') {
     throw new SecurityError('Invalid path provided.');
   }
 
-  const resolvedParent = path.resolve(parentDir);
-  const userProfile = process.env.USERPROFILE || 'C:\\Users\\adria';
+  const fullAccess = overridePolicy?.fullAccess ?? activePolicy.fullAccess;
+  const blockDesktop = overridePolicy?.blockDesktop ?? activePolicy.blockDesktop;
+  const effectiveParent = path.resolve(overridePolicy?.allowedWorkspaceDir || parentDir || activePolicy.allowedWorkspaceDir || process.cwd());
+  const userProfile = process.env.USERPROFILE || os.homedir();
   const resolvedUser = path.resolve(userProfile);
+  const desktopDir = path.resolve(userProfile, 'Desktop');
 
-  // If path is absolute (e.g. C:\Users\adria\Desktop\modeldock\...)
-  if (path.isAbsolute(rawPath) || /^[a-zA-Z]:[\\/]/.test(rawPath)) {
-    const resolvedTarget = path.resolve(rawPath);
+  const resolvedTarget = path.isAbsolute(rawPath) || /^[a-zA-Z]:[\\/]/.test(rawPath)
+    ? path.resolve(rawPath)
+    : path.resolve(effectiveParent, rawPath);
 
-    // Guard against Windows system directories
-    const winDir = process.env.WINDIR || 'C:\\Windows';
-    if (!path.relative(winDir, resolvedTarget).startsWith('..')) {
-      throw new SecurityError(`Access denied: Writing to system directory "${rawPath}" is prohibited.`);
-    }
-
-    // Check if target is inside user profile or designated workspace
-    const isInsideWorkspace = isInsideDir(resolvedTarget, resolvedParent);
-    const isInsideUserProfile = isInsideDir(resolvedTarget, resolvedUser);
-
-    if (isInsideWorkspace || isInsideUserProfile || resolvedTarget.startsWith(resolvedUser)) {
-      return resolvedTarget;
-    }
+  // 1. Guard against Windows system directories
+  const winDir = process.env.WINDIR || 'C:\\Windows';
+  if (!path.relative(winDir, resolvedTarget).startsWith('..')) {
+    throw new SecurityError(`Access denied: Writing to system directory "${rawPath}" is prohibited.`);
   }
 
-  // Otherwise resolve relative to parentDir
-  const resolvedTarget = path.resolve(resolvedParent, rawPath);
-  const relative = path.relative(resolvedParent, resolvedTarget);
-  const relToUser = path.relative(resolvedUser, resolvedTarget);
+  // 2. Guard against Desktop writes when blockDesktop is true or fullAccess is false
+  const isDesktopTarget = isInsideDir(resolvedTarget, desktopDir) ||
+    resolvedTarget.toLowerCase().replace(/\\/g, '/').includes('/desktop/') ||
+    resolvedTarget.toLowerCase().replace(/\\/g, '/').endsWith('/desktop');
 
-  const isInsideParent = !relative.startsWith('..') && !path.isAbsolute(relative);
-  const isInsideUser = !relToUser.startsWith('..') && !path.isAbsolute(relToUser);
+  if (isDesktopTarget && (blockDesktop || !fullAccess)) {
+    throw new SecurityError(`Access denied: Writing to Desktop is prohibited. Sandboxed workspace is active (${effectiveParent}). Enable 'Full Access (Trusted Mode)' with Desktop unblocked in Studio to permit.`);
+  }
 
-  if (!isInsideParent && !isInsideUser) {
-    throw new SecurityError(`Access denied: Path "${rawPath}" is outside accessible workspace boundaries.`);
+  // 3. Sandboxed Mode Check: Target MUST be strictly inside effectiveParent
+  const isInsideWorkspace = isInsideDir(resolvedTarget, effectiveParent) || resolvedTarget === effectiveParent;
+
+  if (!fullAccess) {
+    if (!isInsideWorkspace) {
+      throw new SecurityError(`Access denied: Path "${rawPath}" resolves outside designated workspace "${effectiveParent}". Sandboxed mode is active.`);
+    }
+    return resolvedTarget;
+  }
+
+  // 4. Trusted Full Access Mode:
+  const isInsideUserProfile = isInsideDir(resolvedTarget, resolvedUser) || resolvedTarget.startsWith(resolvedUser);
+  if (!isInsideWorkspace && !isInsideUserProfile) {
+    throw new SecurityError(`Access denied: Path "${rawPath}" is outside accessible boundaries.`);
   }
 
   return resolvedTarget;
 }
+

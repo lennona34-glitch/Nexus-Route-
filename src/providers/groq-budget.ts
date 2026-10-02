@@ -40,9 +40,11 @@ export function getGroqRequestBudget(req: UniversalRequest): GroqRequestBudget {
   const estimatedPromptTokens = estimateGroqPromptTokens(req);
   const requestedCompletionTokens = Math.max(1, req.max_tokens || 8_192);
   const availableCompletionTokens = safetyLimit - estimatedPromptTokens;
-  const maxCompletionTokens = Math.max(1024, Math.min(requestedCompletionTokens, Math.min(8192, availableCompletionTokens)));
+  const maxCompletionTokens = availableCompletionTokens > 0
+    ? Math.min(requestedCompletionTokens, Math.min(8192, availableCompletionTokens))
+    : 0;
   const minimumRequired = Math.min(requestedCompletionTokens, MIN_USEFUL_COMPLETION_TOKENS);
-  const allowed = availableCompletionTokens >= minimumRequired || maxCompletionTokens >= minimumRequired;
+  const allowed = availableCompletionTokens >= minimumRequired && maxCompletionTokens >= minimumRequired;
 
   return {
     limit,

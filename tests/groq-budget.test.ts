@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { ProviderConnectionManager } from '../src/providers/connection-manager.js';
 import { getGroqRequestBudget } from '../src/providers/groq-budget.js';
 import { RoutingEngine } from '../src/router/engine.js';
+import { MockAdapter } from '../src/adapters/mock.js';
 
 describe('Groq TPM guard', () => {
   it('rejects an oversized request before sending it upstream', () => {
+    process.env.GROQ_TPM_LIMIT = '8000';
     const budget = getGroqRequestBudget({
       model: 'groq::qwen/qwen3.6-27b',
       messages: [{ role: 'user', content: 'const value = 123;\n'.repeat(1_200) }],
@@ -17,7 +19,10 @@ describe('Groq TPM guard', () => {
   });
 
   it('falls through to the next route instead of dropping an oversized chat', async () => {
+    process.env.GROQ_TPM_LIMIT = '8000';
     const router = new RoutingEngine();
+    (router as any).configuredKeys.clear();
+    (router as any).initAdapters();
     router.setApiKey('groq', 'test-groq-key');
 
     const response = await router.executeChat({

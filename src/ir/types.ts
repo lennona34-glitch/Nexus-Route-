@@ -27,6 +27,7 @@ export interface ToolCall {
 export interface UniversalMessage {
   role: MessageRole;
   content: string | ContentPart[];
+  reasoning_content?: string | null;
   name?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
@@ -58,10 +59,17 @@ export interface UniversalRequest {
   user?: string;
   session_id?: string;
   openrouter_routing?: 'free' | 'balanced' | 'cheapest' | 'fastest' | 'tools';
+  routing_mode?: 'smart_failover' | 'fixed';
+  fixed_provider_mode?: boolean;
   art_engine?: 'cloud' | 'gpu' | 'together' | 'huggingface' | 'openai' | 'imagen' | 'auto' | string;
   enable_tools?: boolean;
+  client_agent_mode?: boolean;
+  ui_origin?: 'main_chat' | 'external_client' | string;
+  reasoning_effort?: 'none' | 'low' | 'medium' | 'high';
+  caveman_mode?: boolean;
   timeout_ms?: number;
   metadata?: Record<string, unknown>;
+  recalled_lessons?: string[];
 }
 
 export interface UniversalUsage {
@@ -138,6 +146,11 @@ export interface UniversalStreamChunk {
   usage?: UniversalUsage;
   cache_discount?: number;
   route_info?: RouteMetadata;
+  tool_progress?: {
+    name: string;
+    argument_bytes: number;
+    estimated_tokens: number;
+  };
 }
 
 export interface RouteMetadata {
@@ -181,6 +194,11 @@ export interface RouteMetadata {
     bytes_written: number;
   }>;
   turn_count?: number;
+  speculative_verified?: boolean;
+  draft_model?: string;
+  verifier_model?: string;
+  draft_rate?: number;
+  recalled_lessons?: string[];
 }
 
 export type ProviderType =
@@ -189,13 +207,23 @@ export type ProviderType =
   | 'gemini'
   | 'groq'
   | 'deepseek'
+  | 'cerebras'
+  | 'nvidia'
   | 'mistral'
   | 'xai'
   | 'openrouter'
+  | 'cheaperinference'
   | 'github'
   | 'together'
   | 'huggingface'
+  | 'unorouter'
   | 'qwen'
+  | 'xkiro'
+  | 'cloudflare'
+  | 'aimlapi'
+  | 'gmicloud'
+  | 'inception'
+  | 'atria'
   | 'local'
   | 'ollama'
   | 'mock';

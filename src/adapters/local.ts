@@ -22,10 +22,14 @@ export class LocalAdapter extends OpenAIAdapter {
   }
 
   private cleanModelName(targetModel: string): string {
-    let m = targetModel;
-    if (m.startsWith('local/')) m = m.slice(6);
-    if (m.startsWith('ollama/')) m = m.slice(7);
-    if (m === 'free') m = 'qwen2.5-coder:7b';
+    let m = targetModel.trim();
+    while (m.startsWith('local/') || m.startsWith('ollama/')) {
+      if (m.startsWith('local/')) m = m.slice(6);
+      else if (m.startsWith('ollama/')) m = m.slice(7);
+    }
+    if (m === 'free' || !m || m === 'local' || m === 'ollama') {
+      m = process.env.LOCAL_DEFAULT_MODEL || 'llama3.1:8b';
+    }
     return m;
   }
 
@@ -38,6 +42,8 @@ export class LocalAdapter extends OpenAIAdapter {
     'moondream', 'llava', 'bakllava', 'minicpm-v',
     'starcoder', 'codellama', 'wizardcoder', 'stable-code',
     'embed', 'bge-', 'nomic-',
+    'dolphin', 'roaster',
+    '1.5b', '0.5b', '1b',
   ];
 
   private isKnownToolCallingModel(modelName: string): boolean {
@@ -45,13 +51,37 @@ export class LocalAdapter extends OpenAIAdapter {
     return !LocalAdapter.NO_TOOL_SUPPORT.some(name => m.includes(name));
   }
 
+  private isThinkingModel(modelName: string): boolean {
+    const m = modelName.toLowerCase();
+    return m.includes('r1') || m.includes('deepseek-r1') || m.includes('qwq') || m.includes('reasoner') || m.includes('qwen3') || m.includes('brain');
+  }
+
   protected override buildPayload(req: UniversalRequest, targetModel: string, stream: boolean): Record<string, unknown> {
     const payload = super.buildPayload(req, targetModel, stream);
-    const numCtx = Number(process.env.OLLAMA_NUM_CTX || 32768);
+    const modelToUse = this.cleanModelName(targetModel);
+    if (!this.isThinkingModel(modelToUse)) {
+      delete (payload as any).reasoning_effort;
+      delete (payload as any).thinking;
+    } else if (
+      req.reasoning_effort === 'none' ||
+      (req as any).think === false ||
+      (req as any).no_think === true ||
+      req.messages.some(m => typeof m.content === 'string' && (m.content.includes('/no_think') || m.content.includes('[VERIFIER REPAIR PASS]')))
+    ) {
+      (payload as any).think = false;
+    }
+    const numCtx = Number(process.env.OLLAMA_NUM_CTX || 8192);
+    const numPredict = req.max_tokens || (this.isThinkingModel(modelToUse) ? 8192 : 4096);
+    const temp = req.temperature !== undefined ? req.temperature : (req.tools && req.tools.length > 0 ? 0.2 : 0.7);
     (payload as any).options = {
       ...(typeof (payload as any).options === 'object' && (payload as any).options ? (payload as any).options : {}),
       num_ctx: numCtx,
+      num_predict: numPredict,
+      temperature: temp,
+      repeat_penalty: 1.15,
+      repeat_last_n: 128,
     };
+    (payload as any).keep_alive = '60m';
     return payload;
   }
 
@@ -66,8 +96,10 @@ export class LocalAdapter extends OpenAIAdapter {
     try {
       resp = await super.chatCompletion(effectiveReq, modelToUse);
     } catch (err: unknown) {
-      if (err instanceof AdapterError && (err.message.includes('does not support tools') || err.statusCode === 400) && req.tools) {
-        resp = await super.chatCompletion({ ...req, tools: undefined, tool_choice: undefined }, modelToUse);
+      if (err instanceof AdapterError && err.message.includes('does not support thinking')) {
+        resp = await super.chatCompletion({ ...effectiveReq, reasoning_effort: undefined }, modelToUse);
+      } else if (err instanceof AdapterError && (err.message.includes('does not support tools') || err.statusCode === 400) && req.tools) {
+        resp = await super.chatCompletion({ ...req, tools: undefined, tool_choice: undefined, reasoning_effort: undefined }, modelToUse);
       } else {
         throw err;
       }
@@ -92,13 +124,31 @@ export class LocalAdapter extends OpenAIAdapter {
       } catch {}
 
       if (parsedJson && parsedJson.name) {
+        let toolName = parsedJson.name;
+        let toolArgs = parsedJson.arguments ?? {};
+        if (typeof toolArgs === 'string') {
+          try { toolArgs = JSON.parse(toolArgs); } catch {}
+        }
+        if (toolArgs && typeof toolArgs === 'object' && !Array.isArray(toolArgs)) {
+          const contentVal = (toolArgs as any).content ?? (toolArgs as any).code ?? (toolArgs as any).html_content ?? (toolArgs as any).file_content ?? (toolArgs as any).body ?? (toolArgs as any).text;
+          const filenameVal = (toolArgs as any).filename ?? (toolArgs as any).filePath ?? (toolArgs as any).path ?? (toolArgs as any).file_name ?? (toolArgs as any).file
+            ?? Object.keys(toolArgs).find(k => /\.[a-zA-Z0-9]+$/i.test(k) && typeof (toolArgs as any)[k] === 'string')
+            ?? Object.values(toolArgs).find(v => typeof v === 'string' && /\.[a-zA-Z0-9]+$/i.test(v));
+          if (typeof contentVal === 'string' && contentVal.length > 20 && filenameVal) {
+            toolName = 'write_file';
+            toolArgs = {
+              filename: String(filenameVal).replace(/^[/\\]+/, ''),
+              content: contentVal,
+            };
+          }
+        }
         msg.tool_calls = [
           {
             id: `call_${Date.now()}`,
             type: 'function',
             function: {
-              name: parsedJson.name,
-              arguments: typeof parsedJson.arguments === 'string' ? parsedJson.arguments : JSON.stringify(parsedJson.arguments || {}),
+              name: toolName,
+              arguments: typeof toolArgs === 'string' ? toolArgs : JSON.stringify(toolArgs || {}),
             },
           },
         ];
@@ -118,8 +168,10 @@ export class LocalAdapter extends OpenAIAdapter {
     try {
       yield* super.streamChatCompletion(effectiveReq, modelToUse);
     } catch (err: unknown) {
-      if (err instanceof AdapterError && (err.message.includes('does not support tools') || err.statusCode === 400) && req.tools) {
-        yield* super.streamChatCompletion({ ...req, tools: undefined, tool_choice: undefined }, modelToUse);
+      if (err instanceof AdapterError && err.message.includes('does not support thinking')) {
+        yield* super.streamChatCompletion({ ...effectiveReq, reasoning_effort: undefined }, modelToUse);
+      } else if (err instanceof AdapterError && (err.message.includes('does not support tools') || err.statusCode === 400) && req.tools) {
+        yield* super.streamChatCompletion({ ...req, tools: undefined, tool_choice: undefined, reasoning_effort: undefined }, modelToUse);
       } else {
         throw err;
       }

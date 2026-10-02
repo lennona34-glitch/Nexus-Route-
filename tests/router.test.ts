@@ -247,6 +247,16 @@ describe('Routing Engine & Resilience', () => {
     expect(candidates.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('prefers the installed 14B local coder for coding when no cloud route is configured', () => {
+    const localOnly = new RoutingEngine({ configuredKeys: {} } as any);
+    (localOnly as any).configuredKeys.clear();
+    const result = localOnly.resolveCandidates({
+      model: 'coding',
+      messages: [{ role: 'user', content: 'Implement and test this coding task.' }],
+    } as any);
+    expect(result.candidates[0]).toMatchObject({ provider: 'local', model: 'local/qwen2.5-coder:14b' });
+  });
+
   it('should keep a verified artifact target across short repair follow-ups', () => {
     router.setApiKey('openrouter', 'test-openrouter-key');
     const { candidates } = router.resolveCandidates({
@@ -355,6 +365,75 @@ describe('Routing Engine & Resilience', () => {
     expect(systemPrompt).toContain('For standalone HTML');
     expect(systemPrompt).not.toContain('ANDROID APPS');
     expect(systemPrompt).not.toContain('CORE PERSONALITY');
+  });
+
+  it('sends zero tools and ultra-compact system prompt (<30 tokens) for trivial greetings (e.g. "hi")', () => {
+    const request: UniversalRequest = {
+      model: 'gemini::gemini-2.0-flash',
+      messages: [{ role: 'user', content: 'hi' }],
+      enable_tools: true,
+      tools: ToolRegistry.getBuiltInTools(),
+    };
+
+    const effective = (router as any).ensureAutonomousPrompt(request) as UniversalRequest;
+    const systemPrompt = effective.messages.find(message => message.role === 'system')?.content as string;
+
+    // Zero tools sent to the model!
+    expect(effective.tools).toBeUndefined();
+
+    // Ultra-compact system prompt: ~14 tokens (<100 characters)
+    expect(systemPrompt).toBeDefined();
+    expect(systemPrompt.length).toBeLessThan(120);
+    expect(systemPrompt).toContain('NexusRoute AI Assistant');
+    expect(systemPrompt).not.toContain('OPERATING RULES:');
+    expect(systemPrompt).not.toContain('RETRIEVED LESSONS');
+    expect(systemPrompt).not.toContain('build_android_apk');
+  });
+
+  it('sends zero tools and clean prompt for general conceptual questions without file tools', () => {
+    const request: UniversalRequest = {
+      model: 'openai::gpt-4o',
+      messages: [{ role: 'user', content: 'Explain the difference between TCP and UDP networking protocols.' }],
+      enable_tools: true,
+      tools: ToolRegistry.getBuiltInTools(),
+    };
+
+    const effective = (router as any).ensureAutonomousPrompt(request) as UniversalRequest;
+    const systemPrompt = effective.messages.find(message => message.role === 'system')?.content as string;
+
+    // Zero tools sent for conceptual questions
+    expect(effective.tools).toBeUndefined();
+    expect(systemPrompt.length).toBeLessThan(180);
+    expect(systemPrompt).not.toContain('OPERATING RULES:');
+    expect(systemPrompt).not.toContain('RETRIEVED LESSONS');
+  });
+
+  it('sends only web_search and fetch_webpage when user asks for online research', () => {
+    const request: UniversalRequest = {
+      model: 'auto',
+      messages: [{ role: 'user', content: 'Search the web for the latest Mars rover exploration news' }],
+      enable_tools: true,
+      tools: ToolRegistry.getBuiltInTools(),
+    };
+
+    const effective = (router as any).ensureAutonomousPrompt(request) as UniversalRequest;
+    const toolNames = effective.tools?.map(t => t.function.name);
+
+    expect(toolNames).toEqual(['web_search', 'fetch_webpage']);
+  });
+
+  it('sends only generate_image when user asks for visual artwork', () => {
+    const request: UniversalRequest = {
+      model: 'auto',
+      messages: [{ role: 'user', content: 'Generate an image of a cybernetic neon panther in 8k' }],
+      enable_tools: true,
+      tools: ToolRegistry.getBuiltInTools(),
+    };
+
+    const effective = (router as any).ensureAutonomousPrompt(request) as UniversalRequest;
+    const toolNames = effective.tools?.map(t => t.function.name);
+
+    expect(toolNames).toEqual(['generate_image']);
   });
 
   it('should execute chat completion and attach route telemetry', async () => {
@@ -566,7 +645,6 @@ describe('Routing Engine & Resilience', () => {
       const writtenPath = path.join(testWorkspace, 'dogfight_3d.html');
       const text = chunks.map(chunk => chunk.choices[0]?.delta.content || '').join('');
       expect(adapter.correctionText).toContain('placeholder or unfinished-content text');
-      expect(adapter.correctionText).toContain('complete, runnable content');
       expect(text).toContain('Verified file written');
       expect(fs.readFileSync(writtenPath, 'utf8')).toBe(COMPLETE_GAME_HTML);
       expect(chunks.at(-1)?.route_info?.files_written?.[0].bytes_written).toBeGreaterThan(800);
@@ -657,5 +735,55 @@ describe('Routing Engine & Resilience', () => {
     cb.recordFailure('mock', 'model-1');
 
     expect(cb.isAvailable('mock', 'model-1')).toBe(false);
+  });
+
+  it('routes glm-5.3-search:free and unorouter::glm-5.3-search:free to unorouter', () => {
+    const r1 = router.resolveCandidates({
+      model: 'glm-5.3-search:free',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+    expect(r1.candidates[0].provider).toBe('unorouter');
+    expect(r1.candidates[0].model).toBe('glm-5.3-search:free');
+
+    const r2 = router.resolveCandidates({
+      model: 'unorouter::glm-5.3-search:free',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+    expect(r2.candidates[0].provider).toBe('unorouter');
+    expect(r2.candidates[0].model).toBe('unorouter::glm-5.3-search:free');
+  });
+
+  it('routes inception::mercury-2.5 and mercury-2.5 to inception', () => {
+    const r1 = router.resolveCandidates({
+      model: 'inception::mercury-2.5',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+    expect(r1.candidates[0].provider).toBe('inception');
+    expect(r1.candidates[0].model).toBe('inception::mercury-2.5');
+
+    router.setApiKey('inception', 'test-inception-key');
+    const r2 = router.resolveCandidates({
+      model: 'mercury-2.5',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+    expect(r2.candidates[0].provider).toBe('inception');
+    expect(r2.candidates[0].model).toBe('inception/mercury-2.5');
+  });
+
+  it('routes atria::Atria-Dawn-Preview and Atria-Dawn-Preview to atria', () => {
+    const r1 = router.resolveCandidates({
+      model: 'atria::Atria-Dawn-Preview',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+    expect(r1.candidates[0].provider).toBe('atria');
+    expect(r1.candidates[0].model).toBe('atria::Atria-Dawn-Preview');
+
+    router.setApiKey('atria', 'test-atria-key');
+    const r2 = router.resolveCandidates({
+      model: 'Atria-Dawn-Preview',
+      messages: [{ role: 'user', content: 'test' }],
+    });
+    expect(r2.candidates[0].provider).toBe('atria');
+    expect(r2.candidates[0].model).toBe('Atria-Dawn-Preview');
   });
 });

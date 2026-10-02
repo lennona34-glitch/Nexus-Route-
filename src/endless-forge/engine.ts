@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { unloadOllamaModels } from '../gpu/ollama.js';
 import { LocalGpuArtEngine } from '../engine/gpu-art.js';
 import { ToolRegistry } from '../tools/registry.js';
@@ -48,14 +49,29 @@ export class EndlessForgeEngine {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private consecutiveRenderFailures = 0;
 
+  public renderSpeedMode: 'fast' | 'hd' = 'fast';
+  public preferredModel: string = '';
+
   constructor() {
     this.refreshPromptForgeConfig();
     this.startHeartbeat();
   }
 
+  public setSpeedMode(mode: 'fast' | 'hd'): { success: boolean; mode: 'fast' | 'hd'; text: string } {
+    this.renderSpeedMode = mode === 'hd' ? 'hd' : 'fast';
+    return {
+      success: true,
+      mode: this.renderSpeedMode,
+      text: this.renderSpeedMode === 'hd'
+        ? '✨ Endless Forge switched to **Full HD Masterpiece Mode** (SDXL Base 1.0 @ 1024x1024, 28 steps · ~2 pics/min).'
+        : '⚡ Endless Forge switched to **Fast Stream Mode** (majicMIX Realistic @ 512x512 · ~2.5s/pic).'
+    };
+  }
+
   public refreshPromptForgeConfig(): { token: string; port: number } {
     try {
-      const configPath = 'C:\\Users\\adria\\AppData\\Local\\PromptForgeRTX\\config.json';
+      const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : os.homedir());
+      const configPath = path.join(localAppData, 'PromptForgeRTX', 'config.json');
       if (fs.existsSync(configPath)) {
         const pfJson = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         if (pfJson.api_token) this.pfToken = pfJson.api_token;
@@ -90,13 +106,16 @@ export class EndlessForgeEngine {
       };
     }
 
-    this.refreshPromptForgeConfig();
     try {
-      const res = await fetch(`http://127.0.0.1:${this.pfPort}/health`, { signal: AbortSignal.timeout(1000) });
+      this.refreshPromptForgeConfig();
+      const res = await fetch(`http://127.0.0.1:${this.pfPort}/v1/engine/status`, {
+        headers: this.pfToken ? { Authorization: `Bearer ${this.pfToken}` } : {},
+        signal: AbortSignal.timeout(2000),
+      });
       if (res.ok) {
         const data = (await res.json()) as any;
         return {
-          online: data.status === 'ok',
+          online: true,
           activeModel: data.active_model || 'PromptForge RTX',
           queueBusy: data.gpu_queue_busy,
         };
@@ -112,13 +131,20 @@ export class EndlessForgeEngine {
 
   public getStatus() {
     return {
+      success: true,
       state: this.state,
+      isRunning: this.state === 'running',
+      isPaused: this.state === 'paused',
+      isStopped: this.state === 'stopped' || this.state === 'idle',
       currentProgress: this.currentProgress,
       maxArtworks: this.maxArtworks,
       ledgerLength: this.ledger.length,
       currentDirection: this.currentDirection,
       isProcessing: this.isProcessing,
+      speedMode: this.renderSpeedMode,
       lastArtwork: this.ledger[this.ledger.length - 1] || null,
+      currentArtwork: this.ledger[this.ledger.length - 1] || null,
+      history: this.ledger,
       sessionElapsedSeconds: this.sessionStartTime ? Math.floor((Date.now() - this.sessionStartTime) / 1000) : 0,
     };
   }
@@ -128,15 +154,19 @@ export class EndlessForgeEngine {
     return {
       success: true,
       state: this.state,
+      isRunning: this.state === 'running',
+      isPaused: this.state === 'paused',
       currentProgress: this.currentProgress,
       maxArtworks: this.maxArtworks,
       isProcessing: this.isProcessing,
+      speedMode: this.renderSpeedMode,
       lastArtwork: this.ledger[this.ledger.length - 1] || null,
+      currentArtwork: this.ledger[this.ledger.length - 1] || null,
       newEntries,
     };
   }
 
-  public async handleCommand(command: string, theme?: string): Promise<{ text: string; artwork?: ArtworkLedgerEntry }> {
+  public async handleCommand(command: string, theme?: string): Promise<{ success: boolean; text: string; artwork?: ArtworkLedgerEntry; status?: any }> {
     const cleanCmd = command.trim().toLowerCase();
     let explicitTheme = theme?.trim() || '';
     if (!explicitTheme) {
@@ -153,13 +183,13 @@ export class EndlessForgeEngine {
     if (cleanCmd.includes('skip')) return this.skipConcept();
     if (cleanCmd.includes('evolve')) return this.evolveConcept();
     if (cleanCmd.includes('pivot')) return this.hardPivot();
-    return { text: `Unknown Endless Forge command: "${command}". Available: Start Endless Forge, Pause Endless Forge, Stop Endless Forge, Skip, Evolve this, Hard pivot.` };
+    return { success: false, text: `Unknown Endless Forge command: "${command}". Available: Start Endless Forge, Pause Endless Forge, Stop Endless Forge, Skip, Evolve this, Hard pivot.`, status: this.getStatus() };
   }
 
-  public async startSession(theme?: string, maxArtworks = 100): Promise<{ text: string; artwork?: ArtworkLedgerEntry }> {
+  public async startSession(theme?: string, maxArtworks = 100, model?: string): Promise<{ success: boolean; text: string; artwork?: ArtworkLedgerEntry; status: any }> {
     const health = await this.checkHealth();
     if (!health.online) {
-      return { text: '⚠️ PromptForge RTX is unavailable. Please launch PromptForge RTX on your PC, then click **Start Endless Forge**.' };
+      return { success: false, text: '⚠️ PromptForge RTX is unavailable. Please launch PromptForge RTX on your PC, then click **Start Endless Forge**.', status: this.getStatus() };
     }
     const ollamaUnload = await unloadOllamaModels();
     if (this.state === 'stopped' || this.currentProgress >= this.maxArtworks) {
@@ -168,45 +198,50 @@ export class EndlessForgeEngine {
     this.state = 'running';
     this.maxArtworks = Math.max(maxArtworks, this.currentProgress + 25);
     this.sessionStartTime = Date.now();
+    if (model) {
+      this.preferredModel = model;
+    }
     if (theme !== undefined) {
       this.currentDirection = theme?.trim() || '';
     }
     const started = this.launchRender();
     return {
+      success: true,
       text: started
         ? `🔥 **Endless Forge started.**${ollamaUnload.unloadedModels.length ? ` Freed Ollama VRAM from ${ollamaUnload.unloadedModels.join(', ')}.` : ''} The first artwork is rendering on ${health.activeModel || 'PromptForge RTX'} and will appear in the live feed when complete.`
         : '⚡ Endless Forge is already rendering an artwork. The result will appear in the live feed when complete.',
+      status: this.getStatus(),
     };
   }
 
-  public pauseSession(): { text: string } {
+  public pauseSession(): { success: boolean; text: string; status: any } {
     this.state = 'paused';
     if (this.loopTimeout) clearTimeout(this.loopTimeout);
-    return { text: `⏸️ **Endless Forge Paused.** On standby at ${this.currentProgress} artworks. Click **Start Endless Forge** to resume.` };
+    return { success: true, text: `⏸️ **Endless Forge Paused.** On standby at ${this.currentProgress} artworks. Click **Start Endless Forge** to resume.`, status: this.getStatus() };
   }
 
-  public stopSession(): { text: string } {
+  public stopSession(): { success: boolean; text: string; status: any } {
     this.state = 'stopped';
     if (this.loopTimeout) clearTimeout(this.loopTimeout);
-    return { text: `⏹️ **Endless Forge Stopped.** Session ended after ${this.currentProgress} artworks rendered.` };
+    return { success: true, text: `⏹️ **Endless Forge Stopped.** Session ended after ${this.currentProgress} artworks rendered.`, status: this.getStatus() };
   }
 
-  public async skipConcept(): Promise<{ text: string; artwork?: ArtworkLedgerEntry }> {
+  public async skipConcept(): Promise<{ success: boolean; text: string; artwork?: ArtworkLedgerEntry; status: any }> {
     this.state = 'running';
     const started = this.launchRender({ forceFresh: true });
-    return { text: started ? '⏭️ Current concept skipped. A fresh direction is rendering.' : '⚡ The current GPU render must finish before Skip can take effect.' };
+    return { success: true, text: started ? '⏭️ Current concept skipped. A fresh direction is rendering.' : '⚡ The current GPU render must finish before Skip can take effect.', status: this.getStatus() };
   }
 
-  public async evolveConcept(): Promise<{ text: string; artwork?: ArtworkLedgerEntry }> {
+  public async evolveConcept(): Promise<{ success: boolean; text: string; artwork?: ArtworkLedgerEntry; status: any }> {
     this.state = 'running';
     const started = this.launchRender({ evolve: true });
-    return { text: started ? '🧬 Evolution queued. The next variation is rendering.' : '⚡ The current GPU render must finish before Evolve can take effect.' };
+    return { success: true, text: started ? '🧬 Evolution queued. The next variation is rendering.' : '⚡ The current GPU render must finish before Evolve can take effect.', status: this.getStatus() };
   }
 
-  public async hardPivot(): Promise<{ text: string; artwork?: ArtworkLedgerEntry }> {
+  public async hardPivot(): Promise<{ success: boolean; text: string; artwork?: ArtworkLedgerEntry; status: any }> {
     this.state = 'running';
     const started = this.launchRender({ hardPivot: true });
-    return { text: started ? '↪️ Hard pivot accepted. A substantially different concept is rendering.' : '⚡ The current GPU render must finish before Hard Pivot can take effect.' };
+    return { success: true, text: started ? '↪️ Hard pivot accepted. A substantially different concept is rendering.' : '⚡ The current GPU render must finish before Hard Pivot can take effect.', status: this.getStatus() };
   }
 
   private launchRender(options: { forceFresh?: boolean; evolve?: boolean; hardPivot?: boolean } = {}): boolean {
@@ -239,7 +274,7 @@ export class EndlessForgeEngine {
       if (this.state === 'running') {
         this.scheduleNextLoop();
       }
-    }, 2500);
+    }, 100);
   }
 
   public async renderNextArtwork(options: { forceFresh?: boolean; evolve?: boolean; hardPivot?: boolean } = {}): Promise<{ text: string; artwork?: ArtworkLedgerEntry }> {
@@ -617,18 +652,31 @@ export class EndlessForgeEngine {
   private async executePromptForgeRender(concept: { prompt: string; negativePrompt: string; size: string }): Promise<{ seed: number; imageUrl: string; localPath: string }> {
     const seed = Math.floor(Math.random() * 1000000);
     const [wStr, hStr] = (concept.size || '512x512').split('x');
-    const width = parseInt(wStr, 10) || 512;
-    const height = parseInt(hStr, 10) || 512;
+    const origW = parseInt(wStr, 10) || 512;
+    const origH = parseInt(hStr, 10) || 512;
     const wsDir = ToolRegistry.getWorkspaceDir();
+    const isHd = this.renderSpeedMode === 'hd';
 
-    // 1. Primary: Native Local NVIDIA GeForce RTX 4060 GPU Art Engine (1-step SDXL / SD Turbo)
+    const activeModel = this.preferredModel || (isHd ? 'stabilityai/stable-diffusion-xl-base-1.0' : 'local:checkpoints/majicmixRealistic_v7.safetensors');
+    const isSd15 = activeModel.includes('1.5') || activeModel.toLowerCase().includes('majicmix') || activeModel.toLowerCase().includes('revanimated') || activeModel.toLowerCase().includes('dreamshaper') || activeModel.toLowerCase().includes('.safetensors') || activeModel.toLowerCase().includes('checkpoints');
+
+    const renderW = isSd15 ? 512 : (isHd ? (origW > origH ? 1152 : (origH > origW ? 832 : 1024)) : (origW > origH ? 768 : (origH > origW ? 512 : 512)));
+    const renderH = isSd15 ? 512 : (isHd ? (origH > origW ? 1152 : (origW > origH ? 832 : 1024)) : (origH > origW ? 768 : (origW > origH ? 512 : 512)));
+    const steps = isSd15 ? 25 : (isHd ? 28 : 1);
+    const guidance = isSd15 ? 6.5 : (isHd ? 6.5 : 0.0);
+    const model = activeModel;
+
+    // 1. Primary: Native Local NVIDIA GeForce RTX 4060 GPU Art Engine
     try {
       const gpuRes = await LocalGpuArtEngine.generateImage({
         prompt: concept.prompt,
-        width: Math.min(width, 1024),
-        height: Math.min(height, 1024),
-        steps: 1,
+        negativePrompt: concept.negativePrompt,
+        width: renderW,
+        height: renderH,
+        steps,
+        guidance,
         seed,
+        model,
       }, wsDir);
 
       if (gpuRes.success && gpuRes.url) {
@@ -696,7 +744,7 @@ export class EndlessForgeEngine {
               return {
                 seed: finalJob.data[0].seed || seed,
                 imageUrl: `/v1/promptforge/images/${jobId}.png`,
-                localPath: 'C:\\Users\\adria\\Pictures\\PromptForge RTX',
+                localPath: path.join(process.env.USERPROFILE || os.homedir(), 'Pictures', 'PromptForge RTX'),
               };
             }
           }

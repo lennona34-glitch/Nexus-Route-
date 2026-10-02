@@ -83,6 +83,8 @@ export class EmbeddedLocalEngine {
       return false;
     }
 
+    this.cleanOrphanedLlamaServers();
+
     const modelsPath = this.getModelsDirectory();
     console.log(`[EmbeddedLocalEngine] Launching standalone engine daemon from ${bin}...`);
     console.log(`[EmbeddedLocalEngine] Using persistent models store at: ${modelsPath}`);
@@ -135,15 +137,38 @@ export class EmbeddedLocalEngine {
     }
   }
 
+  static cleanOrphanedLlamaServers(): void {
+    if (process.platform === 'win32') {
+      try {
+        spawn('powershell', [
+          '-NoProfile',
+          '-Command',
+          `Get-CimInstance Win32_Process -Filter "Name = 'llama-server.exe'" | ForEach-Object {
+            $p = Get-Process -Id $_.ParentProcessId -ErrorAction SilentlyContinue
+            if (-not $p -or $p.ProcessName -ne 'ollama') {
+              Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+          }`
+        ], { stdio: 'ignore', windowsHide: true });
+      } catch {}
+    }
+  }
+
   static stop(): void {
     if (this.childProcess && this.isManaged) {
       console.log(`[EmbeddedLocalEngine] Stopping standalone engine daemon...`);
+      const pid = this.childProcess.pid;
       try {
-        this.childProcess.kill('SIGTERM');
+        if (process.platform === 'win32' && pid) {
+          spawn('taskkill', ['/F', '/T', '/PID', pid.toString()], { stdio: 'ignore', windowsHide: true });
+        } else {
+          this.childProcess.kill('SIGTERM');
+        }
       } catch {}
       this.childProcess = null;
       this.isManaged = false;
     }
+    this.cleanOrphanedLlamaServers();
   }
 
   static formatBytes(bytes: number): string {
@@ -262,6 +287,9 @@ export class EmbeddedLocalEngine {
           if (!trimmed) continue;
           try {
             const parsed = JSON.parse(trimmed);
+            if (parsed.error) {
+              return { success: false, message: parsed.error };
+            }
             let percent: number | undefined;
             if (parsed.total && parsed.completed) {
               percent = Math.min(100, Math.round((parsed.completed / parsed.total) * 100));
@@ -312,25 +340,313 @@ export class EmbeddedLocalEngine {
     }
   }
 
+  static parseModelfile(modelfileContent: string): {
+    from?: string;
+    system?: string;
+    template?: string;
+    parameters: Record<string, unknown>;
+  } {
+    const result: {
+      from?: string;
+      system?: string;
+      template?: string;
+      parameters: Record<string, unknown>;
+    } = {
+      parameters: {},
+    };
+
+    const lines = modelfileContent.split(/\r?\n/);
+    let inSystemBlock = false;
+    let systemBuffer: string[] = [];
+    let inTemplateBlock = false;
+    let templateBuffer: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (inSystemBlock) {
+        if (line.includes('"""') || line.includes("'''")) {
+          const quote = line.includes('"""') ? '"""' : "'''";
+          const part = line.slice(0, line.indexOf(quote));
+          if (part) systemBuffer.push(part);
+          inSystemBlock = false;
+          result.system = systemBuffer.join('\n').trim();
+        } else {
+          systemBuffer.push(line);
+        }
+        continue;
+      }
+
+      if (inTemplateBlock) {
+        if (line.includes('"""') || line.includes("'''")) {
+          const quote = line.includes('"""') ? '"""' : "'''";
+          const part = line.slice(0, line.indexOf(quote));
+          if (part) templateBuffer.push(part);
+          inTemplateBlock = false;
+          result.template = templateBuffer.join('\n').trim();
+        } else {
+          templateBuffer.push(line);
+        }
+        continue;
+      }
+
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const fromMatch = trimmed.match(/^FROM\s+(.+)$/i);
+      if (fromMatch) {
+        result.from = fromMatch[1].trim().replace(/^["']|["']$/g, '');
+        continue;
+      }
+
+      const systemTripleMatch = trimmed.match(/^SYSTEM\s+("""|''')([\s\S]*)$/i);
+      if (systemTripleMatch) {
+        const quote = systemTripleMatch[1];
+        const rest = systemTripleMatch[2];
+        if (rest.includes(quote)) {
+          result.system = rest.slice(0, rest.indexOf(quote)).trim();
+        } else {
+          inSystemBlock = true;
+          systemBuffer = [rest];
+        }
+        continue;
+      }
+
+      const systemSingleMatch = trimmed.match(/^SYSTEM\s+(.+)$/i);
+      if (systemSingleMatch) {
+        result.system = systemSingleMatch[1].trim().replace(/^["']|["']$/g, '');
+        continue;
+      }
+
+      const templateTripleMatch = trimmed.match(/^TEMPLATE\s+("""|''')([\s\S]*)$/i);
+      if (templateTripleMatch) {
+        const quote = templateTripleMatch[1];
+        const rest = templateTripleMatch[2];
+        if (rest.includes(quote)) {
+          result.template = rest.slice(0, rest.indexOf(quote)).trim();
+        } else {
+          inTemplateBlock = true;
+          templateBuffer = [rest];
+        }
+        continue;
+      }
+
+      const templateSingleMatch = trimmed.match(/^TEMPLATE\s+(.+)$/i);
+      if (templateSingleMatch) {
+        result.template = templateSingleMatch[1].trim().replace(/^["']|["']$/g, '');
+        continue;
+      }
+
+      const paramMatch = trimmed.match(/^PARAMETER\s+([a-zA-Z0-9_-]+)\s+(.+)$/i);
+      if (paramMatch) {
+        const paramKey = paramMatch[1].trim();
+        const rawVal = paramMatch[2].trim().replace(/^["']|["']$/g, '');
+        let parsedVal: unknown = rawVal;
+        if (/^-?\d+$/.test(rawVal)) {
+          parsedVal = parseInt(rawVal, 10);
+        } else if (/^-?\d+(\.\d+)?$/.test(rawVal)) {
+          parsedVal = parseFloat(rawVal);
+        } else if (rawVal.toLowerCase() === 'true') {
+          parsedVal = true;
+        } else if (rawVal.toLowerCase() === 'false') {
+          parsedVal = false;
+        }
+
+        if (paramKey === 'stop') {
+          if (!Array.isArray(result.parameters['stop'])) {
+            result.parameters['stop'] = [];
+          }
+          (result.parameters['stop'] as string[]).push(rawVal);
+        } else {
+          result.parameters[paramKey] = parsedVal;
+        }
+        continue;
+      }
+    }
+
+    if (inSystemBlock && systemBuffer.length > 0) {
+      result.system = systemBuffer.join('\n').trim();
+    }
+    if (inTemplateBlock && templateBuffer.length > 0) {
+      result.template = templateBuffer.join('\n').trim();
+    }
+
+    return result;
+  }
+
+  static sanitizeModelName(raw: string): string {
+    if (!raw) return '';
+    let clean = raw.trim()
+      .replace(/[\s\t\r\n]+/g, '-')
+      .replace(/[^a-zA-Z0-9_.:/-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^[:.-]+/, '')
+      .replace(/[:.-]+$/, '');
+
+    const colonParts = clean.split(':');
+    if (colonParts.length > 2) {
+      clean = colonParts.slice(0, -1).join('-') + ':' + colonParts[colonParts.length - 1];
+    }
+    return clean;
+  }
+
+  static async createModelFromGgufFile(
+    cleanName: string,
+    ggufPath: string,
+    options: { system?: string; template?: string; parameters?: Record<string, unknown> },
+    onChunk: (chunk: { status: string; total?: number; completed?: number; percent?: number }) => void
+  ): Promise<{ success: boolean; message: string }> {
+    const binPath = this.getBinaryPath();
+    if (!binPath || !fs.existsSync(binPath)) {
+      return { success: false, message: `Engine binary not found at ${binPath}` };
+    }
+
+    const tmpDir = path.join(process.cwd(), 'workspace', 'tmp');
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    const tmpModelfile = path.join(tmpDir, `Modelfile_${Date.now()}`);
+
+    try {
+      let mfContent = `FROM "${ggufPath.replace(/\\/g, '/')}"\n`;
+      const system = (options.system || '').trim();
+      if (system) {
+        mfContent += `SYSTEM """${system}"""\n`;
+      }
+      const template = (options.template || '').trim();
+      if (template) {
+        mfContent += `TEMPLATE """${template}"""\n`;
+      }
+      if (options.parameters) {
+        for (const [k, v] of Object.entries(options.parameters)) {
+          if (Array.isArray(v)) {
+            for (const item of v) mfContent += `PARAMETER ${k} "${item}"\n`;
+          } else {
+            mfContent += `PARAMETER ${k} ${v}\n`;
+          }
+        }
+      }
+      fs.writeFileSync(tmpModelfile, mfContent, 'utf-8');
+
+      return new Promise((resolve) => {
+        const proc = spawn(binPath, ['create', cleanName, '-f', tmpModelfile], {
+          env: { ...process.env, OLLAMA_HOST: `${this.host}:${this.port}` },
+        });
+
+        let stderr = '';
+        const handleData = (data: Buffer) => {
+          const text = data.toString();
+          stderr += text;
+          const lines = text.split(/\r?\n/);
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed) {
+              onChunk({ status: trimmed });
+            }
+          }
+        };
+
+        proc.stdout.on('data', handleData);
+        proc.stderr.on('data', handleData);
+
+        proc.on('close', (code) => {
+          try {
+            if (fs.existsSync(tmpModelfile)) fs.unlinkSync(tmpModelfile);
+          } catch {}
+
+          if (code === 0) {
+            resolve({ success: true, message: `Successfully built and registered model "${cleanName}" from local GGUF!` });
+          } else {
+            resolve({ success: false, message: `GGUF build failed: ${stderr.slice(-300)}` });
+          }
+        });
+
+        proc.on('error', (err) => {
+          try {
+            if (fs.existsSync(tmpModelfile)) fs.unlinkSync(tmpModelfile);
+          } catch {}
+          resolve({ success: false, message: `Failed to spawn engine CLI: ${err.message}` });
+        });
+      });
+    } catch (err: any) {
+      try {
+        if (fs.existsSync(tmpModelfile)) fs.unlinkSync(tmpModelfile);
+      } catch {}
+      return { success: false, message: `Error creating model from GGUF: ${err.message}` };
+    }
+  }
+
   static async createModelStream(
     options: { name: string; modelfile?: string; from?: string; system?: string; template?: string; parameters?: Record<string, unknown> },
     onChunk: (chunk: { status: string; total?: number; completed?: number; percent?: number }) => void
   ): Promise<{ success: boolean; message: string }> {
     try {
-      const cleanName = options.name.replace(/^local\//, '').trim();
+      let cleanName = (options.name || '').replace(/^local\//, '').trim();
+      cleanName = this.sanitizeModelName(cleanName);
+      if (!cleanName) {
+        return { success: false, message: 'Target model name is required and must contain alphanumeric characters (e.g. "my-custom-model").' };
+      }
+
+      let parsedMf: { from?: string; system?: string; template?: string; parameters: Record<string, unknown> } = { parameters: {} };
+      if (options.modelfile && options.modelfile.trim()) {
+        parsedMf = this.parseModelfile(options.modelfile.trim());
+      }
+
+      const rawFrom = (options.from || parsedMf.from || '').trim();
+      let cleanFrom = rawFrom.replace(/^local\//, '').trim();
+      if (!cleanFrom) {
+        return { success: false, message: 'Base model (FROM) is required to build a model.' };
+      }
+
+      if (cleanFrom.includes('custom-weights.gguf') || cleanFrom.includes('path/to') || cleanFrom.includes('path\\to')) {
+        return { success: false, message: 'Please provide a valid, existing .gguf file path or choose an installed model instead of the example placeholder.' };
+      }
+
+      const effectiveSystem = (options.system !== undefined && options.system !== '' ? options.system : parsedMf.system || '').trim();
+      let effectiveTemplate = (options.template !== undefined && options.template !== '' ? options.template : parsedMf.template || '').trim();
+      if (!effectiveTemplate && cleanFrom.toLowerCase().includes('starcoder')) {
+        effectiveTemplate = '{{- if .System }}<|im_start|>system\n{{ .System }}<|im_end|>\n{{ end }}{{ if .Prompt }}<|im_start|>user\n{{ .Prompt }}<|im_end|>\n{{ end }}<|im_start|>assistant\n{{ .Response }}<|im_end|>';
+      }
+
+      const effectiveParameters: Record<string, unknown> = {
+        ...parsedMf.parameters,
+        ...(options.parameters || {}),
+      };
+
+      if (!effectiveParameters.stop) {
+        effectiveParameters.stop = ['<|im_start|>', '<|im_end|>', '<|end_of_text|>'];
+      } else if (Array.isArray(effectiveParameters.stop)) {
+        if (!effectiveParameters.stop.includes('<|end_of_text|>')) {
+          effectiveParameters.stop.push('<|end_of_text|>');
+        }
+      }
+      if (effectiveParameters.repeat_penalty === undefined) {
+        effectiveParameters.repeat_penalty = 1.15;
+      }
+
+      const isFilePath = cleanFrom.endsWith('.gguf') || cleanFrom.endsWith('.bin') || cleanFrom.includes('\\') || (cleanFrom.includes('/') && !cleanFrom.includes(':') && !cleanFrom.startsWith('hf.co/'));
+
+      if (isFilePath) {
+        if (!fs.existsSync(cleanFrom)) {
+          return { success: false, message: `Base GGUF file not found: "${cleanFrom}". Please verify the file path exists on your computer or choose an installed model from the dropdown.` };
+        }
+        return this.createModelFromGgufFile(cleanName, cleanFrom, {
+          system: effectiveSystem,
+          template: effectiveTemplate,
+          parameters: effectiveParameters,
+        }, onChunk);
+      }
+
       const bodyPayload: Record<string, unknown> = {
         name: cleanName,
+        from: cleanFrom,
         stream: true,
       };
 
-      if (options.modelfile && options.modelfile.trim()) {
-        bodyPayload.modelfile = options.modelfile.trim();
-      } else {
-        if (options.from) bodyPayload.from = options.from.trim();
-        if (options.system) bodyPayload.system = options.system.trim();
-        if (options.template) bodyPayload.template = options.template.trim();
-        if (options.parameters) bodyPayload.parameters = options.parameters;
-      }
+      if (effectiveSystem) bodyPayload.system = effectiveSystem;
+      if (effectiveTemplate) bodyPayload.template = effectiveTemplate;
+      if (Object.keys(effectiveParameters).length > 0) bodyPayload.parameters = effectiveParameters;
+      if (options.modelfile && options.modelfile.trim()) bodyPayload.modelfile = options.modelfile.trim();
 
       const res = await fetch(`http://${this.host}:${this.port}/api/create`, {
         method: 'POST',
@@ -363,6 +679,9 @@ export class EmbeddedLocalEngine {
           if (!trimmed) continue;
           try {
             const parsed = JSON.parse(trimmed);
+            if (parsed.error) {
+              return { success: false, message: parsed.error };
+            }
             let percent: number | undefined;
             if (parsed.total && parsed.completed) {
               percent = Math.min(100, Math.round((parsed.completed / parsed.total) * 100));

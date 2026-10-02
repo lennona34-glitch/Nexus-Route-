@@ -178,4 +178,89 @@ describe('Live provider model catalogue', () => {
     expect((failure as AdapterError).statusCode).toBe(429);
     expect((failure as AdapterError).isRetryable).toBe(true);
   });
+
+  it('pins configured target model to the top of discovered models with a star, even if already present', async () => {
+    vi.stubEnv('UNOROUTER_DEFAULT_MODEL', 'glm-5.3-search:free');
+    const pool = new ProviderConnectionManager({ storagePath: null, hydrateEnvironment: false });
+    pool.addConnection('unorouter', 'test-unorouter-key', {}, false);
+
+    const fetchImpl = vi.fn(async () => {
+      return new Response(JSON.stringify({
+        data: [
+          { id: 'codestral-latest:free', name: 'Codestral' },
+          { id: 'glm-5.3-search:free', name: 'GLM 5.3 Search' },
+          { id: 'qwen-2.5-coder:free', name: 'Qwen Coder' },
+        ],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    const discovery = new ProviderModelDiscovery(pool, { fetchImpl });
+    const catalogue = await discovery.getCatalogue();
+    const group = catalogue.providers.find(p => p.provider === 'unorouter');
+
+    expect(group?.status).toBe('ready');
+    expect(group?.models[0].id).toBe('glm-5.3-search:free');
+    expect(group?.models[0].name).toContain('⭐');
+    expect(group?.models[0].name).toContain('Configured Target');
+    expect(group?.models[0].routeId).toBe('unorouter::glm-5.3-search:free');
+  });
+
+  it('extracts retryAfterMs from error message bodies when retry-after header is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({
+        error: {
+          message: 'Too many requests. The free tier allows 1 request(s) every 1 min per account on glm-5.3-search:free - nothing is used up, retry in 24s...',
+        },
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } },
+    )));
+    const adapter = new OpenAIAdapter({
+      provider: 'unorouter', apiKey: 'test', baseUrl: 'https://api.unorouter.com/v1',
+    });
+
+    let failure: unknown;
+    try {
+      await adapter.chatCompletion({
+        model: 'glm-5.3-search:free',
+        messages: [{ role: 'user', content: 'hi' }],
+      }, 'glm-5.3-search:free');
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(AdapterError);
+    expect((failure as AdapterError).statusCode).toBe(429);
+    expect((failure as AdapterError).retryAfterMs).toBe(24000);
+  });
+
+  it('discovers models for Atria ASI with fallback', async () => {
+    const pool = new ProviderConnectionManager({ storagePath: null, hydrateEnvironment: false });
+    pool.addConnection('atria', 'secret-atria-key', { label: 'Atria ASI' }, false);
+
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer secret-atria-key');
+      return new Response(JSON.stringify({
+        data: [
+          { id: 'Atria-Dawn-Preview', name: 'Atria-Dawn-Preview' },
+          { id: 'Atria-Dawn', name: 'Atria-Dawn' },
+        ],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+
+    const discovery = new ProviderModelDiscovery(pool, { fetchImpl, cacheTtlMs: 60_000 });
+    const catalogue = await discovery.getCatalogue();
+    const group = catalogue.providers.find(provider => provider.provider === 'atria');
+
+    expect(group?.status).toBe('ready');
+    expect(group?.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'Atria-Dawn-Preview',
+        routeId: 'atria::Atria-Dawn-Preview',
+      }),
+      expect.objectContaining({
+        id: 'Atria-Dawn',
+        routeId: 'atria::Atria-Dawn',
+      }),
+    ]));
+  });
 });

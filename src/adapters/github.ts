@@ -1,4 +1,4 @@
-﻿import { ProviderAdapter, AdapterError } from './base.js';
+import { ProviderAdapter, AdapterError } from './base.js';
 import { UniversalRequest, UniversalResponse, UniversalStreamChunk, ProviderType } from '../ir/types.js';
 import { readStreamWithInactivityTimeout } from './base.js';
 
@@ -19,6 +19,7 @@ export class GitHubAdapter implements ProviderAdapter {
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'User-Agent': 'NexusRoute/1.3.0 (+https://github.com/nexusroute/nexus-route)',
     };
     if (this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;

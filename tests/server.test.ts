@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { app, keyManager } from '../src/server.js';
 import { MockAdapter } from '../src/adapters/mock.js';
 
@@ -33,7 +33,7 @@ describe('NexusRoute Gateway HTTP API', () => {
 
   it('allows bounded multimodal request bodies larger than Fastify\'s 1 MB default', () => {
     expect(app.initialConfig.bodyLimit).toBeGreaterThanOrEqual(2 * 1024 * 1024);
-    expect(app.initialConfig.bodyLimit).toBeLessThanOrEqual(50 * 1024 * 1024);
+    expect(app.initialConfig.bodyLimit).toBeLessThanOrEqual(100 * 1024 * 1024);
   });
 
   it('GET /v1/models should return OpenAI-formatted list', async () => {
@@ -130,4 +130,51 @@ describe('NexusRoute Gateway HTTP API', () => {
     });
     expect(resetRes.statusCode).toBe(200);
   }, 15000);
+
+  it('GET /v1/hf/models returns likes and likesFormatted for model cards', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+      const urlStr = typeof input === 'string' ? input : (input?.url || '');
+      if (urlStr.includes('huggingface.co/api/models')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              id: 'stabilityai/sdxl-turbo',
+              downloads: 1250000,
+              likes: 2631,
+              tags: ['stable-diffusion-xl', 'text-to-image'],
+              cardData: { instance_prompt: 'photo' },
+            },
+            {
+              id: 'test/small-model',
+              downloads: 450,
+              likes: 42,
+              tags: [],
+            },
+          ],
+        } as any;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as any;
+    });
+
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/v1/hf/models?q=sdxl',
+      });
+      expect(res.statusCode).toBe(200);
+      const data = res.json();
+      expect(data.success).toBe(true);
+      expect(data.models).toHaveLength(2);
+      expect(data.models[0].likes).toBe(2631);
+      expect(data.models[0].likesFormatted).toBe('2.6k');
+      expect(data.models[0].downloadsFormatted).toBe('1.3M');
+      expect(data.models[1].likes).toBe(42);
+      expect(data.models[1].likesFormatted).toBe('42');
+      expect(data.models[1].downloadsFormatted).toBe('450');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });

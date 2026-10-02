@@ -7,6 +7,36 @@ const modelSelect = document.getElementById('modelSelect');
 const openRouterRoutingSelect = document.getElementById('openRouterRoutingSelect');
 const streamToggle = document.getElementById('streamToggle');
 const toolsToggle = document.getElementById('toolsToggle');
+const scrollBottomBtn = document.getElementById('scrollBottomBtn');
+
+let userScrolledUp = false;
+
+function checkUserScrolledUp() {
+  if (!chatMessages) return false;
+  const distanceFromBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+  return distanceFromBottom > 90;
+}
+
+if (chatMessages) {
+  chatMessages.addEventListener('scroll', () => {
+    userScrolledUp = checkUserScrolledUp();
+    if (scrollBottomBtn) {
+      if (userScrolledUp && chatMessages.children.length > 1) {
+        scrollBottomBtn.classList.remove('hidden');
+      } else {
+        scrollBottomBtn.classList.add('hidden');
+      }
+    }
+  }, { passive: true });
+}
+
+if (scrollBottomBtn) {
+  scrollBottomBtn.addEventListener('click', () => {
+    userScrolledUp = false;
+    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+    scrollBottomBtn.classList.add('hidden');
+  });
+}
 
 // Inspector Elements
 const kpiModel = document.getElementById('kpiModel');
@@ -26,6 +56,51 @@ const clearCacheBtn = document.getElementById('clearCacheBtn');
 const intentCategory = document.getElementById('intentCategory');
 const complexityPill = document.getElementById('complexityPill');
 const classifierDesc = document.getElementById('classifierDesc');
+
+// Mobile Media Save & Web Share Helper
+window.downloadOrShareMedia = async function(url, filename, title) {
+  if (!url) return;
+  const fullUrl = url.startsWith('http') ? url : (window.location.origin + (url.startsWith('/') ? url : '/' + url));
+  const safeFilename = filename || url.split('/').pop()?.split('?')[0] || 'media_download';
+  const dlUrl = fullUrl + (fullUrl.includes('?') ? '&' : '?') + 'download=1';
+
+  // 1. If Web Share API is supported on mobile, trigger native share sheet (allowing "Save Image" to Photos / Camera Roll)
+  if (navigator.share && navigator.canShare) {
+    try {
+      const resp = await fetch(fullUrl);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const ext = safeFilename.split('.').pop()?.toLowerCase() || 'png';
+        let mime = blob.type;
+        if (!mime || mime === 'application/octet-stream') {
+          mime = ext === 'mp4' ? 'video/mp4' : (ext === 'wav' ? 'audio/wav' : 'image/png');
+        }
+        const file = new File([blob], safeFilename, { type: mime });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: title || safeFilename,
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return; // User tapped cancel
+      console.log('[downloadOrShareMedia] Web Share fallback:', e.message);
+    }
+  }
+
+  // 2. Direct browser download trigger
+  const a = document.createElement('a');
+  a.href = dlUrl;
+  a.download = safeFilename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    try { document.body.removeChild(a); } catch (_) {}
+  }, 400);
+};
 
 // Session Cumulative Telemetry
 let sessionTotalTokens = 0;
@@ -63,8 +138,15 @@ function adminHeaders(custom = {}) {
 function deriveProviderFromModel(model) {
   if (!model) return 'cloud';
   const m = model.toLowerCase();
-  const discoveredProvider = m.match(/^([a-z]+)::/);
+  const discoveredProvider = m.match(/^([a-z0-9_-]+)::/);
   if (discoveredProvider) return discoveredProvider[1];
+  if (m.startsWith('unorouter') || m.startsWith('glm')) return 'unorouter';
+  if (m.startsWith('xkiro')) return 'xkiro';
+  if (m.startsWith('cloudflare') || m.startsWith('@cf/')) return 'cloudflare';
+  if (m.startsWith('aimlapi')) return 'aimlapi';
+  if (m.startsWith('gmicloud')) return 'gmicloud';
+  if (m.startsWith('inception') || m.startsWith('mercury')) return 'inception';
+  if (m.startsWith('atria') || m.startsWith('dawn')) return 'atria';
   if (m.startsWith('gemini')) return 'gemini';
   if (m.startsWith('claude')) return 'anthropic';
   if (m.startsWith('gpt') || m.startsWith('o1') || m.startsWith('o3')) return 'openai';
@@ -72,8 +154,10 @@ function deriveProviderFromModel(model) {
   if (m.startsWith('mistral')) return 'mistral';
   if (m.startsWith('grok') || m.startsWith('xai')) return 'xai';
   if (m.startsWith('openrouter')) return 'openrouter';
+  if (m.startsWith('qwen')) return 'qwen';
+  if (m.startsWith('nvidia')) return 'nvidia';
+  if (m.startsWith('cerebras')) return 'cerebras';
   if (m.startsWith('huggingface') || m.startsWith('hf') || m.includes('flux')) return 'huggingface';
-  if (m.startsWith('qwen') || m.startsWith('qwq') || m.startsWith('glm') || m.startsWith('kimi')) return 'qwen';
   if (m.startsWith('groq') || m.includes('groq')) return 'groq';
   if (m.startsWith('github')) return 'github';
   if (m.startsWith('local')) return 'local';
@@ -85,19 +169,19 @@ function deriveProviderFromModel(model) {
 const mainGrid = document.querySelector('.grid-layout');
 const toggleFullscreenChatBtn = document.getElementById('toggleFullscreenChatBtn');
 const collapseInspectorBtn = document.getElementById('collapseInspectorBtn');
-const openInspectorTabBtn = document.getElementById('openInspectorTabBtn');
-
 function setInspectorCollapsed(collapsed) {
   if (!mainGrid) return;
   if (collapsed) {
     mainGrid.classList.add('inspector-collapsed');
-    if (openInspectorTabBtn) openInspectorTabBtn.classList.remove('hidden');
+    document.body.classList.add('inspector-collapsed');
     if (toggleFullscreenChatBtn) toggleFullscreenChatBtn.textContent = '◧ Split View';
+    if (navToggleTelemetryBtn) navToggleTelemetryBtn.classList.remove('active');
     localStorage.setItem('nexus_inspector_collapsed', 'true');
   } else {
     mainGrid.classList.remove('inspector-collapsed');
-    if (openInspectorTabBtn) openInspectorTabBtn.classList.add('hidden');
+    document.body.classList.remove('inspector-collapsed');
     if (toggleFullscreenChatBtn) toggleFullscreenChatBtn.textContent = '⤢ Fullscreen';
+    if (navToggleTelemetryBtn) navToggleTelemetryBtn.classList.add('active');
     localStorage.setItem('nexus_inspector_collapsed', 'false');
   }
 }
@@ -123,12 +207,6 @@ if (collapseInspectorBtn) {
   });
 }
 
-if (openInspectorTabBtn) {
-  openInspectorTabBtn.addEventListener('click', () => {
-    setInspectorCollapsed(false);
-  });
-}
-
 // Restore user's sidebar preference
 if (localStorage.getItem('nexus_inspector_collapsed') === 'true') {
   setInspectorCollapsed(true);
@@ -149,8 +227,58 @@ if (topEndlessForgeBtn && endlessForgeStrip) {
 
 if (topIdeasBtn && presetStrip) {
   topIdeasBtn.addEventListener('click', () => {
+    const opening = presetStrip.classList.contains('hidden');
     presetStrip.classList.toggle('hidden');
     topIdeasBtn.classList.toggle('active', !presetStrip.classList.contains('hidden'));
+    if (opening && typeof renderRandomPresets === 'function') {
+      renderRandomPresets();
+    }
+  });
+}
+
+// Caveman Terse Mode (Token Killer: cuts ~65% conversational token waste)
+let isCavemanMode = localStorage.getItem('nexus_caveman_mode') === 'true';
+const cavemanToggleBtn = document.getElementById('cavemanToggleBtn');
+
+function updateCavemanUi() {
+  if (cavemanToggleBtn) {
+    cavemanToggleBtn.classList.toggle('active', isCavemanMode);
+    cavemanToggleBtn.textContent = isCavemanMode ? '🦴 Terse: ON' : '🦴 Terse: Off';
+    cavemanToggleBtn.title = isCavemanMode
+      ? 'Caveman Terse Mode: ON (Cuts ~65% output token waste with ultra-terse, high-density outputs)'
+      : 'Caveman Terse Mode: Off (Click or type /caveman to enable ultra-terse outputs)';
+  }
+  const modalToggle = document.getElementById('promptCavemanToggle');
+  if (modalToggle) {
+    modalToggle.checked = isCavemanMode;
+  }
+  localStorage.setItem('nexus_caveman_mode', isCavemanMode ? 'true' : 'false');
+}
+
+function setCavemanMode(enabled) {
+  isCavemanMode = !!enabled;
+  updateCavemanUi();
+}
+
+if (cavemanToggleBtn) {
+  cavemanToggleBtn.addEventListener('click', () => {
+    setCavemanMode(!isCavemanMode);
+  });
+  updateCavemanUi();
+}
+
+
+if (clearTraceBtn) {
+  clearTraceBtn.addEventListener('click', () => {
+    if (waterfallList) {
+      waterfallList.innerHTML = '<div class="waterfall-empty">Send a prompt in the playground to view step-by-step dispatch traces.</div>';
+    }
+    if (attemptsBadge) {
+      attemptsBadge.textContent = '0 Attempts';
+      attemptsBadge.className = 'badge';
+    }
+    clearTraceBtn.textContent = '✓ Cleared';
+    setTimeout(() => { if (clearTraceBtn) clearTraceBtn.textContent = '🧹 Clear Log'; }, 1500);
   });
 }
 
@@ -280,8 +408,53 @@ const mcpStatusLine = document.getElementById('mcpStatusLine');
 // Session State & Chat History
 let currentSessionId = localStorage.getItem('nexus_current_session_id') || `session_${Date.now()}`;
 let currentSessionTitle = 'New Conversation';
+let currentProjectFolder = localStorage.getItem('nexus_current_project_folder') || 'projects/New-Project';
+let currentProjectName = localStorage.getItem('nexus_current_project_name') || 'New Project';
+let isAutoProjectNaming = false;
 let activeFileTargets = [];
 let allSessions = [];
+
+async function updateActiveProjectBadge() {
+  const label = document.getElementById('activeProjectLabel');
+  const badge = document.getElementById('activeProjectBadge');
+  const viewAppBtn = document.getElementById('viewActiveProjectAppBtn');
+  if (label) {
+    label.textContent = currentProjectFolder || 'projects/New-Project';
+  }
+  if (badge) {
+    badge.title = `Active Project: ${currentProjectName || 'New Project'} (${currentProjectFolder})`;
+  }
+  if (viewAppBtn) {
+    const folder = (currentProjectFolder || 'projects/New-Project').replace(/^[/\\]+/, '');
+    try {
+      const res = await fetch(`/v1/workspace/files/${encodeURIComponent(folder)}/index.html`);
+      if (res.ok) {
+        viewAppBtn.classList.remove('hidden');
+        viewAppBtn.onclick = () => window.open(`/v1/workspace/files/${encodeURIComponent(folder)}/index.html`, '_blank');
+      } else {
+        viewAppBtn.classList.add('hidden');
+      }
+    } catch {
+      viewAppBtn.classList.add('hidden');
+    }
+  }
+}
+
+function deriveProjectNameFromPrompt(promptText) {
+  if (!promptText || typeof promptText !== 'string') return 'New Project';
+  let clean = promptText
+    .replace(/^[\/$\s]+/, '')
+    .replace(/^Ask anything[^\n]*\n?/i, '')
+    .replace(/^(You|Assistant)\s*\d{1,2}:\d{2}(:\d{2})?\s*\n?/im, '')
+    .replace(/^(can you|could you|please|how to|how do i|create|build|make|generate|write|code|implement|design)\s+/i, '')
+    .replace(/^(an|a|the)\s+/i, '')
+    .replace(/[^\w\s-]/g, ' ')
+    .trim();
+  const words = clean.split(/\s+/).filter(w => w.length > 1).slice(0, 5);
+  if (words.length === 0) return 'New Project';
+  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
 
 // DOM Elements for Chat History Sidebar
 const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
@@ -322,6 +495,8 @@ async function init() {
   if (savedCurrentId) {
     await loadSession(savedCurrentId);
   }
+  updateActiveProjectBadge();
+  initNewProjectModal();
 }
 
 function formatContextLength(tokens) {
@@ -355,7 +530,7 @@ async function loadProviderModels(force = false) {
       group.dataset.liveProviderCatalogue = 'true';
 
       let provName = provider.displayName;
-      const isArtProv = provider.id === 'qwen' || provider.id === 'dashscope' || provider.id === 'huggingface';
+      const isArtProv = provider.id === 'huggingface';
       if (isArtProv && !provName.includes('🎨')) {
         provName = `🎨 ${provName}`;
       }
@@ -397,8 +572,9 @@ async function loadProviderModels(force = false) {
       modelSelect.insertBefore(group, localGroup);
     }
 
-    if (currentSelected && Array.from(modelSelect.options).some(option => option.value === currentSelected)) {
-      modelSelect.value = currentSelected;
+    const targetToRestore = localStorage.getItem('nexus_selected_model') || currentSelected;
+    if (targetToRestore && Array.from(modelSelect.options).some(option => option.value === targetToRestore)) {
+      modelSelect.value = targetToRestore;
     }
     updateModelPickerDisplay();
     renderFoldedModelPicker();
@@ -416,14 +592,17 @@ async function loadDynamicLocalModels() {
     if (data.success && Array.isArray(data.models) && data.models.length > 0) {
       const optgroup = document.getElementById('localModelsOptgroup');
       if (optgroup) {
-        const currentSelected = modelSelect ? modelSelect.value : '';
+        const currentSelected = localStorage.getItem('nexus_selected_model') || (modelSelect ? modelSelect.value : '');
         optgroup.innerHTML = '<option value="free">🟢 Free Tier (Auto-Route to Local GPU)</option>';
         for (const m of data.models) {
           const opt = document.createElement('option');
           opt.value = m.id;
           let icon = '🖥️';
           const lower = m.cleanName.toLowerCase();
-          if (lower.includes('dolphin')) icon = '🐬';
+          const isTopCoder = lower.includes('deepseek-coder') || lower.includes('starcoder') || lower.includes('llama3.1') || lower.includes('wizard-coder') || lower.includes('codellama');
+
+          if (isTopCoder) icon = '⭐';
+          else if (lower.includes('dolphin')) icon = '🐬';
           else if (lower.includes('wizard')) icon = '🧙';
           else if (lower.includes('claude')) icon = '🧠';
           else if (lower.includes('gemma')) icon = '💎';
@@ -433,10 +612,11 @@ async function loadDynamicLocalModels() {
           else if (lower.includes('moondream')) icon = '🌙';
           else if (lower.includes('animat') || lower.includes('safetensor') || lower.includes('flux') || lower.includes('sdxl') || lower.includes('wan')) icon = '🎨';
 
-          opt.textContent = `${icon} ${m.cleanName} (${m.sizeGb})`;
+          const tag = isTopCoder ? ' ⭐ Top Offline Coder' : '';
+          opt.textContent = `${icon} ${m.cleanName} (${m.sizeGb})${tag}`;
           optgroup.appendChild(opt);
         }
-        if (currentSelected && modelSelect) {
+        if (currentSelected && modelSelect && Array.from(modelSelect.options).some(o => o.value === currentSelected)) {
           modelSelect.value = currentSelected;
         }
         updateModelPickerDisplay();
@@ -543,49 +723,20 @@ if (cacheToggle) {
 }
 
 function updateProviderUI(providers) {
-  providerBadges.innerHTML = '';
-  const knownOrder = ['qwen', 'openai', 'anthropic', 'gemini', 'groq', 'xai', 'deepseek', 'mistral', 'openrouter', 'github', 'huggingface'];
+  if (providerBadges) providerBadges.innerHTML = '';
+  const knownOrder = ['openai', 'anthropic', 'gemini', 'groq', 'cerebras', 'nvidia', 'unorouter', 'qwen', 'xkiro', 'cloudflare', 'aimlapi', 'gmicloud', 'inception', 'atria', 'xai', 'deepseek', 'mistral', 'openrouter', 'cheaperinference', 'github', 'huggingface'];
   const list = [...new Set([...knownOrder, ...Object.keys(providers || {})])].filter(p => !['local', 'ollama', 'mock'].includes(p));
   let anyConfigured = false;
+  let activeLiveCount = 0;
 
   for (const p of list) {
     const info = providers[p];
     const isConfigured = !!info?.configured;
     const isEnabled = info?.enabled !== false;
     if (isConfigured) anyConfigured = true;
+    if (isConfigured && isEnabled) activeLiveCount++;
 
-    // Navbar Badge
-    const badge = document.createElement('div');
-    badge.className = 'metric-pill';
-    const readyConnections = Number(info?.usableConnections || 0);
-    const totalConnections = Number(info?.connections || 0);
-    const hasPoolInfo = totalConnections > 0;
-    badge.title = isConfigured
-      ? `${p.toUpperCase()}: ${isEnabled ? 'Active' : 'Paused'}${hasPoolInfo ? ` · ${readyConnections}/${totalConnections} connections ready` : ''}. Click to configure.`
-      : `Click to configure ${p.toUpperCase()} API key`;
-
-    let dotColor = 'background: var(--text-muted); box-shadow: none;';
-    if (isConfigured) {
-      dotColor = isEnabled ? '' : 'background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.5);';
-    }
-
-    const labelSuffix = isConfigured && !isEnabled
-      ? ' (Paused)'
-      : hasPoolInfo
-        ? ` ${readyConnections}/${totalConnections}`
-        : '';
-
-    badge.innerHTML = `
-      <span class="status-dot ${isConfigured && isEnabled ? 'active' : ''}" style="${dotColor}"></span>
-      <span class="pill-label">${p.charAt(0).toUpperCase() + p.slice(1)}${labelSuffix}</span>
-    `;
-    badge.addEventListener('click', () => {
-      if (keysModal) keysModal.classList.remove('hidden');
-      loadProviderStatus();
-    });
-    providerBadges.appendChild(badge);
-
-    // Modal Badge with 1-Click Toggle
+    // Modal Badge with 1-Click Toggle inside Provider Keys modal
     const modalBadge = document.getElementById(`badge-${p}`);
     if (modalBadge) {
       if (!isConfigured) {
@@ -631,6 +782,29 @@ function updateProviderUI(providers) {
     if (input && info?.maskedKey) {
       input.placeholder = `Configured: ${info.maskedKey}`;
     }
+    const modelInput = document.getElementById(`model-${p}`);
+    if (modelInput && info?.defaultModel && !modelInput.value) {
+      modelInput.value = info.defaultModel;
+    }
+  }
+
+  // Update Provider Keys Navbar Badge
+  const keysCountBadge = document.getElementById('keysCountBadge');
+  if (keysCountBadge) {
+    keysCountBadge.textContent = `${activeLiveCount} Live`;
+    if (activeLiveCount > 0) {
+      keysCountBadge.style.background = 'rgba(34, 197, 94, 0.22)';
+      keysCountBadge.style.color = '#22c55e';
+      keysCountBadge.style.borderColor = 'rgba(34, 197, 94, 0.45)';
+    } else {
+      keysCountBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+      keysCountBadge.style.color = '#ef4444';
+      keysCountBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+    }
+  }
+
+  if (openKeysModalBtn) {
+    openKeysModalBtn.title = `Configure Live API Keys (${activeLiveCount} active provider${activeLiveCount === 1 ? '' : 's'})`;
   }
 
   const alertBadge = document.getElementById('keysAlertBadge');
@@ -680,6 +854,15 @@ async function loadGpuStatus() {
 
     if (gpuMetricPill) {
       gpuMetricPill.title = `GPU: ${gpu.name}\nVRAM: ${usedGb} GB / ${totalGb} GB (${pct}%)\nActive Models in VRAM: ${loaded.length > 0 ? loaded.map(m => m.name).join(', ') : 'None'}\nClick ⚡ Unload to free VRAM for PromptForge RTX art.`;
+    }
+
+    if (quickUnloadGpuBtn) {
+      quickUnloadGpuBtn.classList.remove('has-models', 'critical');
+      if (pct > 85) {
+        quickUnloadGpuBtn.classList.add('critical');
+      } else if (loaded.length > 0) {
+        quickUnloadGpuBtn.classList.add('has-models');
+      }
     }
   } catch (err) {}
 }
@@ -733,21 +916,27 @@ if (modalDoneBtn && keysModal) modalDoneBtn.addEventListener('click', () => keys
 document.querySelectorAll('.save-key-btn').forEach(btn => {
   const provider = btn.getAttribute('data-provider');
   const input = document.getElementById(`key-${provider}`);
+  const modelInput = document.getElementById(`model-${provider}`);
 
   const handleSave = async () => {
     const keyVal = input ? input.value.trim() : '';
-    if (!keyVal) return;
+    const modelVal = modelInput ? modelInput.value.trim() : '';
+    if (!keyVal && !modelVal) return;
 
     try {
       btn.textContent = 'Saving...';
+      const bodyPayload = { provider };
+      if (keyVal) bodyPayload.apiKey = keyVal;
+      if (modelVal) bodyPayload.model = modelVal;
+
       const res = await fetch('/v1/keys', {
         method: 'POST',
         headers: adminHeaders(),
-        body: JSON.stringify({ provider, apiKey: keyVal }),
+        body: JSON.stringify(bodyPayload),
       });
       btn.textContent = 'Save';
       if (res.ok) {
-        if (modalToast) modalToast.textContent = `✓ ${provider.toUpperCase()} API key saved & loaded!`;
+        if (modalToast) modalToast.textContent = `✓ ${provider.toUpperCase()} saved & loaded!`;
         if (input) input.value = '';
         await Promise.all([loadProviderStatus(), loadProviderModels(true)]);
         setTimeout(() => { if (modalToast) modalToast.textContent = ''; }, 3000);
@@ -761,6 +950,14 @@ document.querySelectorAll('.save-key-btn').forEach(btn => {
   btn.addEventListener('click', handleSave);
   if (input) {
     input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      }
+    });
+  }
+  if (modelInput) {
+    modelInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         handleSave();
@@ -1081,6 +1278,7 @@ async function loadMcpInfo() {
 if (openConnectModalBtn && connectModal) openConnectModalBtn.addEventListener('click', () => {
   connectModal.classList.remove('hidden');
   loadMcpInfo();
+  syncPinnedProviderStatus();
 });
 if (closeConnectModalBtn && connectModal) closeConnectModalBtn.addEventListener('click', () => connectModal.classList.add('hidden'));
 if (connectDoneBtn && connectModal) connectDoneBtn.addEventListener('click', () => connectModal.classList.add('hidden'));
@@ -1149,45 +1347,94 @@ function renderWorkspaceFilesTable(files) {
       
       let icon = '📄';
       let typeBadge = '';
+      const isApk = f.name.endsWith('.apk');
       if (f.name.endsWith('.vst3')) {
         icon = '🎛️';
         typeBadge = ' <span class="model-badge" style="background: rgba(168,85,247,0.2); color: #c084fc;">VST3 Plugin</span>';
       } else if (f.name.endsWith('.exe')) {
         icon = '⚡';
         typeBadge = ' <span class="model-badge" style="background: rgba(16,185,129,0.2); color: var(--accent-green);">Executable</span>';
+      } else if (isApk) {
+        icon = '📱';
+        typeBadge = ' <span class="model-badge" style="background: rgba(34,197,94,0.2); color: var(--accent-green); font-weight: 700;">Android APK</span>';
       } else if (f.name.startsWith('art/')) {
         icon = '🎨';
         typeBadge = ' <span class="model-badge" style="background: rgba(56,189,248,0.2); color: var(--accent-cyan);">Artwork</span>';
       }
 
-      const isBinary = f.name.endsWith('.vst3') || f.name.endsWith('.exe') || f.name.endsWith('.lib') || f.name.endsWith('.exp') || f.name.startsWith('art/');
+      const isBinary = f.name.endsWith('.vst3') || f.name.endsWith('.exe') || isApk || f.name.endsWith('.lib') || f.name.endsWith('.exp') || f.name.startsWith('art/');
+
+      const isHtml = f.name.endsWith('.html') || f.name.endsWith('.htm');
 
       tr.innerHTML = `
         <td style="padding-left: 20px;"><strong>${icon} ${f.name}</strong>${typeBadge}</td>
         <td>${kb} KB</td>
         <td>${dateStr}</td>
-        <td style="display: flex; gap: 6px;">
-          ${!isBinary ? `<button class="action-tag-btn view-file-btn" data-file="${f.name}">View Code</button>` : ''}
-          <button class="action-tag-btn reveal-file-btn" data-file="${f.name}" title="Reveal in Windows Explorer">📂 Reveal</button>
+        <td style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+          ${isHtml ? `
+            <a href="/v1/workspace/files/${encodeURIComponent(f.name)}" target="_blank" class="action-tag-btn" style="text-decoration:none; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700; border-color: rgba(56, 189, 248, 0.5); padding: 4px 10px;" title="Launch live web app in new window">🚀 Launch App</a>
+          ` : ''}
+          ${isApk ? `
+            <a href="/v1/workspace/files/${encodeURIComponent(f.name)}?download=1" download="${f.name.split('/').pop()}" class="action-tag-btn" style="text-decoration:none; background: rgba(34,197,94,0.2); color: var(--accent-green); border-color: rgba(34,197,94,0.5); font-weight: 700; padding: 4px 10px;" title="Download Android APK package directly to your phone or PC">⬇️ Download APK</a>
+            <button type="button" class="action-tag-btn install-apk-btn" data-apk="${f.name}" style="background: rgba(56,189,248,0.2); color: #38bdf8; border-color: rgba(56,189,248,0.5); font-weight: 600;" title="Install directly to connected Android phone or emulator via ADB">📲 Install via ADB</button>
+          ` : ''}
+          ${!isBinary ? `<button type="button" class="action-tag-btn view-file-btn" data-file="${f.name}" data-size="${f.size}" title="View source code in app">👁️ View Code</button>` : ''}
+          ${(f.name.startsWith('art/') || /\.(png|jpe?g|webp|gif|mp4|webm|wav|mp3|zip)$/i.test(f.name)) && !isApk ? `
+            <a href="/v1/workspace/files/${encodeURIComponent(f.name)}?download=1" download="${f.name.split('/').pop()}" class="action-tag-btn" style="text-decoration:none; color: #38bdf8; border-color: rgba(56,189,248,0.4);" title="Download file to phone or PC">⬇️ Download</a>
+            <a href="/v1/workspace/files/${encodeURIComponent(f.name)}" target="_blank" class="action-tag-btn" style="text-decoration:none;" title="View full resolution">👁️ View</a>
+          ` : ''}
+          <button type="button" class="action-tag-btn reveal-file-btn" data-file="${f.name}" title="Reveal in Windows Explorer">📂 Reveal</button>
         </td>
       `;
       workspaceFilesTableBody.appendChild(tr);
     }
   }
 
+  workspaceFilesTableBody.querySelectorAll('.install-apk-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const apk = btn.getAttribute('data-apk');
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = '⏳ Installing...';
+      try {
+        const res = await fetch('/v1/android/install', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ apkPath: apk }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`🎉 Success: ${data.message || 'APK installed & launched successfully!'}`);
+        } else {
+          alert(`⚠️ ADB Notice: ${data.error || 'No active device or emulator connected.'}\n\nTip: To install directly on your phone:\n1. Download the APK file directly to your phone.\n2. Tap the downloaded .apk file to install!\n3. Or plug your phone in via USB with USB Debugging enabled.`);
+        }
+      } catch (err) {
+        alert('Failed to connect to ADB install endpoint: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    });
+  });
+
   workspaceFilesTableBody.querySelectorAll('.view-file-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const filename = btn.getAttribute('data-file');
-      try {
-        const res = await fetch(`/v1/workspace/files/${encodeURIComponent(filename)}`);
-        if (res.ok) {
-          const data = await res.json();
-          previewFileName.textContent = `Preview: ${filename}`;
-          previewFileCode.textContent = data.content;
-          filePreviewContainer.style.display = 'block';
+      const size = parseInt(btn.getAttribute('data-size') || '0', 10);
+      if (typeof window.openCodeViewer === 'function') {
+        window.openCodeViewer({ name: filename, path: filename, size, isWorkspace: true }, 'Local Workspace');
+      } else {
+        try {
+          const res = await fetch(`/v1/workspace/files/${encodeURIComponent(filename)}?raw=1`);
+          if (res.ok) {
+            const data = await res.json();
+            if (previewFileName) previewFileName.textContent = `Preview: ${filename}`;
+            if (previewFileCode) previewFileCode.textContent = data.content;
+            if (filePreviewContainer) filePreviewContainer.style.display = 'block';
+          }
+        } catch (err) {
+          console.error('Error reading file:', err);
         }
-      } catch (err) {
-        alert('Error reading file: ' + err.message);
       }
     });
   });
@@ -1232,6 +1479,214 @@ if (closeWorkspaceModalBtn) closeWorkspaceModalBtn.addEventListener('click', () 
 const closePreviewBtn = document.getElementById('closePreviewBtn');
 if (closePreviewBtn && filePreviewContainer) closePreviewBtn.addEventListener('click', () => { filePreviewContainer.style.display = 'none'; });
 
+const connectAppProviderSelect = document.getElementById('connectAppProviderSelect');
+const connectAppModelSelect = document.getElementById('connectAppModelSelect');
+const claudeSnippetCode = document.getElementById('claudeSnippetCode');
+const codexSnippetCode = document.getElementById('codexSnippetCode');
+const cursorSnippetCode = document.getElementById('cursorSnippetCode');
+const pythonSnippetCode = document.getElementById('pythonSnippetCode');
+const nodeSnippetCode = document.getElementById('nodeSnippetCode');
+const curlSnippetCode = document.getElementById('curlSnippetCode');
+
+const PROVIDER_MODELS_CATALOG = {
+  auto: [
+    { value: 'auto', label: '⚡ Auto-Dispatch (Working Defaults)' }
+  ],
+  openai: [
+    { value: 'gpt-4o', label: 'gpt-4o (Flagship Multimodal · Recommended)' },
+    { value: 'gpt-4o-mini', label: 'gpt-4o-mini (Fast & Efficient)' },
+    { value: 'o3-mini', label: 'o3-mini (High Reasoning Frontier)' },
+    { value: 'o1', label: 'o1 (Deep STEM & Architecture Reasoning)' },
+    { value: 'chatgpt-4o-latest', label: 'chatgpt-4o-latest (Codex / ChatGPT Web Snapshot)' }
+  ],
+  gemini: [
+    { value: 'gemini-3.6-flash', label: 'gemini-3.6-flash (Realtime Speed · Recommended)' },
+    { value: 'gemini-flash-latest', label: 'gemini-flash-latest (Latest Auto-Updated Flash)' },
+    { value: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite (Ultra Fast & Low Latency)' },
+    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro (Frontier Coding & Math)' },
+    { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash (Legacy Alias · Auto-maps to 3.6 Flash)' }
+  ],
+  deepseek: [
+    { value: 'deepseek-chat', label: 'deepseek-chat (V3 Code & General · Recommended)' },
+    { value: 'deepseek-reasoner', label: 'deepseek-reasoner (R1 Frontier Reasoning)' }
+  ],
+  groq: [
+    { value: 'llama-3.3-70b-versatile', label: 'llama-3.3-70b-versatile (Fast LPU · Strict 6k TPM Free Limit)' },
+    { value: 'llama-3.1-8b-instant', label: 'llama-3.1-8b-instant (High TPM Quota · Recommended for Chat)' },
+    { value: 'mixtral-8x7b-32768', label: 'mixtral-8x7b-32768 (MoE)' }
+  ],
+  cerebras: [
+    { value: 'llama-3.3-70b', label: 'llama-3.3-70b (1,800+ tok/s · 60k TPM Free Quota · Recommended)' },
+    { value: 'cerebras/gemma-4-31b', label: 'cerebras/gemma-4-31b (2,000 tok/s)' },
+    { value: 'llama3.1-70b', label: 'llama3.1-70b (Ultra Fast Inference)' },
+    { value: 'llama3.1-8b', label: 'llama3.1-8b (Realtime Instant)' }
+  ],
+  cheaperinference: [
+    { value: 'cheaperinference::claude-sonnet-4.5', label: 'claude-sonnet-4.5 (⭐ Recommended for Claude Code · Fast & Reliable)' },
+    { value: 'cheaperinference::gpt-5.6-luna', label: 'gpt-5.6-luna (Codex Workhorse)' },
+    { value: 'cheaperinference::claude-sonnet-4.6', label: 'claude-sonnet-4.6 (Next-Gen Preview)' },
+    { value: 'cheaperinference::claude-3-5-sonnet', label: 'claude-3-5-sonnet' },
+    { value: 'cheaperinference::claude-haiku-4.5', label: 'claude-haiku-4.5 (Fast)' }
+  ],
+  nvidia: [
+    { value: 'meta/llama-3.3-70b-instruct', label: 'meta/llama-3.3-70b-instruct (⭐ 128k ctx · Recommended)' },
+    { value: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'nvidia/llama-3.1-nemotron-70b-instruct (High Reasoning)' },
+    { value: 'deepseek-ai/deepseek-r1', label: 'deepseek-ai/deepseek-r1 (Frontier Reasoning)' },
+    { value: 'nvidia/nemotron-4-340b-instruct', label: 'nemotron-4-340b-instruct (Enterprise)' },
+    { value: 'meta/llama-3.1-70b-instruct', label: 'llama-3.1-70b-instruct' }
+  ],
+  unorouter: [
+    { value: 'unorouter::glm-5.3-search:free', label: 'glm-5.3-search:free (⭐ Free Search & Reasoning)' },
+    { value: 'unorouter/qwen/qwen-2.5-coder-32b-instruct:free', label: 'qwen-2.5-coder-32b-instruct:free (⭐ Free Tools & Coding · 32k ctx)' },
+    { value: 'unorouter/deepseek/deepseek-r1:free', label: 'deepseek-r1:free (Free Reasoning · 64k ctx)' },
+    { value: 'unorouter/meta-llama/llama-3.3-70b-instruct:free', label: 'llama-3.3-70b-instruct:free (Free 70B · 128k ctx)' }
+  ],
+  qwen: [
+    { value: 'qwen-2.5-coder-32b-instruct', label: 'qwen-2.5-coder-32b-instruct (⭐ State-of-the-Art Coding · 128k ctx)' },
+    { value: 'qwen-plus', label: 'qwen-plus (Balanced General / Coding)' },
+    { value: 'qwen-max', label: 'qwen-max (Frontier Alibaba Flagship)' },
+    { value: 'qwen-turbo', label: 'qwen-turbo (Ultra-Fast)' }
+  ],
+  xkiro: [
+    { value: 'xkiro/deepseek/deepseek-r1:free', label: 'deepseek/deepseek-r1:free (⭐ Free Reasoning · 64k ctx)' },
+    { value: 'xkiro/meta-llama/llama-3.3-70b-instruct:free', label: 'meta-llama/llama-3.3-70b-instruct:free (Free 70B · 128k ctx)' },
+    { value: 'xkiro/qwen/qwen-2.5-coder-32b-instruct:free', label: 'qwen/qwen-2.5-coder-32b-instruct:free (Free Coding · 32k ctx)' },
+    { value: 'xkiro/deepseek/deepseek-chat:free', label: 'deepseek/deepseek-chat:free (Free Chat)' }
+  ],
+  cloudflare: [
+    { value: 'cloudflare/@cf/meta/llama-3.3-70b-instruct', label: '@cf/meta/llama-3.3-70b-instruct (⭐ 128k ctx · Recommended)' },
+    { value: 'cloudflare/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', label: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b (Reasoning)' },
+    { value: 'cloudflare/@cf/meta/llama-3.1-8b-instruct', label: '@cf/meta/llama-3.1-8b-instruct (Fast 8B)' },
+    { value: 'cloudflare/@cf/qwen/qwen2.5-coder-7b-instruct', label: '@cf/qwen/qwen2.5-coder-7b-instruct (Coding)' }
+  ],
+  aimlapi: [
+    { value: 'aimlapi/deepseek/deepseek-r1', label: 'deepseek/deepseek-r1 (⭐ Frontier Reasoning)' },
+    { value: 'aimlapi/deepseek/deepseek-chat', label: 'deepseek/deepseek-chat (DeepSeek V3)' },
+    { value: 'aimlapi/meta-llama/llama-3.3-70b-instruct', label: 'meta-llama/llama-3.3-70b-instruct (128k ctx)' },
+    { value: 'aimlapi/mistralai/mistral-7b-instruct-v0.2', label: 'mistralai/mistral-7b-instruct-v0.2' }
+  ],
+  gmicloud: [
+    { value: 'gmicloud/deepseek-ai/DeepSeek-R1', label: 'deepseek-ai/DeepSeek-R1 (⭐ GPU Served Reasoning)' },
+    { value: 'gmicloud/deepseek-ai/DeepSeek-V3', label: 'deepseek-ai/DeepSeek-V3 (Flagship V3)' },
+    { value: 'gmicloud/meta-llama/Llama-3.3-70B-Instruct', label: 'meta-llama/Llama-3.3-70B-Instruct' }
+  ],
+  inception: [
+    { value: 'inception::mercury-2.5', label: 'mercury-2.5 (⭐ High-Speed Diffusion LLM)' },
+    { value: 'inception::mercury-2', label: 'mercury-2 (Diffusion Foundation)' },
+    { value: 'inception::mercury-edit-2', label: 'mercury-edit-2 (Targeted Rewriting)' },
+    { value: 'inception::mercury-coder-small', label: 'mercury-coder-small (Code Diffusion)' }
+  ],
+  atria: [
+    { value: 'atria::Atria-Dawn-Preview', label: 'Atria-Dawn-Preview (🌅 744B MoE Agentic Foundation Model)' },
+    { value: 'atria::Atria-Dawn', label: 'Atria-Dawn (744B MoE)' }
+  ],
+  mistral: [
+    { value: 'mistral/mistral-large-latest', label: 'mistral-large-latest (Frontier)' },
+    { value: 'mistral/codestral-latest', label: 'codestral-latest (Specialized Coding)' },
+    { value: 'mistral/ministral-8b-latest', label: 'ministral-8b-latest (Compact)' }
+  ],
+  xai: [
+    { value: 'grok-4.6', label: 'grok-4.6 (Frontier XAI)' },
+    { value: 'grok-2-1212', label: 'grok-2-1212' },
+    { value: 'grok-beta', label: 'grok-beta' }
+  ],
+  openrouter: [
+    { value: 'openrouter::openrouter/free', label: 'openrouter/free (Dynamic Free Cascade)' },
+    { value: 'anthropic/claude-3.5-sonnet', label: 'anthropic/claude-3.5-sonnet' },
+    { value: 'meta-llama/llama-3.3-70b-instruct', label: 'meta-llama/llama-3.3-70b-instruct' }
+  ],
+  local: [
+    { value: 'local/llama3.1:8b', label: 'llama3.1:8b (Embedded GPU RTX 4060)' },
+    { value: 'local/qwen2.5-coder:7b', label: 'qwen2.5-coder:7b (Local Coding Beast)' },
+    { value: 'local/mistral:7b', label: 'mistral:7b (Local General)' },
+    { value: 'local/deepseek-r1:8b', label: 'deepseek-r1:8b (Local Reasoning)' }
+  ]
+};
+
+function populateConnectModelsDropdown(prov, selectVal = null) {
+  if (!connectAppModelSelect) return;
+  connectAppModelSelect.innerHTML = '';
+  const models = PROVIDER_MODELS_CATALOG[prov] || [{ value: 'auto', label: '⚡ Default Model' }];
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.value;
+    opt.textContent = m.label;
+    connectAppModelSelect.appendChild(opt);
+  });
+  if (selectVal && models.some(m => m.value === selectVal)) {
+    connectAppModelSelect.value = selectVal;
+  } else {
+    connectAppModelSelect.selectedIndex = 0;
+  }
+}
+
+function updateConnectSnippets() {
+  const prov = connectAppProviderSelect ? connectAppProviderSelect.value : 'auto';
+  const customModelInput = document.getElementById('connectAppCustomModelInput');
+  const customVal = customModelInput ? customModelInput.value.trim() : '';
+  const solitaryModel = customVal || (connectAppModelSelect ? connectAppModelSelect.value : 'auto');
+  
+  const sampleModel = solitaryModel !== 'auto' && solitaryModel !== 'default' ? solitaryModel : (prov === 'auto' ? 'auto' : (PROVIDER_MODELS_CATALOG[prov]?.[0]?.value || 'auto'));
+  const claudeCmd = sampleModel !== 'auto' ? `claude --model ${sampleModel}` : 'claude';
+  const claudeEnvWin = `$env:ANTHROPIC_BASE_URL="http://localhost:3000"\n$env:ANTHROPIC_API_KEY="nr-live-xxxx"`;
+  const claudeEnvNix = `export ANTHROPIC_BASE_URL="http://localhost:3000"\nexport ANTHROPIC_API_KEY="nr-live-xxxx"`;
+  const cursorModels = sampleModel !== 'auto' ? `${sampleModel}, auto, fast, coding` : 'auto, fast, reasoning, coding, gpt-4o';
+
+  if (claudeSnippetCode) {
+    claudeSnippetCode.textContent = `# In PowerShell (Windows):\n${claudeEnvWin}\n\n# In Bash / macOS / Linux:\n${claudeEnvNix}\n\n# Run Claude Code CLI (solitary model: ${sampleModel}):\n${claudeCmd}`;
+  }
+
+  if (codexSnippetCode) {
+    codexSnippetCode.textContent = `# 1. Using the one-click launcher (with your Codex Pro subscription):\n.\\Run-Codex.bat\n\n# 2. Run Codex directly with solitary model:\ncodex -m ${sampleModel}\n\n# 3. Route Codex traffic through NexusRoute gateway:\n$env:OPENAI_BASE_URL="http://localhost:3000/v1"\n$env:OPENAI_API_KEY="nr-live-local"\ncodex`;
+  }
+
+  if (cursorSnippetCode) {
+    cursorSnippetCode.textContent = `Base URL: http://localhost:3000/v1\nAPI Key:  nr-live-xxxx (or any string)\nModels:   ${cursorModels}`;
+  }
+
+  if (pythonSnippetCode) {
+    pythonSnippetCode.textContent = `from openai import OpenAI\n\nclient = OpenAI(\n    base_url="http://localhost:3000/v1",\n    api_key="nr-live-xxxx"  # Or your virtual key\n)\n\nresponse = client.chat.completions.create(\n    model="${sampleModel}",\n    messages=[{"role": "user", "content": "Explain quantum computing."}],\n    stream=True\n)\n\nfor chunk in response:\n    print(chunk.choices[0].delta.content or "", end="")`;
+  }
+
+  if (nodeSnippetCode) {
+    nodeSnippetCode.textContent = `import OpenAI from 'openai';\n\nconst openai = new OpenAI({\n  baseURL: 'http://localhost:3000/v1',\n  apiKey: 'nr-live-xxxx',\n});\n\nconst res = await openai.chat.completions.create({\n  model: '${sampleModel}',\n  messages: [{ role: 'user', content: 'Hello NexusRoute!' }],\n});\nconsole.log(res.choices[0].message.content);`;
+  }
+
+  if (curlSnippetCode) {
+    curlSnippetCode.textContent = `curl -X POST http://localhost:3000/v1/chat/completions \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer nr-live-xxxx" \\\n  -d '{\n    "model": "${sampleModel}",\n    "messages": [{"role": "user", "content": "Ping!"}]\n  }'`;
+  }
+}
+
+if (connectAppProviderSelect) {
+  connectAppProviderSelect.addEventListener('change', () => {
+    const prov = connectAppProviderSelect.value;
+    localStorage.setItem('nexus_connect_provider', prov);
+    populateConnectModelsDropdown(prov);
+    updateConnectSnippets();
+  });
+  const savedProv = localStorage.getItem('nexus_connect_provider');
+  if (savedProv) {
+    connectAppProviderSelect.value = savedProv;
+  }
+}
+
+const connectAppCustomModelInput = document.getElementById('connectAppCustomModelInput');
+if (connectAppCustomModelInput) {
+  connectAppCustomModelInput.addEventListener('input', () => {
+    updateConnectSnippets();
+  });
+}
+
+if (connectAppModelSelect) {
+  connectAppModelSelect.addEventListener('change', () => {
+    if (connectAppCustomModelInput && connectAppModelSelect.value && connectAppModelSelect.value !== 'auto' && connectAppModelSelect.value !== 'default') {
+      connectAppCustomModelInput.value = connectAppModelSelect.value;
+    }
+    localStorage.setItem('nexus_connect_model', connectAppModelSelect.value);
+    updateConnectSnippets();
+  });
+}
+
 snippetTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     snippetTabs.forEach(t => t.classList.remove('active'));
@@ -1241,6 +1696,127 @@ snippetTabs.forEach(tab => {
     document.getElementById(target)?.classList.add('active');
   });
 });
+
+const connectFreezeProviderBtn = document.getElementById('connectFreezeProviderBtn');
+const connectFreezeStatusBanner = document.getElementById('connectFreezeStatusBanner');
+const connectFreezeStatusText = document.getElementById('connectFreezeStatusText');
+const connectUnfreezeBtn = document.getElementById('connectUnfreezeBtn');
+const connectCashGuardToggle = document.getElementById('connectCashGuardToggle');
+
+let currentPinnedProvider = null;
+let currentPinnedModel = null;
+let isCashGuardActive = true;
+
+async function syncPinnedProviderStatus() {
+  try {
+    const res = await fetch('/v1/routing/pin');
+    const data = await res.json();
+    currentPinnedProvider = data.pinnedProvider || null;
+    currentPinnedModel = data.pinnedModel || null;
+    isCashGuardActive = data.cashGuard !== false;
+
+    if (connectCashGuardToggle) {
+      connectCashGuardToggle.checked = isCashGuardActive;
+    }
+
+    if (currentPinnedProvider && connectAppProviderSelect) {
+      connectAppProviderSelect.value = currentPinnedProvider;
+      populateConnectModelsDropdown(currentPinnedProvider, currentPinnedModel);
+      updateConnectSnippets();
+    } else if (connectAppProviderSelect) {
+      populateConnectModelsDropdown(connectAppProviderSelect.value, localStorage.getItem('nexus_connect_model'));
+      updateConnectSnippets();
+    }
+    updateFreezeUI();
+  } catch (err) {
+    console.warn('Failed to fetch pinned status:', err);
+  }
+}
+
+function updateFreezeUI() {
+  if (!connectFreezeProviderBtn) return;
+  const isCurrentlyPinned = !!currentPinnedProvider && currentPinnedProvider !== 'auto';
+
+  if (isCurrentlyPinned) {
+    const modelTag = currentPinnedModel ? ` · ${currentPinnedModel}` : '';
+    connectFreezeProviderBtn.innerHTML = `🔒 Frozen (${currentPinnedProvider.toUpperCase()}${modelTag})`;
+    connectFreezeProviderBtn.style.background = 'rgba(16, 185, 129, 0.2)';
+    connectFreezeProviderBtn.style.borderColor = 'rgba(16, 185, 129, 0.6)';
+    connectFreezeProviderBtn.style.color = '#34d399';
+    if (connectFreezeStatusBanner) connectFreezeStatusBanner.style.display = 'flex';
+    if (connectFreezeStatusText) {
+      const guardNotice = isCashGuardActive ? '<span style="color: #86efac; font-weight: 700; margin-left: 6px;">🛡️ Cash Guard: ON (Paid fallbacks blocked)</span>' : '';
+      connectFreezeStatusText.innerHTML = `<strong>FROZEN SOLITARY MODE ACTIVE:</strong> All incoming requests from Claude Code, Cursor, Codex, and SDKs strictly route to solitary model <strong>${currentPinnedModel || 'Default'}</strong> on <strong>${currentPinnedProvider.toUpperCase()}</strong>.${guardNotice}`;
+    }
+  } else {
+    connectFreezeProviderBtn.innerHTML = `❄️ Freeze for Apps`;
+    connectFreezeProviderBtn.style.background = 'rgba(14, 165, 233, 0.15)';
+    connectFreezeProviderBtn.style.borderColor = 'rgba(14, 165, 233, 0.4)';
+    connectFreezeProviderBtn.style.color = '#38bdf8';
+    if (connectFreezeStatusBanner) connectFreezeStatusBanner.style.display = 'none';
+  }
+}
+
+async function setPinnedProvider(prov, model = null) {
+  try {
+    const res = await fetch('/v1/routing/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: prov,
+        model: model,
+        cashGuard: connectCashGuardToggle ? connectCashGuardToggle.checked : true,
+      }),
+    });
+    const data = await res.json();
+    currentPinnedProvider = data.pinnedProvider || null;
+    currentPinnedModel = data.pinnedModel || null;
+    isCashGuardActive = data.cashGuard !== false;
+    updateFreezeUI();
+  } catch (err) {
+    console.error('Failed to set pinned provider/model:', err);
+  }
+}
+
+if (connectFreezeProviderBtn) {
+  connectFreezeProviderBtn.addEventListener('click', async () => {
+    const selectedProv = connectAppProviderSelect ? connectAppProviderSelect.value : 'auto';
+    const customInput = document.getElementById('connectAppCustomModelInput');
+    const customModel = customInput ? customInput.value.trim() : '';
+    const selectedModel = customModel || (connectAppModelSelect ? connectAppModelSelect.value : null);
+
+    if (currentPinnedProvider === selectedProv && currentPinnedModel === selectedModel) {
+      await setPinnedProvider(null, null);
+    } else {
+      await setPinnedProvider(selectedProv === 'auto' ? null : selectedProv, selectedModel === 'auto' || selectedModel === 'default' ? null : selectedModel);
+    }
+  });
+}
+
+if (connectUnfreezeBtn) {
+  connectUnfreezeBtn.addEventListener('click', async () => {
+    await setPinnedProvider(null, null);
+  });
+}
+
+if (connectCashGuardToggle) {
+  connectCashGuardToggle.addEventListener('change', async () => {
+    try {
+      const res = await fetch('/v1/routing/cash-guard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: connectCashGuardToggle.checked }),
+      });
+      const data = await res.json();
+      isCashGuardActive = data.cashGuard !== false;
+      updateFreezeUI();
+    } catch (err) {
+      console.error('Failed to toggle cash guard:', err);
+    }
+  });
+}
+
+syncPinnedProviderStatus();
 
 
 // Chat History & Session Management Functions
@@ -1346,7 +1922,13 @@ async function loadSession(id) {
     currentSessionId = data.id;
     currentSessionTitle = data.title || 'Conversation';
     activeFileTargets = Array.isArray(data.active_file_targets) ? data.active_file_targets : [];
+    currentProjectFolder = data.project_folder || 'projects/New-Project';
+    currentProjectName = data.project_name || (currentProjectFolder ? currentProjectFolder.split('/').pop() : 'New Project');
+    isAutoProjectNaming = false;
     localStorage.setItem('nexus_current_session_id', currentSessionId);
+    localStorage.setItem('nexus_current_project_folder', currentProjectFolder);
+    localStorage.setItem('nexus_current_project_name', currentProjectName);
+    updateActiveProjectBadge();
 
     conversationHistory.length = 0;
     chatMessages.innerHTML = '';
@@ -1392,9 +1974,15 @@ async function saveCurrentSession() {
   if (conversationHistory.length === 0) return;
 
   const firstUserMsg = conversationHistory.find(m => m.role === 'user');
-  if (currentSessionTitle === 'New Conversation' && firstUserMsg) {
+  const isGeneric = !currentSessionTitle || currentSessionTitle === 'New Conversation' || /^New Project( \d+)?$/i.test(currentSessionTitle);
+  if (isGeneric && firstUserMsg) {
     const raw = typeof firstUserMsg.content === 'string' ? firstUserMsg.content : (Array.isArray(firstUserMsg.content) ? firstUserMsg.content.map(c => c.text || '').join(' ') : '');
-    currentSessionTitle = raw.slice(0, 40).trim() || 'New Conversation';
+    const derived = deriveProjectNameFromPrompt(raw);
+    if (derived && derived !== 'New Project') {
+      currentSessionTitle = derived;
+    } else {
+      currentSessionTitle = raw.slice(0, 40).trim() || 'New Conversation';
+    }
   }
 
   const sessionData = {
@@ -1403,6 +1991,8 @@ async function saveCurrentSession() {
     messages: conversationHistory,
     model: modelSelect ? modelSelect.value : 'auto',
     active_file_targets: activeFileTargets,
+    project_folder: currentProjectFolder,
+    project_name: currentProjectName,
     telemetry: {
       totalTokens: sessionTotalTokens,
       totalCost: sessionTotalCost,
@@ -1423,10 +2013,16 @@ async function saveCurrentSession() {
   }
 }
 
-function createNewSession() {
+function createNewSession(options = {}) {
   currentSessionId = `session_${Date.now()}`;
-  currentSessionTitle = 'New Conversation';
+  currentSessionTitle = options.name || 'New Conversation';
+  currentProjectFolder = options.folder || 'projects/New-Project';
+  currentProjectName = options.name || (currentProjectFolder ? currentProjectFolder.split('/').pop() : 'New Project');
+  isAutoProjectNaming = !!options.autoName;
   localStorage.setItem('nexus_current_session_id', currentSessionId);
+  localStorage.setItem('nexus_current_project_folder', currentProjectFolder);
+  localStorage.setItem('nexus_current_project_name', currentProjectName);
+  updateActiveProjectBadge();
   conversationHistory.length = 0;
   activeFileTargets = [];
 
@@ -1498,16 +2094,169 @@ document.addEventListener('click', (e) => {
   }
 });
 
+async function openNewProjectModal() {
+  const modal = document.getElementById('newProjectModal');
+  const input = document.getElementById('newProjectNameInput');
+  if (!modal) {
+    createNewSession();
+    return;
+  }
+
+  let defaultName = 'New Project';
+  let defaultFolder = 'projects/New-Project';
+
+  try {
+    const res = await fetch('/v1/workspace/next-project');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.name) defaultName = data.name;
+      if (data.folder) defaultFolder = data.folder;
+    }
+  } catch {}
+
+  if (input) {
+    input.value = '';
+    input.placeholder = defaultName;
+    input.setAttribute('data-default-name', defaultName);
+    input.setAttribute('data-default-folder', defaultFolder);
+  }
+
+  modal.classList.remove('hidden');
+  if (input) {
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 60);
+  }
+}
+
+function closeNewProjectModal() {
+  const modal = document.getElementById('newProjectModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function initNewProjectModal() {
+  const modal = document.getElementById('newProjectModal');
+  const input = document.getElementById('newProjectNameInput');
+  const confirmBtn = document.getElementById('confirmNewProjectBtn');
+  const autoNameBtn = document.getElementById('autoNameProjectBtn');
+  const cancelBtn = document.getElementById('cancelNewProjectModalBtn');
+  const closeBtn = document.getElementById('closeNewProjectModalBtn');
+  const openFolderBtn = document.getElementById('openActiveProjectFolderBtn');
+
+  if (openFolderBtn) {
+    openFolderBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await fetch('/v1/workspace/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: currentProjectFolder || 'projects' }),
+        });
+      } catch (err) {
+        console.warn('Failed to open project folder:', err);
+      }
+    });
+  }
+
+  const handleConfirm = async () => {
+    const rawVal = input ? input.value.trim() : '';
+    const defName = (input && input.getAttribute('data-default-name')) || 'New Project';
+    const finalName = rawVal || defName;
+    const slug = finalName.replace(/[^a-zA-Z0-9_\-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'New-Project';
+    const folder = `projects/${slug}`;
+
+    try {
+      await fetch('/v1/workspace/create-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder, name: finalName }),
+      });
+    } catch {}
+
+    createNewSession({ folder, name: finalName, autoName: false });
+    closeNewProjectModal();
+    if (promptInput) promptInput.focus();
+  };
+
+  if (confirmBtn) confirmBtn.addEventListener('click', handleConfirm);
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirm();
+      } else if (e.key === 'Escape') {
+        closeNewProjectModal();
+      }
+    });
+  }
+
+  if (autoNameBtn) {
+    autoNameBtn.addEventListener('click', async () => {
+      const defName = (input && input.getAttribute('data-default-name')) || 'New Project';
+      const defFolder = (input && input.getAttribute('data-default-folder')) || 'projects/New-Project';
+      createNewSession({ folder: defFolder, name: defName, autoName: true });
+      closeNewProjectModal();
+      if (promptInput) {
+        promptInput.placeholder = "Ask anything — Nexus will auto-name your project folder...";
+        promptInput.focus();
+      }
+    });
+  }
+
+  if (cancelBtn) cancelBtn.addEventListener('click', closeNewProjectModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeNewProjectModal);
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeNewProjectModal();
+    });
+  }
+}
+
+async function startAutoNamedChat() {
+  closeNewProjectModal();
+  let defaultName = 'New Project';
+  let defaultFolder = 'projects/New-Project';
+
+  // Immediately clear the chat and reset session so the UI updates instantly!
+  createNewSession({ folder: defaultFolder, name: defaultName, autoName: true });
+  if (promptInput) {
+    promptInput.placeholder = "Ask anything, generate games, create native Windows/Android apps, or forge RTX artwork...";
+    promptInput.focus();
+  }
+
+  try {
+    const res = await fetch('/v1/workspace/next-project');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.name) {
+        currentSessionTitle = data.name;
+        currentProjectName = data.name;
+        currentProjectFolder = data.folder || defaultFolder;
+        updateActiveProjectBadge();
+      }
+    }
+  } catch {}
+}
+
 if (sidebarNewChatBtn) {
   sidebarNewChatBtn.addEventListener('click', () => {
-    createNewSession();
+    startAutoNamedChat();
   });
 }
 
 const newChatBtn = document.getElementById('newChatBtn');
 if (newChatBtn) {
   newChatBtn.addEventListener('click', () => {
-    createNewSession();
+    startAutoNamedChat();
+  });
+}
+
+const activeProjectBadgeEl = document.getElementById('activeProjectBadge');
+if (activeProjectBadgeEl) {
+  activeProjectBadgeEl.style.cursor = 'pointer';
+  activeProjectBadgeEl.addEventListener('click', () => {
+    openNewProjectModal();
   });
 }
 
@@ -2148,14 +2897,6 @@ if (endlessForgeBtnGroup) {
   });
 }
 
-// Clear Trace
-if (clearTraceBtn && waterfallList) {
-  clearTraceBtn.addEventListener('click', () => {
-    waterfallList.innerHTML = '<div class="waterfall-empty">Traces cleared. Ready for next prompt.</div>';
-    if (attemptsBadge) attemptsBadge.textContent = '0 Attempts';
-  });
-}
-
 // Chaos Mode Toggle
 if (chaosMockGpt4o) {
   chaosMockGpt4o.addEventListener('change', async (e) => {
@@ -2442,6 +3183,24 @@ function stopVoiceRecording() {
   if (voiceInputBtn) voiceInputBtn.title = 'Voice Input: Dictate prompt with your microphone (Click to Speak)';
 }
 
+// Quick 'Continue' Action Button
+const continueBtn = document.getElementById('continueBtn');
+if (continueBtn) {
+  continueBtn.addEventListener('click', () => {
+    if (promptInput) {
+      promptInput.value = 'Continue';
+      if (promptInput.dispatchEvent) {
+        promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (chatForm && chatForm.requestSubmit) {
+        chatForm.requestSubmit();
+      } else if (chatForm) {
+        chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
+    }
+  });
+}
+
 // Text-to-Speech (TTS) Voice Synthesis
 const ttsToggleBtn = document.getElementById('ttsToggleBtn');
 const ttsIcon = document.getElementById('ttsIcon');
@@ -2491,8 +3250,236 @@ function speakCleanText(rawText) {
   window.speechSynthesis.speak(utter);
 }
 
-// Enter key submits prompt, Shift+Enter inserts newline
+// --------------------------------------------------------------------------
+// Auto-Detect In-Chat Terminal Command Engine & Runner Helpers
+// --------------------------------------------------------------------------
+let forceAiChatOnce = false;
+let cmdIndicatorEl = null;
+
+function formatTerminalOutput(raw) {
+  if (!raw) return '';
+  const colorMap = {
+    '30': '#64748b', '31': '#f87171', '32': '#4ade80', '33': '#facc15',
+    '34': '#60a5fa', '35': '#c084fc', '36': '#38bdf8', '37': '#f8fafc',
+    '90': '#94a3b8', '91': '#ef4444', '92': '#22c55e', '93': '#eab308',
+    '94': '#3b82f6', '95': '#a855f7', '96': '#06b6d4', '97': '#ffffff'
+  };
+
+  let escaped = escapeHtml(raw);
+
+  // Convert ANSI SGR sequences
+  escaped = escaped.replace(/\x1b\[([0-9;]+)m/g, (match, p1) => {
+    const codes = p1.split(';');
+    if (codes.includes('0')) return '</span>';
+    const styles = [];
+    for (const code of codes) {
+      if (colorMap[code]) {
+        styles.push(`color: ${colorMap[code]}`);
+      } else if (code === '1') {
+        styles.push('font-weight: bold');
+      } else if (code === '4') {
+        styles.push('text-decoration: underline');
+      }
+    }
+    return styles.length > 0 ? `<span style="${styles.join('; ')}">` : '';
+  });
+
+  // Strip remaining ANSI escapes
+  escaped = escaped.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '');
+  return escaped;
+}
+
+function detectTerminalCommand(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const text = rawText.trim();
+  if (!text) return null;
+
+  // 1. Explicit Prefixes: $, >, or #
+  const prefixMatch = text.match(/^[$>#]\s*(.+)$/s);
+  if (prefixMatch && prefixMatch[1].trim()) {
+    return prefixMatch[1].trim();
+  }
+
+  // 2. Explicit Slash Commands: /run, /exec, /terminal, /cmd, /sh, /powershell, /pwsh
+  const slashMatch = text.match(/^\/(?:run|exec|terminal|cmd|sh|powershell|pwsh)(?:\s+(.*))?$/si);
+  if (slashMatch) {
+    return (slashMatch[1] && slashMatch[1].trim()) ? slashMatch[1].trim() : '__HELP__';
+  }
+
+  // 3. Tool Call Extraction (XML or JSON format pasted by user or other agent)
+  // e.g. <tool_call><function=execute_command><parameter=command>cd foo && bar</parameter></function></tool_call>
+  const toolCallXml = text.match(/<function=execute_command>[\s\S]*?<parameter=command>([\s\S]*?)<\/parameter>/i) ||
+                      text.match(/<(?:parameter|command)=?command?>([\s\S]*?)<\/(?:parameter|command)>/i) ||
+                      text.match(/<tool_call>[\s\S]*?command>([\s\S]*?)<\/[^>]+>[\s\S]*?<\/tool_call>/i);
+  if (toolCallXml && toolCallXml[1].trim()) {
+    return toolCallXml[1].trim();
+  }
+
+  const toolCallJson = text.match(/\{[\s\S]*?"(?:name|function)"\s*:\s*"(?:execute_command|run_command)"[\s\S]*?"(?:command|cmd)"\s*:\s*"([^"]+)"/i);
+  if (toolCallJson && toolCallJson[1].trim()) {
+    return toolCallJson[1].trim();
+  }
+
+  // 4. Markdown Fenced Code Block (e.g. ```bash\npython script.py\n```)
+  const codeBlockMatch = text.match(/^```(?:bash|sh|cmd|powershell|pwsh|bat|shell)?\s*\n([\s\S]*?)\n```$/i);
+  if (codeBlockMatch && codeBlockMatch[1].trim()) {
+    return codeBlockMatch[1].trim();
+  }
+
+  // 5. Exclude conversational English sentences
+  if (/\?$/.test(text)) return null;
+  if (/^(can|could|how|what|why|who|when|where|is|are|will|would|do|does|did|please|tell|explain|help|show|write|generate|create|design|draw|make|review|fix|refactor|analyze)\b/i.test(text)) {
+    return null;
+  }
+  if (/^(i want|i need|can you|could you|would you|let's|lets|please|thank you|thanks)\b/i.test(text)) {
+    return null;
+  }
+
+  // 6. Direct CLI Executables & Known System Commands
+  const KNOWN_CLI_TOOLS = new Set([
+    'npm', 'npx', 'pnpm', 'yarn', 'bun',
+    'dotnet', 'cargo', 'rustc', 'go', 'pip', 'pip3', 'conda', 'mamba',
+    'node', 'tsx', 'ts-node', 'tsc', 'python', 'python3', 'py', 'ruby', 'perl', 'php', 'java', 'javac',
+    'git', 'gh', 'svn', 'hg',
+    'powershell', 'pwsh', 'cmd', 'bash', 'sh', 'zsh',
+    'dir', 'ls', 'cd', 'cat', 'type', 'mkdir', 'md', 'rmdir', 'rd', 'del', 'rm', 'copy', 'cp', 'move', 'mv',
+    'tree', 'attrib', 'touch', 'find', 'findstr', 'grep', 'sed', 'awk', 'head', 'tail', 'less', 'more',
+    'curl', 'wget', 'ping', 'tracert', 'traceroute', 'netstat', 'ipconfig', 'ifconfig', 'nslookup', 'ssh', 'scp',
+    'tasklist', 'taskkill', 'kill', 'ps', 'top', 'htop', 'systeminfo', 'whoami', 'hostname',
+    'ollama', 'docker', 'docker-compose', 'podman', 'kubectl', 'ffmpeg', 'ffprobe',
+    'winget', 'choco', 'scoop', 'brew', 'code', 'explorer', 'start', 'echo', 'cls', 'clear', 'where', 'which',
+    'vitest', 'jest', 'eslint', 'prettier', 'wt', 'rundll32', 'reg', 'sc', 'wmic', 'set', 'export', 'env'
+  ]);
+
+  const firstLine = text.split('\n')[0].trim();
+  const firstToken = firstLine.split(/[\s|&;]+/)[0].toLowerCase().replace(/\.(exe|cmd|bat|ps1|sh)$/i, '');
+
+  if (KNOWN_CLI_TOOLS.has(firstToken)) {
+    const zeroArgAllowed = new Set(['dir', 'ls', 'cls', 'clear', 'pwd', 'top', 'htop', 'whoami', 'hostname', 'systeminfo', 'ipconfig', 'ifconfig']);
+    if (zeroArgAllowed.has(firstToken) || firstLine.includes(' ') || firstLine.includes('&') || firstLine.includes('|') || firstLine.includes(';') || firstLine.includes('-') || firstLine.includes('/')) {
+      return text;
+    }
+  }
+
+  // 7. PowerShell Cmdlet Syntax: Verb-Noun
+  if (/^(Get|Set|New|Remove|Start|Stop|Restart|Test|Invoke|Select|Where|Sort|Format|Measure|Export|Import|Out|Write|Clear|Copy|Move|Rename|Update|Install|Uninstall|Enable|Disable)-[A-Za-z]+(\s+.*)?$/i.test(firstLine)) {
+    return text;
+  }
+
+  // 8. Relative / Absolute Executable Path Execution (e.g. ./build.sh, .\app.exe, C:\tool.exe, /usr/bin/tool)
+  if (/^(\.\/|\.\\|[A-Za-z]:\\)[^\s]+(\s+.*)?$/.test(firstLine) || /^\/[A-Za-z0-9_.-]+\/[^\s]+(\s+.*)?$/.test(firstLine)) {
+    return text;
+  }
+
+  // 9. Multi-command chaining starting with cd or env vars
+  if (/^cd\s+[^\s&|;]+[\s\S]*(&&|\||;)/i.test(text)) {
+    return text;
+  }
+
+  return null;
+}
+
+function initCommandIndicator() {
+  if (cmdIndicatorEl || !chatForm) return;
+  cmdIndicatorEl = document.createElement('div');
+  cmdIndicatorEl.id = 'cmdDetectedIndicator';
+  cmdIndicatorEl.style.display = 'none';
+  cmdIndicatorEl.style.marginBottom = '8px';
+  cmdIndicatorEl.style.padding = '7px 12px';
+  cmdIndicatorEl.style.borderRadius = '8px';
+  cmdIndicatorEl.style.background = 'linear-gradient(135deg, rgba(8, 14, 29, 0.96), rgba(15, 23, 42, 0.96))';
+  cmdIndicatorEl.style.border = '1px solid rgba(56, 189, 248, 0.4)';
+  cmdIndicatorEl.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.5)';
+  cmdIndicatorEl.style.fontSize = '11.5px';
+  cmdIndicatorEl.style.color = '#e2e8f0';
+  cmdIndicatorEl.style.alignItems = 'center';
+  cmdIndicatorEl.style.justifyContent = 'space-between';
+  cmdIndicatorEl.style.gap = '10px';
+  cmdIndicatorEl.style.flexWrap = 'wrap';
+  cmdIndicatorEl.style.transition = 'all 0.18s ease-in-out';
+  chatForm.parentNode.insertBefore(cmdIndicatorEl, chatForm);
+}
+
+function updateCommandDetectionUi(rawText) {
+  initCommandIndicator();
+  if (!cmdIndicatorEl) return;
+
+  if (forceAiChatOnce) {
+    cmdIndicatorEl.style.display = 'none';
+    if (sendBtn) {
+      const textSpan = sendBtn.querySelector('span:first-child');
+      if (textSpan) textSpan.textContent = 'Send';
+      sendBtn.style.background = '';
+    }
+    return;
+  }
+
+  const detected = detectTerminalCommand(rawText);
+  if (detected && detected !== '__HELP__') {
+    const preview = detected.length > 55 ? detected.slice(0, 52) + '...' : detected;
+    cmdIndicatorEl.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+        <span style="font-size: 13px;">💻</span>
+        <span style="font-weight: 700; color: #38bdf8; letter-spacing: 0.3px; white-space: nowrap;">Terminal Command:</span>
+        <code style="background: rgba(0,0,0,0.5); padding: 2px 7px; border-radius: 4px; color: #facc15; font-size: 11px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono);">${escapeHtml(preview)}</code>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: #94a3b8; font-size: 11px;">Press <strong>Enter</strong> to run live</span>
+        <button type="button" id="bypassTerminalBtn" class="action-tag-btn" style="color: #cbd5e1; font-size: 10.5px; padding: 2px 8px; cursor: pointer; border-color: rgba(255,255,255,0.18);">💬 Ask AI Instead</button>
+      </div>
+    `;
+    cmdIndicatorEl.style.display = 'flex';
+
+    const bypassBtn = document.getElementById('bypassTerminalBtn');
+    if (bypassBtn) {
+      bypassBtn.addEventListener('click', () => {
+        forceAiChatOnce = true;
+        cmdIndicatorEl.style.display = 'none';
+        if (sendBtn) {
+          const textSpan = sendBtn.querySelector('span:first-child');
+          if (textSpan) textSpan.textContent = 'Send';
+          sendBtn.style.background = '';
+        }
+        promptInput?.focus();
+      });
+    }
+
+    if (sendBtn) {
+      const textSpan = sendBtn.querySelector('span:first-child');
+      if (textSpan) textSpan.textContent = '⚡ Run';
+      sendBtn.style.background = 'linear-gradient(135deg, #0284c7, #0369a1)';
+    }
+  } else {
+    cmdIndicatorEl.style.display = 'none';
+    if (sendBtn) {
+      const textSpan = sendBtn.querySelector('span:first-child');
+      if (textSpan) textSpan.textContent = 'Send';
+      sendBtn.style.background = '';
+    }
+  }
+}
+
+// Auto-resize prompt textarea cleanly as user types & detect commands
 if (promptInput) {
+  function autoResizePrompt() {
+    promptInput.style.height = 'auto';
+    const newHeight = Math.min(180, Math.max(40, promptInput.scrollHeight));
+    promptInput.style.height = `${newHeight}px`;
+    promptInput.style.overflowY = promptInput.scrollHeight > 180 ? 'auto' : 'hidden';
+  }
+
+  promptInput.addEventListener('input', () => {
+    autoResizePrompt();
+    updateCommandDetectionUi(promptInput.value);
+  });
+
+  promptInput.addEventListener('paste', () => {
+    setTimeout(() => {
+      autoResizePrompt();
+      updateCommandDetectionUi(promptInput.value);
+    }, 10);
+  });
+
   promptInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -2505,12 +3492,504 @@ if (promptInput) {
   });
 }
 
+// --------------------------------------------------------------------------
+// Direct In-Chat Terminal Execution Runner (SSE Streaming Console)
+// --------------------------------------------------------------------------
+async function executeTerminalCommandInChat(command) {
+  setLoading(true);
+  const startTime = Date.now();
+
+  const assistantMsgEl = appendMessage('assistant', '', '💻 Nexus Terminal');
+  const bodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.message-body') : null;
+  if (!bodyEl) {
+    setLoading(false);
+    return;
+  }
+
+  const termId = 'term_' + Math.random().toString(36).slice(2, 9);
+
+  bodyEl.innerHTML = `
+    <div id="${termId}" class="nexus-terminal-card" style="background: #070a12; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 8px; overflow: hidden; font-family: var(--font-mono); margin: 6px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
+      <!-- Terminal Header Bar -->
+      <div style="background: rgba(15, 23, 42, 0.95); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 11.5px; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+          <span style="font-size: 13px;">💻</span>
+          <span style="font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">TERMINAL</span>
+          <span style="background: rgba(255,255,255,0.08); color: #94a3b8; padding: 2px 7px; border-radius: 4px; font-size: 10.5px;">📂 root</span>
+          <code style="color: #facc15; font-size: 11px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(command)}</code>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="term-status-badge" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+            <span class="term-pulse-dot" style="width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; display: inline-block;"></span>
+            Running...
+          </span>
+          <button type="button" class="term-stop-btn action-tag-btn" style="color: #f87171; border-color: rgba(248, 113, 113, 0.4); font-size: 10.5px; padding: 2px 8px; cursor: pointer;">⏹️ Stop</button>
+        </div>
+      </div>
+
+      <!-- Terminal Output Console -->
+      <pre class="term-console-pre" style="margin: 0; padding: 12px 14px; color: #e2e8f0; font-size: 12px; line-height: 1.55; min-height: 120px; max-height: 440px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; background: #040711;"><code>⚡ Initializing terminal session...</code></pre>
+
+      <!-- Terminal Footer Bar -->
+      <div class="term-footer-bar" style="background: rgba(15, 23, 42, 0.85); padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; flex-wrap: wrap; gap: 8px;">
+        <div class="term-footer-meta" style="color: var(--text-muted); display: flex; align-items: center; gap: 10px;">
+          <span class="term-duration">⏱️ 0.0s</span>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+          <button type="button" class="action-tag-btn term-copy-btn" style="color: #cbd5e1; font-size: 11px; padding: 4px 8px; cursor: pointer;">📋 Copy Output</button>
+          <button type="button" class="action-tag-btn term-rerun-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 4px 8px; cursor: pointer;">🔄 Re-run</button>
+          ${(command.includes('build:exe') || command.includes('package:portable')) ? `
+            <button type="button" class="action-tag-btn term-open-folder-btn" style="color: #4ade80; border-color: rgba(74, 222, 128, 0.4); font-size: 11px; padding: 4px 8px; cursor: pointer;">📁 Open Portable Folder</button>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const card = document.getElementById(termId);
+  const consolePre = card ? card.querySelector('.term-console-pre code') : null;
+  const preContainer = card ? card.querySelector('.term-console-pre') : null;
+  const statusBadge = card ? card.querySelector('.term-status-badge') : null;
+  const stopBtn = card ? card.querySelector('.term-stop-btn') : null;
+  const durationSpan = card ? card.querySelector('.term-duration') : null;
+  const copyBtn = card ? card.querySelector('.term-copy-btn') : null;
+  const rerunBtn = card ? card.querySelector('.term-rerun-btn') : null;
+  const openFolderBtn = card ? card.querySelector('.term-open-folder-btn') : null;
+
+  let activePid = null;
+  let fullOutput = `⚡ Spawning PowerShell session...\n> ${command}\n\n`;
+
+  if (consolePre) consolePre.innerHTML = formatTerminalOutput(fullOutput);
+
+  const timerInterval = setInterval(() => {
+    if (durationSpan) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      durationSpan.textContent = `⏱️ ${elapsed}s`;
+    }
+  }, 200);
+
+  if (stopBtn) {
+    stopBtn.addEventListener('click', async () => {
+      if (activePid) {
+        try {
+          await fetch('/v1/terminal/kill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+            body: JSON.stringify({ pid: activePid }),
+          });
+          if (statusBadge) {
+            statusBadge.style.color = '#f87171';
+            statusBadge.textContent = '⏹️ Terminated';
+          }
+          stopBtn.style.display = 'none';
+        } catch (_) {}
+      }
+    });
+  }
+
+  if (rerunBtn) {
+    rerunBtn.addEventListener('click', () => {
+      executeTerminalCommandInChat(command);
+    });
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const cleanPlain = fullOutput.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      navigator.clipboard.writeText(cleanPlain).then(() => {
+        const oldText = copyBtn.textContent;
+        copyBtn.textContent = '✅ Copied!';
+        setTimeout(() => { copyBtn.textContent = oldText; }, 2000);
+      });
+    });
+  }
+
+  if (openFolderBtn) {
+    openFolderBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/v1/workspace/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+          body: JSON.stringify({ filename: '../../release/NexusRoute-Portable' }),
+        });
+      } catch (_) {}
+    });
+  }
+
+  try {
+    const res = await fetch('/v1/terminal/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...adminHeaders(),
+      },
+      body: JSON.stringify({ command }),
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr) continue;
+
+        try {
+          const event = JSON.parse(jsonStr);
+          if (event.type === 'start') {
+            activePid = event.pid;
+            fullOutput = `[PID ${event.pid} | CWD: ${event.cwd}]\n> ${event.command}\n\n`;
+            if (consolePre) {
+              consolePre.innerHTML = formatTerminalOutput(fullOutput);
+              if (preContainer) preContainer.scrollTop = preContainer.scrollHeight;
+            }
+          } else if (event.type === 'stdout' || event.type === 'stderr') {
+            fullOutput += event.text;
+            if (consolePre) {
+              consolePre.innerHTML = formatTerminalOutput(fullOutput);
+              if (preContainer) preContainer.scrollTop = preContainer.scrollHeight;
+            }
+          } else if (event.type === 'done') {
+            clearInterval(timerInterval);
+            const totalSec = (event.durationMs ? event.durationMs / 1000 : (Date.now() - startTime) / 1000).toFixed(1);
+            if (durationSpan) durationSpan.textContent = `⏱️ ${totalSec}s`;
+            fullOutput += `\n[Process finished with exit code ${event.exitCode ?? 0} in ${totalSec}s]\n`;
+            if (consolePre) {
+              consolePre.innerHTML = formatTerminalOutput(fullOutput);
+              if (preContainer) preContainer.scrollTop = preContainer.scrollHeight;
+            }
+
+            if (statusBadge) {
+              if (event.success) {
+                statusBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                statusBadge.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+                statusBadge.style.color = '#22c55e';
+                statusBadge.innerHTML = '✅ Exit 0 (Success)';
+              } else {
+                statusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                statusBadge.style.color = '#f87171';
+                statusBadge.innerHTML = `❌ Exit ${event.exitCode ?? 1} (Failed)`;
+              }
+            }
+            if (stopBtn) stopBtn.style.display = 'none';
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    clearInterval(timerInterval);
+    fullOutput += `\n[Execution Error: ${err.message}]`;
+    if (consolePre) consolePre.innerHTML = formatTerminalOutput(fullOutput);
+    if (statusBadge) {
+      statusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+      statusBadge.style.color = '#f87171';
+      statusBadge.innerHTML = '❌ Error';
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+  } finally {
+    clearInterval(timerInterval);
+    setLoading(false);
+    conversationHistory.push({ role: 'user', content: command });
+    conversationHistory.push({ role: 'assistant', content: `\`\`\`terminal\n${fullOutput}\n\`\`\`` });
+    saveCurrentSession();
+  }
+}
+
 // Submit prompt
 if (chatForm) {
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
   const text = promptInput.value.trim();
   if (!text && !attachedImageDataUrl) return;
+
+  // --------------------------------------------------------------------------
+  // Intelligent Direct In-Chat Terminal Execution Runner
+  // --------------------------------------------------------------------------
+  if (!forceAiChatOnce && !attachedImageDataUrl) {
+    const detectedCmd = detectTerminalCommand(text);
+    if (detectedCmd) {
+      if (cmdIndicatorEl) cmdIndicatorEl.style.display = 'none';
+      if (sendBtn) {
+        const textSpan = sendBtn.querySelector('span:first-child');
+        if (textSpan) textSpan.textContent = 'Send';
+        sendBtn.style.background = '';
+      }
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+
+      if (detectedCmd === '__HELP__') {
+        appendMessage('user', text);
+        appendMessage('assistant', '💡 **Nexus Terminal Runner**\n\nType or paste any CLI command to execute live in your project directory!\n\n**Examples:**\n- `npm test`\n- `git status`\n- `python test_dsp.py`\n- `dir` or `ls`\n- `cd projects/New-Project-2 && python test_dsp.py`\n- `Get-Process NexusRoute`\n- `curl http://localhost:3000/health`', '💻 Terminal');
+        return;
+      }
+
+      appendMessage('user', `💻 \`${detectedCmd}\``);
+      await executeTerminalCommandInChat(detectedCmd);
+      return;
+    }
+  }
+
+  // Reset forceAiChatOnce if it was set
+  forceAiChatOnce = false;
+  if (cmdIndicatorEl) cmdIndicatorEl.style.display = 'none';
+  if (sendBtn) {
+    const textSpan = sendBtn.querySelector('span:first-child');
+    if (textSpan) textSpan.textContent = 'Send';
+    sendBtn.style.background = '';
+  }
+
+  // --------------------------------------------------------------------------
+  // Direct In-Chat Slash Commands (/run, /art, /video, /help, etc.)
+  // --------------------------------------------------------------------------
+  if (text.startsWith('/') && (!attachedImageDataUrl || text.startsWith('/video') || text.startsWith('/clip') || text.startsWith('/morph'))) {
+    const spaceIdx = text.indexOf(' ');
+    const cmd = (spaceIdx === -1 ? text : text.slice(0, spaceIdx)).toLowerCase();
+    const arg = spaceIdx === -1 ? '' : text.slice(spaceIdx + 1).trim();
+    if (cmd === '/caveman' || cmd === '/terse') {
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+      if (arg === 'on' || arg === '1' || arg === 'true') {
+        setCavemanMode(true);
+      } else if (arg === 'off' || arg === '0' || arg === 'false') {
+        setCavemanMode(false);
+      } else {
+        setCavemanMode(!isCavemanMode);
+      }
+      appendMessage('user', text);
+      appendMessage('assistant', isCavemanMode
+        ? '🦴 **Caveman Terse Mode: ON**\n\n"Brain big, mouth small." Cutting ~65% of conversational token waste with ultra-terse, high-density outputs.'
+        : '🗣️ **Caveman Terse Mode: OFF**\n\nStandard conversational output mode restored.', '🦴 Terse');
+      return;
+    }
+
+    if (cmd === '/run' || cmd === '/exec' || cmd === '/terminal' || cmd === '/cmd' || cmd === '/sh') {
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+      if (!arg) {
+        appendMessage('user', text);
+        appendMessage('assistant', '💡 **Nexus Terminal Runner**\n\nType any CLI command to execute live in your project directory!\n\n**Examples:**\n- `npm run build:exe:selfcontained`\n- `npm test`\n- `git status`\n- `/run dotnet --version`\n- `$ dir`', '💻 Terminal');
+        return;
+      }
+      appendMessage('user', `💻 \`${arg}\``);
+      await executeTerminalCommandInChat(arg);
+      return;
+    }
+
+    if (cmd === '/slideshow' || cmd === '/slides' || cmd === '/pics' || cmd === '/gallery' || cmd === '/theater') {
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+      startSlideshow();
+      return;
+    }
+
+    if (cmd === '/art' || cmd === '/image' || cmd === '/draw') {
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+      if (!arg) {
+        appendMessage('user', text);
+        appendMessage('assistant', '⚠️ Please provide a visual prompt! Example: `/art a cyberpunk samurai in neon rain, 8k render`', '🎨 Art Studio');
+        return;
+      }
+      appendMessage('user', text);
+      setLoading(true);
+      const assistantMsgEl = appendMessage('assistant', '', '🎨 Local RTX 4060 GPU');
+      const bodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.message-body') : null;
+      if (bodyEl) bodyEl.innerHTML = '<span style="color: var(--accent-cyan); font-size: 13px;">⚡ Rendering artwork locally on NVIDIA RTX 4060 GPU...</span>';
+
+      try {
+        const res = await fetch('/v1/art/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: arg,
+            engine: 'local-gpu',
+            width: 512,
+            height: 512,
+            steps: 1,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.url) {
+          const imgMd = `![${arg}](${data.url})\n\n🎨 **Studio Artwork** rendered locally on \`${data.engine || 'NVIDIA RTX 4060'}\` in **${data.elapsedSeconds || 1.5}s**`;
+          if (bodyEl) bodyEl.innerHTML = formatMarkdown(imgMd);
+          conversationHistory.push({ role: 'user', content: text });
+          conversationHistory.push({ role: 'assistant', content: imgMd });
+          saveCurrentSession();
+
+          // Sync with Fullscreen Slideshow immediately without any screen jumping
+          const rawFilename = data.url.replace('/v1/workspace/files/', '');
+          if (!studioGalleryItems.some(i => i.name === rawFilename)) {
+            studioGalleryItems.unshift({
+              name: rawFilename,
+              size: data.sizeBytes || 0,
+              mtime: Date.now(),
+            });
+            const navSsBadge = document.getElementById('navSlideshowCountBadge');
+            if (navSsBadge) navSsBadge.textContent = `${studioGalleryItems.length} Pics`;
+            if (slideshowCounter && isSlideshowActive) {
+              slideshowCounter.textContent = `${slideshowIndex + 1} / ${Math.max(1, studioGalleryItems.length)}`;
+            }
+          }
+          if (isSlideshowActive) {
+            slideshowIndex = 0;
+            showLiveStreamSlideshowImage(data.url, false);
+          }
+        } else {
+          if (bodyEl) bodyEl.innerHTML = `<span style="color: var(--accent-red);">⚠️ Generation failed: ${escapeHtml(data.error || 'Unknown GPU error')}</span>`;
+        }
+      } catch (err) {
+        if (bodyEl) bodyEl.innerHTML = `<span style="color: var(--accent-red);">⚠️ Network error: ${escapeHtml(err.message)}</span>`;
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (cmd === '/video' || cmd === '/clip' || cmd === '/morph') {
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+      if (!arg) {
+        appendMessage('user', text);
+        appendMessage('assistant', '⚠️ Please provide a video prompt! Example: `/video a glowing jellyfish swimming through deep blue neon waters` (optional: prefix with `wan`, `ltx`, `sdxl`, `realvis`, `5s`, or `60fps`)', '🎬 Video Studio');
+        return;
+      }
+
+      let targetFps = 60;
+      let targetModel = document.getElementById('videoModelSelect')?.value || 'wan';
+      let targetDuration = 3.0;
+      let cleanArg = arg;
+
+      // Extract optional prefixes in any order (e.g. wan 3s 60fps or 60fps 3s wan)
+      let matched = true;
+      let fpsExplicit = false;
+      while (matched) {
+        matched = false;
+        const fpsMatch = cleanArg.match(/^(\d{2,3})\s*fps\b\s*/i);
+        if (fpsMatch) {
+          targetFps = parseInt(fpsMatch[1], 10);
+          cleanArg = cleanArg.slice(fpsMatch[0].length).trim();
+          matched = true;
+          fpsExplicit = true;
+          continue;
+        }
+        const durMatch = cleanArg.match(/^(\d{1,2})\s*s(?:ec)?\b\s*/i);
+        if (durMatch) {
+          targetDuration = parseFloat(durMatch[1]);
+          cleanArg = cleanArg.slice(durMatch[0].length).trim();
+          matched = true;
+          continue;
+        }
+        const modelMatch = cleanArg.match(/^(wan(?:2\.1)?|ltx(?:-video)?|sdxl|realvis|juggernaut|dreamshaper|turbo|sd-turbo|lumina)\b\s*/i);
+        if (modelMatch) {
+          targetModel = modelMatch[1].toLowerCase();
+          cleanArg = cleanArg.slice(modelMatch[0].length).trim();
+          matched = true;
+          continue;
+        }
+      }
+
+      const isWan = targetModel.toLowerCase().includes('wan');
+      if (isWan && !fpsExplicit) {
+        targetFps = 16; // Wan 2.1 native 16 FPS video
+      }
+
+      // Check if photo is attached in chat
+      let inputImage = '';
+      if (attachedImageDataUrl) {
+        try {
+          const upRes = await fetch('/v1/workspace/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: attachedImageFilename || 'chat_photo.png',
+              dataUrl: attachedImageDataUrl,
+            }),
+          });
+          const upData = await upRes.json();
+          if (upData.success && upData.filename) {
+            inputImage = upData.filename;
+          }
+        } catch {}
+        attachedImageDataUrl = null;
+        if (imagePreview) imagePreview.style.display = 'none';
+      }
+
+      const hasChatPhoto = Boolean(inputImage);
+      appendMessage('user', text);
+      setLoading(true);
+      const assistantMsgEl = appendMessage('assistant', '', '🎬 Local RTX 4060 GPU');
+      const bodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.message-body') : null;
+      const modelNameLabel = isWan 
+        ? (hasChatPhoto ? 'Wan 2.1 I2V Photo Animation (~50s)' : 'Wan 2.1 3D Video DiT (~50s)') 
+        : (targetModel === 'default' ? 'SD-Turbo 60 FPS Engine' : targetModel.toUpperCase());
+      if (bodyEl) bodyEl.innerHTML = `<span style="color: #c084fc; font-size: 13px;">🎬 ${hasChatPhoto ? 'Animating attached photo' : 'Synthesizing local video'} on RTX 4060 GPU with ${modelNameLabel} (${targetDuration}s @ ${targetFps} FPS & synthwave audio)...</span>`;
+
+      try {
+        const numFrames = targetDuration >= 6 ? 24 : 16;
+        const res = await fetch('/v1/meme-studio/generate-gif', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: cleanArg,
+            numFrames,
+            fps: targetFps,
+            durationSec: targetDuration,
+            audioVibe: 'synthwave',
+            model: targetModel,
+            image: inputImage,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.url) {
+          const actualFps = data.fps || targetFps;
+          const engineLabel = formatModelDisplayName(data.model || modelNameLabel);
+          const vidMd = `![${cleanArg}](${data.url})\n\n🎬 **${hasChatPhoto ? 'Photo-to-Video Animation' : 'Video Clip'}** generated on \`RTX 4060\` using **${engineLabel}** in **${data.elapsedSeconds || 2}s** (${data.framesCount || numFrames} frames @ **${actualFps} FPS** · ${targetDuration}s · Synthwave Audio)`;
+          if (bodyEl) bodyEl.innerHTML = formatMarkdown(vidMd);
+          conversationHistory.push({ role: 'user', content: text });
+          conversationHistory.push({ role: 'assistant', content: vidMd });
+          saveCurrentSession();
+          updateStudioGpuStatus();
+        } else {
+          if (bodyEl) bodyEl.innerHTML = `<span style="color: var(--accent-red);">⚠️ Video generation failed: ${escapeHtml(data.error || 'Unknown error')}</span>`;
+        }
+      } catch (err) {
+        if (bodyEl) bodyEl.innerHTML = `<span style="color: var(--accent-red);">⚠️ Video request error: ${escapeHtml(err.message)}</span>`;
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (cmd === '/help' || cmd === '/commands' || cmd === '/shortcuts') {
+      promptInput.value = '';
+      promptInput.style.height = '40px';
+      appendMessage('user', text);
+      const helpHtml = renderCommandsCheatsheetCard();
+      const assistantMsgEl = appendMessage('assistant', '', '⚡ Studio Command Center');
+      const bodyEl = assistantMsgEl ? assistantMsgEl.querySelector('.message-body') : null;
+      if (bodyEl) bodyEl.innerHTML = helpHtml;
+      return;
+    }
+  }
+
+  userScrolledUp = false;
+  if (scrollBottomBtn) scrollBottomBtn.classList.add('hidden');
 
   const targetModel = modelSelect.value;
   const isStream = streamToggle.checked;
@@ -2576,9 +4055,33 @@ if (chatForm) {
       appendMessage('user', text);
     }
 
+  const isGenericTitle = !currentSessionTitle || currentSessionTitle === 'New Conversation' || /^New Project( \d+)?$/i.test(currentSessionTitle);
+  if ((isAutoProjectNaming || isGenericTitle) && text) {
+    const derivedName = deriveProjectNameFromPrompt(text);
+    const derivedSlug = derivedName.replace(/[^a-zA-Z0-9_\-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'Project';
+    const newFolder = `projects/${derivedSlug}`;
+    currentProjectFolder = newFolder;
+    currentProjectName = derivedName;
+    currentSessionTitle = derivedName;
+    isAutoProjectNaming = false;
+    localStorage.setItem('nexus_current_project_folder', currentProjectFolder);
+    localStorage.setItem('nexus_current_project_name', currentProjectName);
+    updateActiveProjectBadge();
+    if (promptInput) promptInput.placeholder = "Ask anything, generate games, create native Windows/Android apps, or forge RTX artwork...";
+    try {
+      fetch('/v1/workspace/create-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: newFolder, name: derivedName }),
+      }).catch(() => {});
+    } catch {}
+  }
+
   conversationHistory.push({ role: 'user', content: userContent });
   saveCurrentSession();
   promptInput.value = '';
+  promptInput.style.height = '40px';
+  promptInput.style.overflowY = 'hidden';
   setLoading(true);
 
   const assistantMsgEl = appendMessage('assistant', '', targetModel);
@@ -2595,16 +4098,36 @@ if (chatForm) {
     messagesToSend = [...systemMsgs, ...(firstUserMsg && !recentTurns.includes(firstUserMsg) ? [firstUserMsg] : []), ...recentTurns];
   }
 
+  // If target model is text-only (e.g. DeepSeek), sanitize any image parts in client history
+  if (targetModel.toLowerCase().includes('deepseek')) {
+    messagesToSend = messagesToSend.map(m => {
+      if (Array.isArray(m.content)) {
+        const text = m.content.map(p => p.type === 'text' ? p.text : '[Attached image]').join('\n');
+        return { ...m, content: text };
+      }
+      return m;
+    });
+  }
+
+  const fixedToggle = document.getElementById('fixedProviderToggle');
   const payload = {
     model: targetModel,
     messages: messagesToSend,
     stream: isStream,
     session_id: currentSessionId,
+    ui_origin: 'main_chat',
     openrouter_routing: openRouterRoutingSelect?.value || 'balanced',
-    metadata: { active_file_targets: activeFileTargets },
+    routing_mode: fixedToggle && fixedToggle.checked ? 'fixed' : 'smart_failover',
+    fixed_provider_mode: !!(fixedToggle && fixedToggle.checked),
+    metadata: {
+      active_file_targets: activeFileTargets,
+      project_folder: currentProjectFolder,
+      project_name: currentProjectName,
+    },
     art_engine: artEngine,
     enable_tools: useTools,
     tools: useTools ? availableTools : [],
+    caveman_mode: isCavemanMode,
   };
 
   currentAbortController = new AbortController();
@@ -2678,6 +4201,25 @@ async function handleNonStreamRequest(payload, bodyEl) {
     }
   }
 
+  if (data.route_info?.recalled_lessons && data.route_info.recalled_lessons.length > 0) {
+    const meta = bodyEl.parentElement?.querySelector('.message-meta');
+    if (meta && !meta.querySelector('.lesson-hit-pill')) {
+      const pill = document.createElement('span');
+      pill.className = 'lesson-hit-pill';
+      pill.style.background = 'rgba(16, 185, 129, 0.15)';
+      pill.style.color = '#34d399';
+      pill.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+      pill.style.padding = '2px 7px';
+      pill.style.borderRadius = '4px';
+      pill.style.fontSize = '11px';
+      pill.style.fontWeight = '600';
+      pill.style.cursor = 'help';
+      pill.title = `Recalled from vault: ${data.route_info.recalled_lessons.join(', ')}`;
+      pill.innerHTML = `💡 ${data.route_info.recalled_lessons.length} LESSON${data.route_info.recalled_lessons.length === 1 ? '' : 'S'}`;
+      meta.appendChild(pill);
+    }
+  }
+
   let usage = data.usage;
   if (!usage || !usage.total_tokens) {
     const userPrompt = payload.messages?.[payload.messages.length - 1]?.content;
@@ -2720,11 +4262,28 @@ function updateLiveRouteStatus(routeInfo) {
 async function handleStreamRequest(payload, bodyEl) {
   const startTime = Date.now();
   let fullText = '';
+  let inThinkingBlock = false;
   let finalRouteInfo = null;
   let finalUsage = null;
   const maxAttempts = 3;
   let completed = false;
   let retriesUsed = 0;
+
+  const estimatedPromptTokens = Math.max(1, Math.round(JSON.stringify(payload.messages).length / 3.8));
+  if (kpiTokens) kpiTokens.textContent = `Evaluating…`;
+  if (kpiTokenBreakdown) kpiTokenBreakdown.textContent = `P: ~${estimatedPromptTokens.toLocaleString()} tok | Ingesting input…`;
+
+  let prefillTimer = setInterval(() => {
+    if (fullText.length > 0) {
+      if (prefillTimer) { clearInterval(prefillTimer); prefillTimer = null; }
+      return;
+    }
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    if (bodyEl && !fullText) {
+      const provider = escapeHtml((finalRouteInfo?.selected_provider || payload.model?.split('/')[0] || 'AI').toUpperCase());
+      bodyEl.innerHTML = `<span style="color: var(--text-muted); font-size: 13px;">⚡ ${provider} thinking & evaluating prompt (~${estimatedPromptTokens.toLocaleString()} tokens · ${elapsed}s)…</span>`;
+    }
+  }, 400);
 
   for (let attempt = 0; attempt < maxAttempts && !completed; attempt++) {
     const retryingAfterPartial = attempt > 0 && fullText.length > 0;
@@ -2743,6 +4302,8 @@ async function handleStreamRequest(payload, bodyEl) {
           ],
         }
       : payload;
+
+    let sawDone = false;
 
     try {
       const res = await fetch('/v1/chat/completions', {
@@ -2763,7 +4324,19 @@ async function handleStreamRequest(payload, bodyEl) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let sawDone = false;
+
+      let renderPending = false;
+      const scheduleDomUpdate = () => {
+        if (renderPending) return;
+        renderPending = true;
+        requestAnimationFrame(() => {
+          renderPending = false;
+          if (bodyEl) bodyEl.innerHTML = formatMarkdown(fullText);
+          if (!userScrolledUp) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+        });
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -2805,23 +4378,80 @@ async function handleStreamRequest(payload, bodyEl) {
           }
 
           const delta = chunk.choices?.[0]?.delta?.content;
-          if (delta) {
-            fullText += delta;
-            if (bodyEl) bodyEl.innerHTML = formatMarkdown(fullText);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+          const reasoningDelta = chunk.choices?.[0]?.delta?.reasoning_content || chunk.choices?.[0]?.delta?.reasoning;
 
-            const liveCompTok = Math.max(1, Math.round(fullText.length / 3.8));
+          if (reasoningDelta) {
+            if (!inThinkingBlock) {
+              inThinkingBlock = true;
+              fullText += '<think>' + reasoningDelta;
+            } else {
+              fullText += reasoningDelta;
+            }
+            scheduleDomUpdate();
+          } else if (delta) {
+            if (inThinkingBlock) {
+              inThinkingBlock = false;
+              fullText += '</think>\n\n' + delta;
+            } else {
+              fullText += delta;
+            }
+            scheduleDomUpdate();
+          }
+
+          if (reasoningDelta || delta) {
+            if (prefillTimer) {
+              clearInterval(prefillTimer);
+              prefillTimer = null;
+            }
+          }
+
+          // Real-time token meter update during thinking, writing, tool progress, or chunk usage
+          if (reasoningDelta || delta || chunk.tool_progress || chunk.usage) {
+            const toolExtra = chunk.tool_progress?.estimated_tokens || 0;
+            const liveCompTok = Math.max(1, Math.round(fullText.length / 3.8) + toolExtra);
             const livePromptTok = Math.max(1, Math.round(JSON.stringify(payload.messages).length / 3.8));
-            const liveTot = livePromptTok + liveCompTok;
+            const liveTot = chunk.usage?.total_tokens || (livePromptTok + liveCompTok);
             const liveDurSec = Math.max(0.1, (Date.now() - startTime) / 1000);
             const liveSpeed = (liveCompTok / liveDurSec).toFixed(1);
             if (kpiTokens) kpiTokens.textContent = `${liveTot.toLocaleString()} tok`;
-            if (kpiTokenBreakdown) kpiTokenBreakdown.textContent = `P: ${livePromptTok} | C: ${liveCompTok} (⚡ ${liveSpeed} tok/s)`;
+            if (kpiTokenBreakdown) {
+              const toolStatus = chunk.tool_progress ? ` · ⚙️ ${chunk.tool_progress.name} (${chunk.tool_progress.argument_bytes}B)` : '';
+              kpiTokenBreakdown.textContent = `P: ${livePromptTok} | C: ${liveCompTok} (⚡ ${liveSpeed} tok/s)${toolStatus}`;
+            }
+
+            const msgLivePill = bodyEl?.parentElement?.querySelector('.msg-token-live-pill');
+            if (msgLivePill) {
+              msgLivePill.style.display = 'inline-block';
+              msgLivePill.style.color = inThinkingBlock ? '#c084fc' : 'var(--accent-cyan)';
+              msgLivePill.textContent = inThinkingBlock
+                ? `🧠 Thinking: ${liveCompTok} tok (⚡ ${liveSpeed} tok/s)`
+                : `⚡ ${liveCompTok} tok (⚡ ${liveSpeed} tok/s)`;
+            }
+          }
+
+          if (chunk.tool_progress && bodyEl && !fullText) {
+            const provider = escapeHtml((finalRouteInfo?.selected_provider || 'AI').toUpperCase());
+            bodyEl.innerHTML = `<span style="color: var(--text-muted); font-size: 13px;">⚡ ${provider} is calling \`${escapeHtml(chunk.tool_progress.name)}\` (${chunk.tool_progress.argument_bytes} bytes)…</span>`;
           }
 
           if (chunk.route_info) {
             finalRouteInfo = chunk.route_info;
             updateLiveRouteStatus(chunk.route_info);
+            const selMod = chunk.route_info.selected_model;
+            if (selMod && bodyEl) {
+              const meta = bodyEl.parentElement?.querySelector('.message-meta');
+              if (meta && !meta.querySelector('.chat-model-avatar')) {
+                const av = getModelAvatar(selMod);
+                if (av) {
+                  const img = document.createElement('img');
+                  img.src = av;
+                  img.className = 'chat-model-avatar';
+                  img.alt = 'Avatar';
+                  img.title = selMod;
+                  meta.insertBefore(img, meta.firstChild);
+                }
+              }
+            }
             if (bodyEl && !fullText && chunk.route_info.route_stage === 'selected') {
               const provider = escapeHtml((chunk.route_info.selected_provider || 'provider').toUpperCase());
               const model = escapeHtml(chunk.route_info.selected_model || payload.model || 'model');
@@ -2835,29 +4465,56 @@ async function handleStreamRequest(payload, bodyEl) {
       }
 
       if (!sawDone) {
-        const incompleteError = new Error('Connection closed before NexusRoute received the stream completion marker.');
-        incompleteError.retryable = true;
-        throw incompleteError;
+        if (fullText.trim().length > 0) {
+          sawDone = true;
+        } else {
+          const incompleteError = new Error('Connection closed before NexusRoute received the stream completion marker.');
+          incompleteError.retryable = true;
+          throw incompleteError;
+        }
+      }
+      if (inThinkingBlock) {
+        fullText += '</think>';
+        inThinkingBlock = false;
+        if (bodyEl) bodyEl.innerHTML = formatMarkdown(fullText);
       }
       completed = true;
     } catch (err) {
+      if (prefillTimer) { clearInterval(prefillTimer); prefillTimer = null; }
       if (err.name === 'AbortError') {
         err.partialText = fullText;
         throw err;
       }
 
-      // Previously this defaulted to retrying (retryable !== false), so any
-      // error that carried no explicit verdict - including ones no amount of
-      // retrying could fix - re-ran the whole request, and each re-run drove a
-      // fresh server-side cascade at full prompt cost. Retry is now opt-in.
-      // A fetch-level TypeError is the one case we classify here: it means the
-      // transport dropped, which a retry genuinely can recover.
+      // If we already received text from the model, show interruption clearly with resume button
+      if (fullText.trim().length > 0) {
+        if (!fullText.includes('⚠️') && !fullText.includes('Streaming stopped')) {
+          fullText += `\n\n*(⚠️ Stream interrupted: ${escapeHtml(err.message || 'connection closed prematurely')})*`;
+        }
+        if (bodyEl) {
+          bodyEl.innerHTML = formatMarkdown(fullText);
+          const resumeDiv = document.createElement('div');
+          resumeDiv.style.marginTop = '10px';
+          resumeDiv.innerHTML = `<button class="resume-stream-btn" style="background: rgba(14, 165, 233, 0.2); border: 1px solid var(--accent-cyan); color: #38bdf8; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">🔄 Resume / Continue Response</button>`;
+          resumeDiv.querySelector('.resume-stream-btn')?.addEventListener('click', () => {
+            resumeDiv.remove();
+            const input = document.getElementById('promptInput') || document.getElementById('chatInput');
+            if (input) {
+              input.value = 'Continue exactly from where you stopped. Complete the task.';
+              document.getElementById('sendBtn')?.click();
+            }
+          });
+          bodyEl.appendChild(resumeDiv);
+        }
+        completed = true;
+        break;
+      }
+
       if (err.retryable === undefined && err instanceof TypeError) err.retryable = true;
       const canRetry = err.retryable === true && attempt < maxAttempts - 1;
       if (!canRetry) {
         err.partialText = fullText;
         err.retriesUsed = retriesUsed;
-        if (fullText) conversationHistory.push({ role: 'assistant', content: fullText });
         throw err;
       }
 
@@ -2870,7 +4527,9 @@ async function handleStreamRequest(payload, bodyEl) {
   }
 
   const durationMs = Date.now() - startTime;
-  conversationHistory.push({ role: 'assistant', content: fullText });
+  if (fullText) {
+    conversationHistory.push({ role: 'assistant', content: fullText });
+  }
 
   if (isAutoTtsEnabled && fullText) {
     speakCleanText(fullText);
@@ -2886,6 +4545,25 @@ async function handleStreamRequest(payload, bodyEl) {
     }
   }
 
+  if (finalRouteInfo?.recalled_lessons && finalRouteInfo.recalled_lessons.length > 0) {
+    const meta = bodyEl.parentElement?.querySelector('.message-meta');
+    if (meta && !meta.querySelector('.lesson-hit-pill')) {
+      const pill = document.createElement('span');
+      pill.className = 'lesson-hit-pill';
+      pill.style.background = 'rgba(16, 185, 129, 0.15)';
+      pill.style.color = '#34d399';
+      pill.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+      pill.style.padding = '2px 7px';
+      pill.style.borderRadius = '4px';
+      pill.style.fontSize = '11px';
+      pill.style.fontWeight = '600';
+      pill.style.cursor = 'help';
+      pill.title = `Recalled from vault: ${finalRouteInfo.recalled_lessons.join(', ')}`;
+      pill.innerHTML = `💡 ${finalRouteInfo.recalled_lessons.length} LESSON${finalRouteInfo.recalled_lessons.length === 1 ? '' : 'S'}`;
+      meta.appendChild(pill);
+    }
+  }
+
   if (!finalUsage || !finalUsage.total_tokens) {
     const userPrompt = payload.messages?.[payload.messages.length - 1]?.content;
     const promptStr = typeof userPrompt === 'string' ? userPrompt : JSON.stringify(userPrompt || '');
@@ -2897,6 +4575,20 @@ async function handleStreamRequest(payload, bodyEl) {
       total_tokens: promptTok + compTok,
       estimated_cost_usd: 0.0,
     };
+  }
+
+  if (prefillTimer) {
+    clearInterval(prefillTimer);
+    prefillTimer = null;
+  }
+
+  const msgLivePill = bodyEl?.parentElement?.querySelector('.msg-token-live-pill');
+  if (msgLivePill && fullText) {
+    const finalComp = finalUsage?.completion_tokens || Math.round(fullText.length / 3.8);
+    const finalSpeed = (finalComp / Math.max(0.1, durationMs / 1000)).toFixed(1);
+    msgLivePill.style.display = 'inline-block';
+    msgLivePill.style.color = 'var(--text-muted)';
+    msgLivePill.textContent = `⚡ ${finalComp.toLocaleString()} tok · ${finalSpeed} tok/s`;
   }
 
   const routeInfo = finalRouteInfo || {
@@ -2917,6 +4609,7 @@ function updateTelemetry(routeInfo, usage, durationMs = 0) {
       .map(file => file?.filename || file?.full_path)
       .filter(Boolean)
       .slice(-10);
+    updateActiveProjectBadge();
   }
 
   if (kpiModel && routeInfo) kpiModel.textContent = routeInfo.selected_model || '-';
@@ -3028,6 +4721,20 @@ function updateTelemetry(routeInfo, usage, durationMs = 0) {
       waterfallList.appendChild(decisionItem);
     }
 
+    if (Array.isArray(routeInfo.recalled_lessons) && routeInfo.recalled_lessons.length > 0) {
+      const lessonItem = document.createElement('div');
+      lessonItem.className = 'waterfall-item lesson';
+      lessonItem.style.borderLeft = '3px solid #10b981';
+      lessonItem.style.background = 'rgba(16, 185, 129, 0.08)';
+      lessonItem.innerHTML = `
+        <div class="waterfall-row">
+          <div class="attempt-name"><span class="status-indicator">💡</span><strong>Learned Memory Recalled</strong></div>
+          <div class="attempt-meta"><span class="attempt-status-tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">${routeInfo.recalled_lessons.length} RECALLED</span></div>
+        </div>
+        <div class="attempt-error decision-reasons" style="color: #6ee7b7;">${routeInfo.recalled_lessons.map(lesson => escapeHtml(lesson)).join(' · ')}</div>`;
+      waterfallList.appendChild(lessonItem);
+    }
+
     attempts.forEach((att, idx) => {
       const item = document.createElement('div');
       item.className = `waterfall-item ${att.status}`;
@@ -3089,6 +4796,47 @@ function updateTelemetry(routeInfo, usage, durationMs = 0) {
   loadFreeCapacity();
 }
 
+// Model Avatar Storage Helpers
+function getModelAvatar(modelIdentifier) {
+  if (!modelIdentifier) return '';
+  try {
+    const raw = localStorage.getItem('nexus_model_avatars');
+    if (!raw) return '';
+    const map = JSON.parse(raw);
+    const clean = modelIdentifier.replace(/^local\//, '').replace(/^[a-z0-9_-]+::/, '').trim();
+    return map[modelIdentifier] || map[clean] || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveModelAvatar(modelIdentifier, url) {
+  if (!modelIdentifier || !url) return;
+  try {
+    const raw = localStorage.getItem('nexus_model_avatars');
+    const map = raw ? JSON.parse(raw) : {};
+    const clean = modelIdentifier.replace(/^local\//, '').replace(/^[a-z0-9_-]+::/, '').trim();
+    map[modelIdentifier] = url;
+    map[clean] = url;
+    map[`local/${clean}`] = url;
+    localStorage.setItem('nexus_model_avatars', JSON.stringify(map));
+  } catch {}
+}
+
+function deleteModelAvatar(modelIdentifier) {
+  if (!modelIdentifier) return;
+  try {
+    const raw = localStorage.getItem('nexus_model_avatars');
+    if (!raw) return;
+    const map = JSON.parse(raw);
+    const clean = modelIdentifier.replace(/^local\//, '').replace(/^[a-z0-9_-]+::/, '').trim();
+    delete map[modelIdentifier];
+    delete map[clean];
+    delete map[`local/${clean}`];
+    localStorage.setItem('nexus_model_avatars', JSON.stringify(map));
+  } catch {}
+}
+
 // UI Helpers
 function appendMessage(role, text, modelTag = null) {
   const msgDiv = document.createElement('div');
@@ -3096,6 +4844,11 @@ function appendMessage(role, text, modelTag = null) {
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   const isAssistant = role === 'assistant';
+  const avatarUrl = isAssistant ? getModelAvatar(modelTag) : '';
+  const avatarHtml = avatarUrl
+    ? `<img src="${escapeHtml(avatarUrl)}" class="chat-model-avatar" alt="Avatar" title="${escapeHtml(modelTag || 'Assistant')}">`
+    : '';
+
   const actionsHtml = isAssistant
     ? `<div style="display: flex; gap: 4px; margin-left: auto;">
         <button class="msg-action-btn tts-btn" title="Read Aloud (Voice)">🔊</button>
@@ -3105,8 +4858,10 @@ function appendMessage(role, text, modelTag = null) {
 
   msgDiv.innerHTML = `
     <div class="message-meta" style="display: flex; align-items: center;">
+      ${avatarHtml}
       <span class="sender-tag">${role === 'user' ? 'You' : (modelTag || 'Assistant')}</span>
       <span class="time-tag">${now}</span>
+      <span class="msg-token-live-pill" style="margin-left: 8px; font-size: 11px; font-family: var(--font-mono, monospace); color: var(--accent-cyan); display: none;"></span>
       ${actionsHtml}
     </div>
     <div class="message-body">${formatMarkdown(text)}</div>
@@ -3136,7 +4891,9 @@ function appendMessage(role, text, modelTag = null) {
   }
 
   chatMessages.appendChild(msgDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  if (!userScrolledUp || role === 'user') {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
   return msgDiv;
 }
 
@@ -3167,16 +4924,18 @@ function formatMarkdown(str) {
 
   // Deep Reasoning & Thinking Accordeon: <think>...</think>
   escaped = escaped.replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/gi, (_, thought) => {
-    return `<details class="thought-box" style="margin: 8px 0; padding: 8px 12px; background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; font-size: 12px; color: var(--text-muted);">
-      <summary style="cursor: pointer; font-weight: 600; color: #c084fc; user-select: none;">🧠 Deep Reasoning & Chain of Thought (Click to Expand)</summary>
+    const thoughtTok = Math.max(1, Math.round(thought.trim().length / 3.8));
+    return `<details open class="thought-box" style="margin: 8px 0; padding: 8px 12px; background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; font-size: 12px; color: var(--text-muted);">
+      <summary style="cursor: pointer; font-weight: 600; color: #c084fc; user-select: none;">🧠 Deep Reasoning (${thoughtTok.toLocaleString()} tokens)</summary>
       <div style="margin-top: 8px; line-height: 1.5; white-space: pre-wrap; font-family: monospace; opacity: 0.9;">${thought.trim()}</div>
     </details>`;
   });
 
   // Active streaming think box (when <think> has started but </think> is not yet received)
   escaped = escaped.replace(/&lt;think&gt;([\s\S]*)$/gi, (_, thought) => {
+    const liveThoughtTok = Math.max(1, Math.round(thought.trim().length / 3.8));
     return `<details open class="thought-box" style="margin: 8px 0; padding: 8px 12px; background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; font-size: 12px; color: var(--text-muted);">
-      <summary style="cursor: pointer; font-weight: 600; color: #c084fc; user-select: none;">🧠 Deep Reasoning in progress...</summary>
+      <summary style="cursor: pointer; font-weight: 600; color: #c084fc; user-select: none;">🧠 Deep Reasoning (${liveThoughtTok.toLocaleString()} tokens · streaming…)</summary>
       <div style="margin-top: 8px; line-height: 1.5; white-space: pre-wrap; font-family: monospace; opacity: 0.9;">${thought.trim()}</div>
     </details>`;
   });
@@ -3185,68 +4944,115 @@ function formatMarkdown(str) {
   escaped = escaped.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
     return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
   });
-  // Markdown images: ![alt](url)
-  escaped = escaped.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, src) => {
+  // Markdown videos: ![alt](url.mp4) or ![alt](url.webm)
+  escaped = escaped.replace(/!\[(.*?)\]\((.*?\.(?:mp4|webm|mov)(?:\?[^)]*)?)\)/gi, (_, alt, src) => {
     let cleanSrc = src.replace(/&amp;/g, '&').trim();
-    if (cleanSrc.startsWith('http://') || cleanSrc.startsWith('https://')) {
-      cleanSrc = `/v1/image-proxy?url=${encodeURIComponent(cleanSrc)}`;
+    if (cleanSrc.includes('<') || cleanSrc.includes('>') || (!cleanSrc.startsWith('http://') && !cleanSrc.startsWith('https://') && !cleanSrc.startsWith('/'))) {
+      return '';
     }
-    const shortAlt = (alt || 'Generated Artwork').replace(/"/g, '&quot;');
-    return `<div class="generated-art-card" style="margin: 10px 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); padding: 8px; border-radius: 12px; display: inline-block; max-width: min(420px, 100%);">
-      <div style="position: relative; max-height: 260px; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-        <a href="${cleanSrc}" target="_blank" title="Click to view full size" style="display: block; cursor: zoom-in;">
-          <img src="${cleanSrc}" alt="${shortAlt}" style="max-width: 100%; max-height: 260px; width: auto; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); display: block; object-fit: contain;" onerror="let r = parseInt(this.dataset.retries || '0'); if (r < 5) { this.dataset.retries = r + 1; setTimeout(() => { this.src = '${cleanSrc}' + (cleanSrc.includes('?') ? '&' : '?') + 't=' + Date.now(); }, 1200); }">
-        </a>
+    const shortAlt = (alt || 'Generated Video').replace(/"/g, '&quot;');
+    const dlUrl = cleanSrc + (cleanSrc.includes('?') ? '&' : '?') + 'download=1';
+    const cleanVidName = (cleanSrc.split('/').pop()?.split('?')[0] || (shortAlt + '.mp4')).replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `<div class="generated-video-card" style="margin: 10px 0; background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.3); padding: 8px; border-radius: 12px; display: inline-block; max-width: min(512px, 100%);">
+      <div style="position: relative; max-height: 320px; background: rgba(0,0,0,0.6); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <video src="${cleanSrc}" controls autoplay loop muted playsinline style="max-width: 100%; max-height: 320px; width: auto; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); display: block;"></video>
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px; white-space: nowrap;">
-        <span style="color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: 280px; white-space: nowrap;">🎨 ${shortAlt}</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
+        <span style="color: #c084fc; font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: 240px; white-space: nowrap; font-weight: 500;">🎬 ${shortAlt}</span>
         <div style="display: flex; gap: 6px; align-items: center; white-space: nowrap; flex-shrink: 0;">
-          <a href="${cleanSrc}" download title="Download Artwork" class="action-tag-btn" style="text-decoration:none; padding: 3px 8px; font-size: 13px; font-weight: bold; white-space: nowrap;">⬇️</a>
-          <a href="${cleanSrc}" target="_blank" title="Open Full Resolution in New Tab" class="action-tag-btn" style="text-decoration:none; padding: 3px 8px; font-size: 13px; white-space: nowrap;">🔍</a>
+          <a href="${dlUrl}" download="${cleanVidName}" title="Download Video (MP4)" class="action-tag-btn" style="text-decoration:none; padding: 4px 10px; font-size: 12px; font-weight: bold; white-space: nowrap; border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">⬇️ MP4</a>
+          <button type="button" class="action-tag-btn" onclick="downloadOrShareMedia('${cleanSrc}', '${cleanVidName}', '${shortAlt}')" title="Save Video or Share" style="padding: 4px 10px; font-size: 12px; font-weight: bold; background: rgba(168, 85, 247, 0.15); color: #c084fc; border-color: rgba(168, 85, 247, 0.4); cursor: pointer;">📲 Save</button>
+          <a href="${cleanSrc}" target="_blank" title="Open Video in New Tab" class="action-tag-btn" style="text-decoration:none; padding: 4px 8px; font-size: 12px; white-space: nowrap;">🔍 View</a>
         </div>
       </div>
     </div>`;
   });
+  // Markdown images: ![alt](url)
+  escaped = escaped.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, src) => {
+    let cleanSrc = src.replace(/&amp;/g, '&').trim();
+    if (cleanSrc.includes('<') || cleanSrc.includes('>') || cleanSrc.toLowerCase().includes('top_gif_url') || (!cleanSrc.startsWith('http://') && !cleanSrc.startsWith('https://') && !cleanSrc.startsWith('/') && !cleanSrc.startsWith('data:image/'))) {
+      return '';
+    }
+    if (cleanSrc.startsWith('http://') || cleanSrc.startsWith('https://')) {
+      cleanSrc = `/v1/image-proxy?url=${encodeURIComponent(cleanSrc)}`;
+    }
+    const shortAlt = (alt || 'Generated Artwork').replace(/"/g, '&quot;');
+    const dlUrl = cleanSrc + (cleanSrc.includes('?') ? '&' : '?') + 'download=1';
+    const cleanImgName = (cleanSrc.split('/').pop()?.split('?')[0] || (shortAlt + '.png')).replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `<div class="generated-art-card" style="margin: 10px 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); padding: 8px; border-radius: 12px; display: inline-block; max-width: min(420px, 100%);">
+      <div style="position: relative; max-height: 260px; background: rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <a href="${cleanSrc}" target="_blank" title="Click to view full size" style="display: block; cursor: pointer;">
+          <img src="${cleanSrc}" alt="${shortAlt}" style="max-width: 100%; max-height: 260px; width: auto; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); display: block; object-fit: contain;" onerror="let r = parseInt(this.dataset.retries || '0'); if (r < 2) { this.dataset.retries = r + 1; setTimeout(() => { this.src = '${cleanSrc}' + (cleanSrc.includes('?') ? '&' : '?') + 't=' + Date.now(); }, 1500); } else { this.closest('.generated-art-card')?.remove(); }">
+        </a>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px; flex-wrap: wrap;">
+        <span style="color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; max-width: 200px; white-space: nowrap;">🎨 ${shortAlt}</span>
+        <div style="display: flex; gap: 6px; align-items: center; white-space: nowrap; flex-shrink: 0;">
+          <a href="${dlUrl}" download="${cleanImgName}" title="Download Artwork to Device" class="action-tag-btn" style="text-decoration:none; padding: 4px 10px; font-size: 12px; font-weight: bold; white-space: nowrap; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">⬇️ Download</a>
+          <button type="button" class="action-tag-btn" onclick="downloadOrShareMedia('${cleanSrc}', '${cleanImgName}', '${shortAlt}')" title="Save to Photos or Share" style="padding: 4px 10px; font-size: 12px; font-weight: bold; background: rgba(168, 85, 247, 0.15); color: #c084fc; border-color: rgba(168, 85, 247, 0.4); cursor: pointer;">📲 Save</button>
+          <a href="${cleanSrc}" target="_blank" title="Open Full Resolution in New Tab" class="action-tag-btn" style="text-decoration:none; padding: 4px 8px; font-size: 12px; white-space: nowrap;">🔍</a>
+        </div>
+      </div>
+    </div>`;
+  });
+  function resolveWorkspaceHtmlUrl(rawPath) {
+    let clean = (rawPath || '').trim().replace(/^`+|`+$/g, '');
+    if (clean.startsWith('file:///')) {
+      clean = decodeURIComponent(clean.replace(/^file:\/\/\/?/, ''));
+    }
+    const localMatch = clean.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/.*)$/i);
+    if (localMatch) {
+      clean = localMatch[1];
+    } else if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+    clean = clean.replace(/\\/g, '/');
+    const wsMatch = clean.match(/workspace\/(.+)$/i);
+    if (wsMatch) {
+      clean = wsMatch[1];
+    }
+    clean = clean.replace(/^\/?v1\/workspace\/files\//i, '');
+    clean = clean.replace(/^\/?projects\//i, 'projects/');
+
+    if (clean.startsWith('projects/')) {
+      return `/v1/workspace/files/${clean}`;
+    }
+    if (currentProjectFolder && !clean.includes('/')) {
+      const folder = currentProjectFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      return `/v1/workspace/files/${folder}/${clean}`;
+    }
+    const rel = clean.replace(/^[/\\]+/, '');
+    return `/v1/workspace/files/${rel}`;
+  }
+
   // Markdown links: [text](url)
   escaped = escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
     let cleanHref = href.replace(/&amp;/g, '&').trim();
     let isHtmlApp = cleanHref.endsWith('.html') || cleanHref.endsWith('.htm') || cleanHref.includes('.html');
-    
-    let target = cleanHref;
-    if (cleanHref.startsWith('file:///')) {
-      const stripped = decodeURIComponent(cleanHref.replace(/^file:\/\/\/?/, ''));
-      const match = stripped.match(/workspace[/\\](.+)$/i) || stripped.match(/([^/\\]+\.html)$/i);
-      if (match) {
-        target = `/v1/workspace/files/${encodeURIComponent(match[1].replace(/\\/g, '/'))}`;
-      } else {
-        const base = stripped.split(/[/\\]/).pop() || '';
-        target = `/v1/workspace/files/${encodeURIComponent(base)}`;
-      }
-    } else if (cleanHref.startsWith('http://') || cleanHref.startsWith('https://') || cleanHref.startsWith('/v1/')) {
-      target = cleanHref;
-    } else {
-      const rel = cleanHref.replace(/^[/\\]+/, '');
-      target = `/v1/workspace/files/${encodeURIComponent(rel.replace(/\\/g, '/'))}`;
-    }
-    
+    let target = isHtmlApp ? resolveWorkspaceHtmlUrl(cleanHref) : cleanHref;
     if (isHtmlApp) {
       return `<a href="${target}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(37, 99, 235, 0.25)); border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 8px; color: #38bdf8; font-weight: 700; font-size: 12px; text-decoration: none; margin: 4px 0; cursor: pointer; transition: all 0.15s ease;">🚀 ${label} <span style="font-size: 10px; opacity: 0.85; font-weight: 500;">(Launch Web App)</span></a>`;
     }
     return `<a href="${target}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-cyan); text-decoration: underline;">${label}</a>`;
   });
 
-  // Auto-detect raw file:/// paths ending in .html
-  escaped = escaped.replace(/(?<!["'=/\w])file:\/\/\/?([^\s<>"']+?\.html)(?!["'=/\w])/gi, (_, filePath) => {
-    const cleanPath = decodeURIComponent(filePath);
-    const match = cleanPath.match(/workspace[/\\](.+)$/i) || cleanPath.match(/([^/\\]+\.html)$/i);
-    const fname = match ? match[1].replace(/\\/g, '/') : (cleanPath.split(/[/\\]/).pop() || cleanPath);
-    return `<a href="/v1/workspace/files/${encodeURIComponent(fname)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(37, 99, 235, 0.25)); border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 8px; color: #38bdf8; font-weight: 700; font-size: 12px; text-decoration: none; margin: 4px 0;">🚀 ${fname} <span style="font-size: 10px; opacity: 0.85; font-weight: 500;">(Launch Web App)</span></a>`;
+  // Auto-detect HTML files (Windows absolute paths, file:/// paths, projects/... paths, localhost URLs, or bare filenames)
+  escaped = escaped.replace(/(?<![="'>])`?(https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\/[^\s<>"'`]+?\.html|[a-zA-Z]:[\\/][^\s<>"'`]+?\.html|file:\/\/\/[^\s<>"'`]+?\.html|[a-zA-Z0-9_\-\./\\]+\.html)`?(?![="'>\w])/gi, (full, p) => {
+    const url = resolveWorkspaceHtmlUrl(p);
+    const fname = p.split(/[\\/]/).pop() || p;
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(37, 99, 235, 0.25)); border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 8px; color: #38bdf8; font-weight: 700; font-size: 12px; text-decoration: none; margin: 4px 0; cursor: pointer; transition: all 0.15s ease;">🚀 ${fname} <span style="font-size: 10px; opacity: 0.85; font-weight: 500;">(Launch Web App)</span></a>`;
   });
 
-  // Auto-detect any referenced .html filenames mentioned in plain text or backticks
-  escaped = escaped.replace(/(?<![="'>/\w])`?([a-zA-Z0-9_\-\.]+\.html)`?(?![="'>/\w])/gi, (full, fname) => {
-    if (fname.startsWith('http') || fname.includes('/')) return full;
-    return `<a href="/v1/workspace/files/${encodeURIComponent(fname)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(37, 99, 235, 0.35)); border: 1px solid rgba(56, 189, 248, 0.6); border-radius: 6px; color: #38bdf8; font-weight: 700; font-size: 11px; text-decoration: none; margin: 2px 2px; cursor: pointer;">🚀 ${fname} <span style="font-size: 9px; opacity: 0.85; font-weight: 500;">(Open App)</span></a>`;
+  // Auto-detect Android APK files
+  escaped = escaped.replace(/(?<![="'>])`?([a-zA-Z0-9_\-\./\\]+?\.apk)`?(?![="'>\w])/gi, (full, p) => {
+    let clean = p.replace(/^[/\\]+/, '');
+    const fname = p.split(/[\\/]/).pop() || p;
+    const appName = fname.replace(/\.apk$/i, '');
+    if (!clean.startsWith('android/')) {
+      clean = `android/${appName}/dist/${fname}`;
+    }
+    const url = `/v1/workspace/files/${encodeURIComponent(clean)}?download=1`;
+    return `<a href="${url}" download="${fname}" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.25)); border: 1px solid rgba(34, 197, 94, 0.5); border-radius: 8px; color: #4ade80; font-weight: 700; font-size: 12px; text-decoration: none; margin: 4px 0; cursor: pointer; transition: all 0.15s ease;" title="Click to download Android APK to phone or PC">📱 ${fname} <span style="font-size: 10px; opacity: 0.9; font-weight: 500;">(⬇️ Download APK)</span></a>`;
   });
 
   // Inline code
@@ -3268,30 +5074,491 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Fullscreen Toggle
+function renderCommandsCheatsheetCard() {
+  return `
+  <div class="studio-commands-card" style="margin: 8px 0; padding: 18px; background: linear-gradient(135deg, rgba(30, 27, 75, 0.45), rgba(15, 23, 42, 0.7)); border: 1px solid rgba(168, 85, 247, 0.45); border-radius: 14px; color: var(--text-primary); font-family: var(--font-sans); box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(168, 85, 247, 0.3); padding-bottom: 10px; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 22px;">⚡</span>
+        <div>
+          <span style="font-size: 15px; font-weight: 800; background: linear-gradient(90deg, #38bdf8, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NexusRoute Command Center &amp; Quick Reference</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 600;">NEXUSROUTE.EXE</span>
+        <span style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); font-weight: 600;">RTX 4060 GPU</span>
+      </div>
+    </div>
+
+    <!-- Section 0: Token Killer & Terse Mode -->
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 12px; font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>🦴</span> TOKEN KILLER &amp; CAVEMAN TERSE MODE
+      </div>
+      <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: var(--font-mono); line-height: 1.6;">
+        <div><code style="color: #fbbf24; font-weight: bold;">/caveman [on|off]</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Toggle ultra-terse "Brain big, mouth small" mode (~65% token savings)</span></div>
+        <div><code style="color: #fbbf24; font-weight: bold;">/terse [on|off]</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Alias for /caveman</span></div>
+        <div style="margin-top: 4px; font-size: 11px; color: #94a3b8; font-family: var(--font-sans);">⚡ <i>Also active: RTK terminal noise compressor, Headroom dynamic effort routing, and Ponytail anti-bloat ladder.</i></div>
+      </div>
+    </div>
+
+    <!-- Section 1: In-Chat Art Generation -->
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 12px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>🎨</span> IN-CHAT ART GENERATION (LOCAL GPU)
+      </div>
+      <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: var(--font-mono); line-height: 1.6;">
+        <div><code style="color: #67e8f9; font-weight: bold;">/art &lt;prompt&gt;</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Render studio image on RTX 4060 in ~1.5s</span></div>
+        <div><code style="color: #67e8f9; font-weight: bold;">/image &lt;prompt&gt;</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Alias for /art</span></div>
+        <div><code style="color: #67e8f9; font-weight: bold;">/draw &lt;prompt&gt;</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Alias for /art</span></div>
+        <div style="margin-top: 4px; font-size: 11px; color: #94a3b8; font-family: var(--font-sans);">💡 <i>Tip: Add styles like "8k, cinematic lighting, cyberpunk, oil painting, unreal engine".</i></div>
+      </div>
+    </div>
+
+    <!-- Section 2: In-Chat Video DiT Generation -->
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 12px; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>🎬</span> IN-CHAT VIDEO DIT GENERATION (LOCAL GPU)
+      </div>
+      <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 8px 10px; font-size: 12px; font-family: var(--font-mono); line-height: 1.6;">
+        <div><code style="color: #f472b6; font-weight: bold;">/video &lt;prompt&gt;</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Synthesize MP4 video clip on RTX 4060 with audio</span></div>
+        <div><code style="color: #f472b6; font-weight: bold;">/clip &lt;prompt&gt;</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Alias for /video</span></div>
+        <div><code style="color: #f472b6; font-weight: bold;">/morph &lt;prompt&gt;</code> <span style="color: var(--text-muted); font-family: var(--font-sans);">— Alias for /video</span></div>
+        <div style="margin-top: 5px; font-size: 11px; color: #e2e8f0; font-family: var(--font-sans);">
+          ⚡ <b>Engine Modifiers (prefix in prompt):</b> <code>wan</code> (Wan 2.1 DiT), <code>ltx</code> (LTX-Video 2B), <code>cogvideo</code> (CogVideoX-2B), <code>turbo</code> (SD-Turbo 60 FPS), <code>sdxl</code>, <code>60fps</code>, <code>3s</code>, <code>6s</code>
+        </div>
+        <div style="margin-top: 3px; font-size: 11px; color: #94a3b8; font-family: var(--font-sans);">
+          📸 <i>Photo Animation: Attach or paste an image, then type <code>/video animate this camera pan left</code>.</i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Native Desktop .exe & Tray Menu -->
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 12px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>🖥️</span> NATIVE WINDOWS .EXE &amp; TASKBAR TRAY
+      </div>
+      <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5;">
+        <div><b>Taskbar Tray Menu (Bottom-Right):</b> Right-click the ⚡ icon for <i>Open Studio</i>, <i>Open Workspace</i>, <i>Prompts &amp; Rules</i>, <i>Restart Gateway</i>, and <i>Exit</i> (clean kernel process cleanup).</div>
+        <div style="margin-top: 4px; font-family: var(--font-mono); font-size: 11px; color: #7dd3fc;">
+          • <code>NexusRoute.exe</code>: Standard launch (auto-opens web dashboard)<br>
+          • <code>NexusRoute.exe --tray</code>: Start minimized to taskbar tray<br>
+          • <code>NexusRoute.exe --headless</code>: Run silently as background service for Claude Code / Cursor<br>
+          • <code>NexusRoute.exe --port &lt;p&gt;</code>: Custom port | <code>--stop</code>: Shut down running instance
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: In-Chat Terminal Execution Runner -->
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 12px; font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>💻</span> IN-CHAT TERMINAL EXECUTION (LIVE SSE STREAMING)
+      </div>
+      <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5;">
+        <div>Type commands directly into chat (or prefix with <code>/run</code> or <code>$</code>) to run live in your project with real-time streaming output:</div>
+        <div style="margin-top: 4px; font-family: var(--font-mono); font-size: 11px; color: #86efac;">
+          • <code>npm run build:exe:selfcontained</code> — Build standalone .exe with embedded .NET<br>
+          • <code>npm test</code> — Run all 171 automated test suites with live console output<br>
+          • <code>/run git status</code> or <code>$ dir</code> — Execute any command live with exit code, duration, copy &amp; stop buttons
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Autonomous AI Tools & Workspace Sandboxing -->
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 12px; font-weight: 700; color: #fbbf24; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>🛠️</span> AUTONOMOUS AGENT TOOLS &amp; 🛡️ SANDBOXING
+      </div>
+      <div style="background: rgba(0,0,0,0.25); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5;">
+        <div>Turn on <b>🛠️ Tools</b> to allow AI models to perform real engineering tasks safely:</div>
+        <div style="margin-top: 4px; font-family: var(--font-mono); font-size: 11px; color: #fde047;">
+          • <code style="color: #fde047;">write_file</code> / <code style="color: #fde047;">patch_file</code> / <code style="color: #fde047;">read_file</code>: Autonomous coding inside workspace<br>
+          • <code style="color: #fde047;">execute_command</code> / <code style="color: #fde047;">test_html_app</code>: Headless Playwright UI verification<br>
+          • <code style="color: #fde047;">generate_image</code> / <code style="color: #fde047;">generate_video</code>: Autonomous visual rendering<br>
+          • <code style="color: #fde047;">web_search</code> / <code style="color: #fde047;">search_gif</code>: Real-time search &amp; animated reactions
+        </div>
+        <div style="margin-top: 5px; font-size: 11px; color: #86efac;">
+          🛡️ <b>Sandboxing:</b> Confined to <code>./workspace</code> by default. Desktop is strictly shielded against roaming models.
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Hotkeys & Shortcuts -->
+    <div>
+      <div style="font-size: 12px; font-weight: 700; color: #4ade80; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <span>⌨️</span> KEYBOARD SHORTCUTS
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px; font-size: 11px;">
+        <div style="background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 6px;"><kbd style="background: #1e293b; border: 1px solid #475569; padding: 1px 4px; border-radius: 4px; font-size: 10px;">Enter</kbd> Send prompt</div>
+        <div style="background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 6px;"><kbd style="background: #1e293b; border: 1px solid #475569; padding: 1px 4px; border-radius: 4px; font-size: 10px;">Shift+Enter</kbd> Multiline newline</div>
+        <div style="background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 6px;"><kbd style="background: #1e293b; border: 1px solid #475569; padding: 1px 4px; border-radius: 4px; font-size: 10px;">Ctrl+V</kbd> Paste clipboard image</div>
+        <div style="background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 6px;"><kbd style="background: #1e293b; border: 1px solid #475569; padding: 1px 4px; border-radius: 4px; font-size: 10px;">Esc</kbd> Cancel active stream</div>
+        <div style="background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 6px;"><kbd style="background: #1e293b; border: 1px solid #475569; padding: 1px 4px; border-radius: 4px; font-size: 10px;">/help</kbd> Show this cheat card</div>
+      </div>
+      <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+        <button type="button" onclick="window.openHelpModal ? window.openHelpModal() : document.getElementById('helpModal')?.classList.remove('hidden')" class="action-tag-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; padding: 5px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          <span>📖</span> Open Full Tabbed Manual &amp; Command Center ↗
+        </button>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
+// Help & Command Center Modal Wiring
+const helpModal = document.getElementById('helpModal');
+const openHelpModalBtn = document.getElementById('openHelpModalBtn');
+const closeHelpModalBtn = document.getElementById('closeHelpModalBtn');
+const closeHelpModalFooterBtn = document.getElementById('closeHelpModalFooterBtn');
+
+window.openHelpModal = function(tabId) {
+  const modal = document.getElementById('helpModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  if (tabId) {
+    const tabBtn = modal.querySelector(`.prompts-tab-btn[data-helptab="${tabId}"]`);
+    if (tabBtn) tabBtn.click();
+  }
+};
+
+window.closeHelpModal = function() {
+  const modal = document.getElementById('helpModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+if (openHelpModalBtn) {
+  openHelpModalBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.openHelpModal();
+  });
+}
+
+if (closeHelpModalBtn) {
+  closeHelpModalBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.closeHelpModal();
+  });
+}
+
+if (closeHelpModalFooterBtn) {
+  closeHelpModalFooterBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.closeHelpModal();
+  });
+}
+
+if (helpModal) {
+  helpModal.addEventListener('click', (e) => {
+    if (e.target === helpModal) {
+      window.closeHelpModal();
+    }
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('helpModal');
+    if (modal && !modal.classList.contains('hidden')) {
+      window.closeHelpModal();
+    }
+  }
+});
+
+// Help Modal Tab Navigation
+document.querySelectorAll('#helpModal .prompts-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetTab = btn.getAttribute('data-helptab');
+    if (!targetTab) return;
+    document.querySelectorAll('#helpModal .prompts-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#helpModal .help-tab-panel').forEach(p => p.classList.add('hidden'));
+    btn.classList.add('active');
+    const panel = document.getElementById(targetTab);
+    if (panel) panel.classList.remove('hidden');
+  });
+});
+
+// Fullscreen / Zen Mode Toggle for Dashboard
+function toggleZenMode() {
+  const isZen = document.body.classList.contains('zen-mode') || !!document.fullscreenElement || !!document.webkitFullscreenElement;
+  const icon = document.getElementById('fullscreenIcon');
+  if (!isZen) {
+    document.body.classList.add('zen-mode', 'fullscreen-mode');
+    const rootEl = document.documentElement;
+    if (rootEl.requestFullscreen) {
+      rootEl.requestFullscreen().catch(() => {});
+    } else if (rootEl.webkitRequestFullscreen) {
+      rootEl.webkitRequestFullscreen().catch(() => {});
+    }
+    if (icon) icon.textContent = '🗗';
+  } else {
+    document.body.classList.remove('zen-mode', 'fullscreen-mode');
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+      document.webkitExitFullscreen().catch(() => {});
+    }
+    if (icon) icon.textContent = '⛶';
+  }
+}
+
+// Fullscreen / Zen Mode Toggle for Dashboard (Opt-in via button or F11, never forced on initial page load)
+
 const toggleFullscreenBtn = document.getElementById('toggleFullscreenBtn');
 if (toggleFullscreenBtn) {
-  toggleFullscreenBtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      document.getElementById('fullscreenIcon').textContent = '🗗';
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-        document.getElementById('fullscreenIcon').textContent = '⛶';
-      }
+  toggleFullscreenBtn.addEventListener('click', toggleZenMode);
+
+  document.addEventListener('fullscreenchange', () => {
+    const isFull = !!document.fullscreenElement;
+    const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const icon = document.getElementById('fullscreenIcon');
+    if (isFull) {
+      document.body.classList.add('zen-mode', 'fullscreen-mode');
+      if (icon) icon.textContent = '🗗';
+    } else if (!isMobile) {
+      document.body.classList.remove('zen-mode', 'fullscreen-mode');
+      if (icon) icon.textContent = '⛶';
+    }
+  });
+}
+
+// Mobile Navigation Drawer & Header Interactivity
+const mobileNavToggleBtn = document.getElementById('mobileNavToggleBtn');
+const closeMobileNavBtn = document.getElementById('closeMobileNavBtn');
+const mobileNavDrawer = document.getElementById('mobileNavDrawer');
+const mobileOpenMeshHeaderBtn = document.getElementById('mobileOpenMeshHeaderBtn');
+
+if (mobileNavToggleBtn && mobileNavDrawer) {
+  mobileNavToggleBtn.addEventListener('click', () => {
+    const gpuLabel = document.getElementById('gpuMetricLabel');
+    const mobileGpuLabel = document.getElementById('mobileGpuLabel');
+    if (gpuLabel && mobileGpuLabel) {
+      mobileGpuLabel.textContent = gpuLabel.textContent;
+    }
+    const keysBadge = document.getElementById('keysCountBadge');
+    const mobileKeysBadge = document.getElementById('mobileKeysBadge');
+    if (keysBadge && mobileKeysBadge) {
+      mobileKeysBadge.textContent = keysBadge.textContent;
+    }
+    const meshBadge = document.getElementById('navMeshCountBadge');
+    const mobileMeshBadge = document.getElementById('mobileMeshBadge');
+    if (meshBadge && mobileMeshBadge) {
+      mobileMeshBadge.textContent = meshBadge.textContent;
+    }
+    mobileNavDrawer.classList.remove('hidden');
+  });
+
+  if (closeMobileNavBtn) {
+    closeMobileNavBtn.addEventListener('click', () => {
+      mobileNavDrawer.classList.add('hidden');
+    });
+  }
+
+  mobileNavDrawer.addEventListener('click', (e) => {
+    if (e.target === mobileNavDrawer) {
+      mobileNavDrawer.classList.add('hidden');
     }
   });
 
-  document.addEventListener('fullscreenchange', () => {
-    if (document.fullscreenElement) {
-      document.body.classList.add('fullscreen-mode');
-      const icon = document.getElementById('fullscreenIcon');
-      if (icon) icon.textContent = '🗗';
-    } else {
-      document.body.classList.remove('fullscreen-mode');
-      const icon = document.getElementById('fullscreenIcon');
-      if (icon) icon.textContent = '⛶';
+  const mobileUnloadGpuBtn = document.getElementById('mobileUnloadGpuBtn');
+  const quickUnloadGpuBtn = document.getElementById('quickUnloadGpuBtn');
+  if (mobileUnloadGpuBtn && quickUnloadGpuBtn) {
+    mobileUnloadGpuBtn.addEventListener('click', () => {
+      quickUnloadGpuBtn.click();
+      mobileNavDrawer.classList.add('hidden');
+    });
+  }
+
+  document.querySelectorAll('.mobile-nav-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const action = tile.getAttribute('data-action');
+      mobileNavDrawer.classList.add('hidden');
+      switch (action) {
+        case 'mesh':
+          document.getElementById('heroOpenMeshBtn')?.click() || document.getElementById('openMeshModalBtn')?.click();
+          break;
+        case 'art':
+          document.getElementById('openArtStudioModalBtn')?.click();
+          break;
+        case 'studio':
+          document.getElementById('navOpenStudioBtn')?.click();
+          break;
+        case 'radio':
+          document.getElementById('openRadioModalBtn')?.click();
+          break;
+        case 'keys':
+          document.getElementById('openKeysModalBtn')?.click();
+          break;
+        case 'capacity':
+          document.getElementById('openCapacityModalBtn')?.click();
+          break;
+        case 'workspace':
+          document.getElementById('openWorkspaceModalBtn')?.click();
+          break;
+        case 'local':
+          document.getElementById('openLocalHubModalBtn')?.click();
+          break;
+        case 'hf':
+          document.getElementById('openHfHubModalBtn')?.click();
+          break;
+        case 'civitai':
+          document.getElementById('openCivitaiHubModalBtn')?.click();
+          break;
+        case 'history':
+          document.getElementById('toggleHistoryBtn')?.click();
+          break;
+        case 'prompts':
+          document.getElementById('openPromptsModalBtn')?.click();
+          break;
+        case 'balances':
+          document.getElementById('openBalancesModalBtn')?.click();
+          break;
+        case 'telemetry':
+          document.getElementById('navToggleTelemetryBtn')?.click();
+          break;
+        case 'zen':
+          toggleZenMode();
+          break;
+        case 'help':
+          if (window.openHelpModal) window.openHelpModal();
+          else document.getElementById('helpModal')?.classList.remove('hidden');
+          break;
+      }
+    });
+  });
+}
+
+if (mobileOpenMeshHeaderBtn) {
+  mobileOpenMeshHeaderBtn.addEventListener('click', () => {
+    document.getElementById('heroOpenMeshBtn')?.click() || document.getElementById('openMeshModalBtn')?.click();
+  });
+}
+
+// Collapsible Hero Banner
+const meshHeroBanner = document.getElementById('meshHeroBanner');
+const meshHeroCollapseBtn = document.getElementById('meshHeroCollapseBtn');
+const meshHeroCollapsedBar = document.getElementById('meshHeroCollapsedBar');
+const meshHeroRestoreBtn = document.getElementById('meshHeroRestoreBtn');
+const heroOpenMeshCollapsedBtn = document.getElementById('heroOpenMeshCollapsedBtn');
+
+if (meshHeroCollapseBtn && meshHeroBanner && meshHeroCollapsedBar) {
+  meshHeroCollapseBtn.addEventListener('click', () => {
+    meshHeroBanner.classList.add('hidden');
+    meshHeroCollapsedBar.classList.remove('hidden');
+    localStorage.setItem('nexus_mesh_hero_collapsed', '1');
+  });
+
+  if (meshHeroRestoreBtn) {
+    meshHeroRestoreBtn.addEventListener('click', () => {
+      meshHeroBanner.classList.remove('hidden');
+      meshHeroCollapsedBar.classList.add('hidden');
+      localStorage.removeItem('nexus_mesh_hero_collapsed');
+    });
+  }
+
+  if (heroOpenMeshCollapsedBtn) {
+    heroOpenMeshCollapsedBtn.addEventListener('click', () => {
+      document.getElementById('heroOpenMeshBtn')?.click() || document.getElementById('openMeshModalBtn')?.click();
+    });
+  }
+
+  if (localStorage.getItem('nexus_mesh_hero_collapsed') === '1') {
+    meshHeroBanner.classList.add('hidden');
+    meshHeroCollapsedBar.classList.remove('hidden');
+  }
+}
+
+// Mobile Chat Quick Actions Strip
+const mobileQuickAttachBtn = document.getElementById('mobileQuickAttachBtn');
+const mobileQuickFaceBtn = document.getElementById('mobileQuickFaceBtn');
+const mobileQuickContinueBtn = document.getElementById('mobileQuickContinueBtn');
+const mobileQuickTtsBtn = document.getElementById('mobileQuickTtsBtn');
+const mobileQuickIdeasBtn = document.getElementById('mobileQuickIdeasBtn');
+const mobileQuickTerseBtn = document.getElementById('mobileQuickTerseBtn');
+
+if (mobileQuickAttachBtn) {
+  mobileQuickAttachBtn.addEventListener('click', () => {
+    document.getElementById('attachImageBtn')?.click();
+  });
+}
+if (mobileQuickFaceBtn) {
+  mobileQuickFaceBtn.addEventListener('click', () => {
+    document.getElementById('faceLockPickBtn')?.click();
+  });
+}
+if (mobileQuickContinueBtn) {
+  mobileQuickContinueBtn.addEventListener('click', () => {
+    document.getElementById('continueBtn')?.click();
+  });
+}
+if (mobileQuickTtsBtn) {
+  mobileQuickTtsBtn.addEventListener('click', () => {
+    document.getElementById('ttsToggleBtn')?.click();
+    const ttsIcon = document.getElementById('ttsIcon');
+    const mobileIcon = document.getElementById('mobileQuickTtsIcon');
+    if (ttsIcon && mobileIcon) mobileIcon.textContent = ttsIcon.textContent;
+  });
+}
+if (mobileQuickIdeasBtn) {
+  mobileQuickIdeasBtn.addEventListener('click', () => {
+    document.getElementById('topIdeasBtn')?.click();
+  });
+}
+if (mobileQuickTerseBtn) {
+  mobileQuickTerseBtn.addEventListener('click', () => {
+    document.getElementById('cavemanToggleBtn')?.click();
+  });
+}
+
+// Minimize Window / Hide Screen
+const minimizeWindowBtn = document.getElementById('minimizeWindowBtn');
+if (minimizeWindowBtn) {
+  let isMinimizing = false;
+
+  const restoreScreen = () => {
+    isMinimizing = false;
+    document.body.classList.remove('screen-disappearing');
+  };
+
+  minimizeWindowBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (isMinimizing) return;
+    isMinimizing = true;
+    document.body.classList.add('screen-disappearing');
+
+    try {
+      const res = await fetch('/v1/desktop/minimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data && data.success === false) {
+        console.warn('Desktop minimize call indicated failure:', data);
+        setTimeout(restoreScreen, 300);
+        return;
+      }
+    } catch (e) {
+      console.warn('Desktop minimize call failed:', e);
+      setTimeout(restoreScreen, 300);
+      return;
+    }
+
+    // Safety fallback: if after 3.5s the window is still visible and focused,
+    // restore smoothly so the user isn't stuck with a blank screen
+    setTimeout(() => {
+      if (!document.hidden) {
+        restoreScreen();
+      }
+    }, 3500);
+  });
+
+  window.addEventListener('focus', () => {
+    restoreScreen();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      restoreScreen();
     }
   });
 }
@@ -3438,16 +5705,37 @@ async function renderLocalHubModels() {
         const mfFromInputEl = document.getElementById('mfFromInput');
         if (mfFromInputEl) mfFromInputEl.value = models[0].rawName;
       }
+      syncModelfileToRaw();
     }
 
     localModelsTableBody.innerHTML = '';
     for (const m of models) {
       const tr = document.createElement('tr');
       const quant = m.quantization || m.parameterSize || 'Standard';
+      const lowerName = (m.rawName || m.id || '').toLowerCase();
+      const isTopCoder = lowerName.includes('deepseek-coder') || lowerName.includes('starcoder') || lowerName.includes('llama3.1') || lowerName.includes('wizard-coder') || lowerName.includes('codellama');
+      const goldStarBadge = isTopCoder 
+        ? `<span class="model-badge" style="background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.5); color: #facc15; font-size: 11px; font-weight: 700; margin-left: 6px;" title="Top-Rated Offline Coding Model (100% GPU offload, zero lazy placeholders)">⭐ Verified Coder</span>` 
+        : '';
+      const rawModelName = m.rawName || m.id || '';
+      const avatarUrl = getModelAvatar(rawModelName);
+      const defaultEmoji = isTopCoder ? '💻' : (lowerName.includes('roast') ? '🔥' : (lowerName.includes('dolphin') ? '🐬' : '🤖'));
+      const avatarEl = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" class="table-model-avatar" alt="Avatar" title="${escapeHtml(rawModelName)}">`
+        : `<div style="width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.05); border:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;">${defaultEmoji}</div>`;
+
       tr.innerHTML = `
         <td>
-          <div style="font-weight: 600; color: var(--text-primary); font-family: monospace;">${escapeHtml(m.rawName || m.id)}</div>
-          <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(m.family || 'llm')} · modified ${new Date(m.modifiedAt).toLocaleDateString()}</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${avatarEl}
+            <div>
+              <div style="font-weight: 600; color: var(--text-primary); font-family: monospace; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                ${escapeHtml(rawModelName)}
+                ${goldStarBadge}
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(m.family || 'llm')} · modified ${new Date(m.modifiedAt).toLocaleDateString()}</div>
+            </div>
+          </div>
         </td>
         <td><span style="font-weight: 500;">${escapeHtml(m.sizeFormatted || m.sizeGb || 'Unknown')}</span></td>
         <td><span class="model-badge" style="font-size: 11px;">${escapeHtml(quant)}</span></td>
@@ -3498,7 +5786,6 @@ async function renderLocalHubModels() {
           const sData = await sRes.json();
           if (sData.success) {
             const mfModelNameInput = document.getElementById('mfModelNameInput');
-            const mfFromInput = document.getElementById('mfFromInput');
             const mfSystemPromptInput = document.getElementById('mfSystemPromptInput');
             const mfRawModelfileInput = document.getElementById('mfRawModelfileInput');
             const mfTempInput = document.getElementById('mfTempInput');
@@ -3506,7 +5793,7 @@ async function renderLocalHubModels() {
             const mfTopPInput = document.getElementById('mfTopPInput');
 
             if (mfModelNameInput) mfModelNameInput.value = `${rawName.replace(/:latest$/, '')}-custom`;
-            if (mfFromInput) mfFromInput.value = rawName;
+            setEffectiveFromModel(rawName);
             if (mfSystemPromptInput) mfSystemPromptInput.value = sData.system || '';
             if (mfRawModelfileInput) mfRawModelfileInput.value = sData.modelfile || '';
             
@@ -3520,6 +5807,17 @@ async function renderLocalHubModels() {
               if (topPMatch && mfTopPInput) mfTopPInput.value = topPMatch[1];
             }
 
+            syncModelfileToRaw();
+            const existingAvatar = getModelAvatar(rawName);
+            if (existingAvatar) {
+              setStudioAvatarPreview(existingAvatar);
+              if (mfAvatarStatus) {
+                mfAvatarStatus.textContent = `✅ Loaded avatar for ${rawName}`;
+                mfAvatarStatus.style.color = '#22c55e';
+              }
+            } else {
+              clearStudioAvatarPreview();
+            }
             const studioEl = document.getElementById('mfModelNameInput');
             if (studioEl) studioEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
           } else {
@@ -3548,6 +5846,7 @@ async function renderLocalHubModels() {
           });
           const dData = await dRes.json();
           if (dData.success) {
+            deleteModelAvatar(modelName);
             await renderLocalHubModels();
             await fetchLocalHubStatus();
             fetchModels();
@@ -3659,28 +5958,37 @@ if (startPullModelBtn && pullModelInput) {
           const jsonStr = trimmed.slice(5).trim();
           if (!jsonStr) continue;
 
+          let chunk;
           try {
-            const chunk = JSON.parse(jsonStr);
-            if (chunk.done) {
+            chunk = JSON.parse(jsonStr);
+          } catch {
+            continue;
+          }
+
+          if (chunk.done) {
+            if (chunk.success) {
               if (pullStatusLabel) pullStatusLabel.textContent = `🎉 ${chunk.message || 'Model downloaded and ready!'}`;
               if (pullProgressBar) pullProgressBar.style.width = '100%';
               if (pullPercentLabel) pullPercentLabel.textContent = '100%';
             } else {
-              const statusText = chunk.status || 'downloading';
-              const percent = chunk.percent !== undefined ? chunk.percent : null;
-              if (pullStatusLabel) pullStatusLabel.textContent = `${statusText} ${chunk.digest ? `(${chunk.digest.slice(0, 12)})` : ''}`;
-              if (percent !== null) {
-                if (pullProgressBar) pullProgressBar.style.width = `${percent}%`;
-                if (pullPercentLabel) pullPercentLabel.textContent = `${percent}%`;
-              }
+              throw new Error(chunk.message || 'Model pull failed');
             }
-          } catch {}
+          } else {
+            const statusText = chunk.status || 'downloading';
+            const percent = chunk.percent !== undefined ? chunk.percent : null;
+            if (pullStatusLabel) pullStatusLabel.textContent = `${statusText} ${chunk.digest ? `(${chunk.digest.slice(0, 12)})` : ''}`;
+            if (percent !== null) {
+              if (pullProgressBar) pullProgressBar.style.width = `${percent}%`;
+              if (pullPercentLabel) pullPercentLabel.textContent = `${percent}%`;
+            }
+          }
         }
       }
 
       await renderLocalHubModels();
       await fetchLocalHubStatus();
-      fetchModels();
+      if (typeof fetchModels === 'function') await fetchModels();
+      selectModelInDropdowns(modelName, modelName);
     } catch (err) {
       if (pullStatusLabel) pullStatusLabel.textContent = `⚠️ Error: ${err.message}`;
       if (pullProgressBar) pullProgressBar.style.background = '#ef4444';
@@ -3728,6 +6036,33 @@ const mfAvatarPlaceholder = document.getElementById('mfAvatarPlaceholder');
 const mfAvatarPromptInput = document.getElementById('mfAvatarPromptInput');
 const mfAvatarStatus = document.getElementById('mfAvatarStatus');
 const mfGenerateAvatarBtn = document.getElementById('mfGenerateAvatarBtn');
+const mfClearAvatarBtn = document.getElementById('mfClearAvatarBtn');
+
+function setStudioAvatarPreview(url) {
+  if (mfAvatarPreviewImg) {
+    mfAvatarPreviewImg.src = url;
+    mfAvatarPreviewImg.style.display = 'block';
+  }
+  if (mfAvatarPlaceholder) mfAvatarPlaceholder.style.display = 'none';
+  if (mfClearAvatarBtn) mfClearAvatarBtn.style.display = 'inline';
+}
+
+function clearStudioAvatarPreview() {
+  if (mfAvatarPreviewImg) {
+    mfAvatarPreviewImg.src = '';
+    mfAvatarPreviewImg.style.display = 'none';
+  }
+  if (mfAvatarPlaceholder) mfAvatarPlaceholder.style.display = 'block';
+  if (mfClearAvatarBtn) mfClearAvatarBtn.style.display = 'none';
+  if (mfAvatarStatus) {
+    mfAvatarStatus.textContent = 'Ready to generate art';
+    mfAvatarStatus.style.color = 'var(--text-muted)';
+  }
+}
+
+if (mfClearAvatarBtn) {
+  mfClearAvatarBtn.addEventListener('click', clearStudioAvatarPreview);
+}
 
 const mfPresetRoasterBtn = document.getElementById('mfPresetRoasterBtn');
 const mfPresetCoderBtn = document.getElementById('mfPresetCoderBtn');
@@ -3736,34 +6071,63 @@ const mfPresetGgufBtn = document.getElementById('mfPresetGgufBtn');
 
 let isRawModelfileMode = false;
 
+function sanitizeModelName(raw) {
+  if (!raw) return '';
+  let clean = raw.trim()
+    .replace(/[\s\t\r\n]+/g, '-')
+    .replace(/[^a-zA-Z0-9_.:/-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^[:.-]+/, '')
+    .replace(/[:.-]+$/, '');
+
+  const colonParts = clean.split(':');
+  if (colonParts.length > 2) {
+    clean = colonParts.slice(0, -1).join('-') + ':' + colonParts[colonParts.length - 1];
+  }
+  return clean;
+}
+
+if (mfModelNameInput) {
+  mfModelNameInput.addEventListener('blur', () => {
+    const sanitized = sanitizeModelName(mfModelNameInput.value);
+    if (sanitized && sanitized !== mfModelNameInput.value) {
+      mfModelNameInput.value = sanitized;
+    }
+  });
+}
+
 function getEffectiveFromModel() {
   if (mfFromInput && mfFromInput.style.display !== 'none' && mfFromInput.value.trim()) {
-    return mfFromInput.value.trim();
+    return mfFromInput.value.trim().replace(/^local\//, '');
   }
   if (mfFromSelect && mfFromSelect.value && mfFromSelect.value !== '__custom__') {
-    return mfFromSelect.value;
+    return mfFromSelect.value.trim().replace(/^local\//, '');
   }
-  return mfFromInput?.value.trim() || 'dolphin-roaster:latest';
+  return (mfFromInput?.value.trim() || '').replace(/^local\//, '');
 }
 
 function setEffectiveFromModel(modelName) {
   if (!modelName) return;
+  const clean = modelName.replace(/^local\//, '').trim();
   if (mfFromSelect) {
-    const matchingOpt = Array.from(mfFromSelect.options).find(o => o.value === modelName);
+    const matchingOpt = Array.from(mfFromSelect.options).find(o => o.value === clean || o.value === modelName);
     if (matchingOpt) {
-      mfFromSelect.value = modelName;
-      if (mfFromInput) mfFromInput.style.display = 'none';
+      mfFromSelect.value = matchingOpt.value;
+      if (mfFromInput) {
+        mfFromInput.style.display = 'none';
+        mfFromInput.value = matchingOpt.value;
+      }
       if (mfCustomPathToggleBtn) mfCustomPathToggleBtn.textContent = '✏️ Custom Path';
     } else {
       mfFromSelect.value = '__custom__';
       if (mfFromInput) {
         mfFromInput.style.display = 'block';
-        mfFromInput.value = modelName;
+        mfFromInput.value = clean;
       }
       if (mfCustomPathToggleBtn) mfCustomPathToggleBtn.textContent = '📋 Pick List';
     }
   } else if (mfFromInput) {
-    mfFromInput.value = modelName;
+    mfFromInput.value = clean;
   }
 }
 
@@ -3805,29 +6169,41 @@ if (mfCustomPathToggleBtn && mfFromInput && mfFromSelect) {
 }
 
 function generateModelfileFromForm() {
-  const from = getEffectiveFromModel();
+  const from = getEffectiveFromModel() || 'dolphin-roaster:latest';
   const system = (mfSystemPromptInput?.value || '').trim();
   const temp = mfTempInput?.value || '0.7';
-  const ctx = mfCtxInput?.value || '8192';
+  const ctx = mfCtxInput?.value || '4096';
   const topP = mfTopPInput?.value || '0.9';
 
   let mf = `FROM ${from}\n`;
+  if (from.toLowerCase().includes('starcoder')) {
+    mf += `TEMPLATE """{{- if .System }}<|im_start|>system\n{{ .System }}<|im_end|>\n{{ end }}{{ if .Prompt }}<|im_start|>user\n{{ .Prompt }}<|im_end|>\n{{ end }}<|im_start|>assistant\n{{ .Response }}<|im_end|>"""\n`;
+  }
   if (system) {
     mf += `SYSTEM """${system}"""\n`;
   }
   mf += `PARAMETER temperature ${temp}\n`;
   mf += `PARAMETER num_ctx ${ctx}\n`;
   mf += `PARAMETER top_p ${topP}\n`;
+  mf += `PARAMETER repeat_penalty 1.15\n`;
   mf += `PARAMETER stop "<|im_start|>"\n`;
   mf += `PARAMETER stop "<|im_end|>"\n`;
+  mf += `PARAMETER stop "<|end_of_text|>"\n`;
   return mf;
 }
 
 function syncModelfileToRaw() {
-  if (mfRawModelfileInput) {
+  if (mfRawModelfileInput && !isRawModelfileMode) {
     mfRawModelfileInput.value = generateModelfileFromForm();
   }
 }
+
+// Live synchronization from visual form inputs to raw modelfile preview
+[mfSystemPromptInput, mfTempInput, mfCtxInput, mfTopPInput, mfFromInput].forEach(el => {
+  if (el) {
+    el.addEventListener('input', syncModelfileToRaw);
+  }
+});
 
 if (mfToggleRawModeBtn && mfSystemPromptInput && mfRawModelfileInput) {
   mfToggleRawModeBtn.addEventListener('click', () => {
@@ -3839,6 +6215,27 @@ if (mfToggleRawModeBtn && mfSystemPromptInput && mfRawModelfileInput) {
       mfToggleRawModeBtn.textContent = 'Toggle Visual Form';
       mfToggleRawModeBtn.classList.add('active');
     } else {
+      // Switched from raw back to visual form: parse raw text back into visual fields!
+      const rawText = mfRawModelfileInput.value.trim();
+      if (rawText) {
+        const fromMatch = rawText.match(/^\s*FROM\s+([^\s\r\n]+)/im);
+        if (fromMatch) setEffectiveFromModel(fromMatch[1]);
+
+        const sysMatchTriple = rawText.match(/^\s*SYSTEM\s+("""|''')([\s\S]*?)\1/im);
+        const sysMatchSingle = rawText.match(/^\s*SYSTEM\s+(.+)$/im);
+        if (sysMatchTriple && mfSystemPromptInput) {
+          mfSystemPromptInput.value = sysMatchTriple[2].trim();
+        } else if (sysMatchSingle && mfSystemPromptInput) {
+          mfSystemPromptInput.value = sysMatchSingle[1].trim();
+        }
+
+        const tempMatch = rawText.match(/PARAMETER\s+temperature\s+([\d\.]+)/i);
+        if (tempMatch && mfTempInput) mfTempInput.value = tempMatch[1];
+        const ctxMatch = rawText.match(/PARAMETER\s+num_ctx\s+(\d+)/i);
+        if (ctxMatch && mfCtxInput) mfCtxInput.value = ctxMatch[1];
+        const topPMatch = rawText.match(/PARAMETER\s+top_p\s+([\d\.]+)/i);
+        if (topPMatch && mfTopPInput) mfTopPInput.value = topPMatch[1];
+      }
       mfSystemPromptInput.style.display = 'block';
       mfRawModelfileInput.style.display = 'none';
       mfToggleRawModeBtn.textContent = 'Toggle Raw Modelfile';
@@ -3889,8 +6286,13 @@ if (mfPresetArchitectBtn) {
 
 if (mfPresetGgufBtn) {
   mfPresetGgufBtn.addEventListener('click', () => {
-    if (mfModelNameInput) mfModelNameInput.value = 'my-gguf-model:latest';
+    if (mfModelNameInput) mfModelNameInput.value = 'my-gguf-model';
     setEffectiveFromModel('C:\\path\\to\\custom-weights.gguf');
+    if (mfFromInput) {
+      mfFromInput.value = '';
+      mfFromInput.placeholder = 'Paste full path to your .gguf file (e.g. C:\\models\\model.gguf)';
+      mfFromInput.focus();
+    }
     if (mfSystemPromptInput) mfSystemPromptInput.value = `You are a helpful AI assistant running directly from a custom local GGUF weight file.`;
     if (mfTempInput) mfTempInput.value = '0.7';
     if (mfCtxInput) mfCtxInput.value = '8192';
@@ -4057,11 +6459,11 @@ if (mfGenerateAvatarBtn && mfAvatarPromptInput) {
 
       const data = await res.json();
       if (data.success && data.url) {
-        if (mfAvatarPreviewImg) {
-          mfAvatarPreviewImg.src = data.url;
-          mfAvatarPreviewImg.style.display = 'block';
+        setStudioAvatarPreview(data.url);
+        const curName = (mfModelNameInput?.value || '').trim();
+        if (curName) {
+          saveModelAvatar(curName, data.url);
         }
-        if (mfAvatarPlaceholder) mfAvatarPlaceholder.style.display = 'none';
         if (mfAvatarStatus) {
           mfAvatarStatus.textContent = `✅ ${data.message || `Rendered on ${data.engine || 'RTX 4060'}`}`;
           mfAvatarStatus.style.color = '#22c55e';
@@ -4105,10 +6507,34 @@ checkGpuArtStatus();
 
 if (mfBuildModelBtn) {
   mfBuildModelBtn.addEventListener('click', async () => {
-    const targetName = (mfModelNameInput?.value || '').trim();
-    if (!targetName) {
+    const rawTargetName = (mfModelNameInput?.value || '').trim();
+    if (!rawTargetName) {
       alert('Please provide a target model name (e.g. "my-custom-model").');
       if (mfModelNameInput) mfModelNameInput.focus();
+      return;
+    }
+
+    const targetName = sanitizeModelName(rawTargetName);
+    if (!targetName) {
+      alert('Model name must contain alphanumeric characters (e.g. "my-custom-model").');
+      if (mfModelNameInput) mfModelNameInput.focus();
+      return;
+    }
+    if (mfModelNameInput) mfModelNameInput.value = targetName;
+
+    const effectiveFrom = getEffectiveFromModel();
+    if (!isRawModelfileMode && !effectiveFrom) {
+      alert('Please select or specify a Base Model (FROM).');
+      if (mfFromSelect) mfFromSelect.focus();
+      return;
+    }
+
+    if (effectiveFrom.includes('custom-weights.gguf') || effectiveFrom.includes('path/to') || effectiveFrom.includes('path\\to')) {
+      alert('Please replace the sample path with a real .gguf file path on your computer, or pick an installed model from the dropdown.');
+      if (mfFromInput) {
+        mfFromInput.focus();
+        mfFromInput.select();
+      }
       return;
     }
 
@@ -4118,14 +6544,16 @@ if (mfBuildModelBtn) {
 
     if (isRawModelfileMode && mfRawModelfileInput?.value.trim()) {
       payload.modelfile = mfRawModelfileInput.value.trim();
+      if (effectiveFrom) payload.from = effectiveFrom;
     } else {
-      payload.from = (mfFromInput?.value || '').trim();
+      payload.from = effectiveFrom;
       payload.system = (mfSystemPromptInput?.value || '').trim();
       payload.parameters = {
         temperature: parseFloat(mfTempInput?.value || '0.7'),
         num_ctx: parseInt(mfCtxInput?.value || '8192', 10),
         top_p: parseFloat(mfTopPInput?.value || '0.9'),
       };
+      payload.modelfile = generateModelfileFromForm();
     }
 
     mfBuildModelBtn.disabled = true;
@@ -4146,7 +6574,8 @@ if (mfBuildModelBtn) {
       });
 
       if (!res.ok) {
-        throw new Error(`Build request failed: HTTP ${res.status}`);
+        const errText = await res.text();
+        throw new Error(`Build request failed: HTTP ${res.status} - ${errText}`);
       }
 
       if (!res.body) {
@@ -4167,28 +6596,34 @@ if (mfBuildModelBtn) {
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith('data: ')) continue;
+          let data;
           try {
-            const data = JSON.parse(trimmed.slice(6));
-            if (data.status && mfBuildStatusLabel) {
-              mfBuildStatusLabel.textContent = data.status;
-            }
-            if (data.percent !== undefined && mfBuildPercentLabel && mfBuildProgressBar) {
-              mfBuildPercentLabel.textContent = `${data.percent}%`;
-              mfBuildProgressBar.style.width = `${data.percent}%`;
-            }
-            if (data.done) {
-              if (data.success) {
-                if (mfBuildStatusLabel) mfBuildStatusLabel.textContent = `✅ ${data.message || 'Build complete!'}`;
-                if (mfBuildProgressBar) {
-                  mfBuildProgressBar.style.width = '100%';
-                  mfBuildProgressBar.style.background = '#22c55e';
-                }
-              } else {
-                throw new Error(data.message || 'Build failed');
+            data = JSON.parse(trimmed.slice(6));
+          } catch {
+            continue;
+          }
+
+          if (data.status && mfBuildStatusLabel) {
+            mfBuildStatusLabel.textContent = data.status;
+          }
+          if (data.percent !== undefined && mfBuildPercentLabel && mfBuildProgressBar) {
+            mfBuildPercentLabel.textContent = `${data.percent}%`;
+            mfBuildProgressBar.style.width = `${data.percent}%`;
+          }
+          if (data.done) {
+            if (data.success) {
+              if (mfBuildStatusLabel) mfBuildStatusLabel.textContent = `✅ ${data.message || 'Build complete!'}`;
+              if (mfBuildPercentLabel) mfBuildPercentLabel.textContent = '100%';
+              if (mfBuildProgressBar) {
+                mfBuildProgressBar.style.width = '100%';
+                mfBuildProgressBar.style.background = '#22c55e';
               }
+              if (mfAvatarPreviewImg?.src && mfAvatarPreviewImg.style.display !== 'none') {
+                saveModelAvatar(targetName, mfAvatarPreviewImg.src);
+              }
+            } else {
+              throw new Error(data.message || 'Build failed');
             }
-          } catch (e) {
-            // ignore JSON parse chunk noise
           }
         }
       }
@@ -4198,7 +6633,10 @@ if (mfBuildModelBtn) {
       fetchModels();
     } catch (err) {
       if (mfBuildStatusLabel) mfBuildStatusLabel.textContent = `⚠️ Error: ${err.message}`;
-      if (mfBuildProgressBar) mfBuildProgressBar.style.background = '#ef4444';
+      if (mfBuildProgressBar) {
+        mfBuildProgressBar.style.background = '#ef4444';
+        mfBuildProgressBar.style.width = '100%';
+      }
     } finally {
       mfBuildModelBtn.disabled = false;
       mfBuildModelBtn.textContent = '🚀 Build Model';
@@ -4259,12 +6697,13 @@ function renderFoldedModelPicker(filterText = '') {
     if (query && matchingOptions.length === 0) continue;
     totalMatches += matchingOptions.length;
 
-    // Retain opened state if user had it open or if searching
-    const shouldBeOpen = query.length > 0 || currentlyOpenGroups.has(groupLabel.trim());
+    const isSelectedInGroup = options.some(opt => opt.value === modelSelect.value);
+    const isVirtualRoutes = groupLabel.toLowerCase().includes('virtual smart');
+
+    // Retain opened state if user had it open, searching, or primary routes / selected group
+    const shouldBeOpen = query.length > 0 || currentlyOpenGroups.has(groupLabel.trim()) || isSelectedInGroup || isVirtualRoutes;
     const accordion = document.createElement('div');
     accordion.className = `provider-accordion ${shouldBeOpen ? 'open' : ''}`;
-
-    const isSelectedInGroup = options.some(opt => opt.value === modelSelect.value);
 
     accordion.innerHTML = `
       <div class="provider-accordion-header ${isSelectedInGroup ? 'active' : ''}">
@@ -4336,15 +6775,27 @@ if (modelPickerTrigger && modelPickerDropdown) {
     e.stopPropagation();
     const isHidden = modelPickerDropdown.classList.contains('hidden');
     if (isHidden) {
+      if (window.innerWidth <= 768 && modelPickerDropdown.parentElement !== document.body) {
+        document.body.appendChild(modelPickerDropdown);
+      }
       modelPickerDropdown.classList.remove('hidden');
       renderFoldedModelPicker(modelPickerSearch ? modelPickerSearch.value : '');
-      if (modelPickerSearch) {
+      // Only auto-focus on desktop to avoid abruptly launching the mobile virtual keyboard
+      if (modelPickerSearch && window.innerWidth > 768) {
         setTimeout(() => modelPickerSearch.focus(), 50);
       }
     } else {
       modelPickerDropdown.classList.add('hidden');
     }
   });
+
+  const modelPickerCloseBtn = document.getElementById('modelPickerCloseBtn');
+  if (modelPickerCloseBtn) {
+    modelPickerCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modelPickerDropdown.classList.add('hidden');
+    });
+  }
 
   // Stop clicks inside the dropdown from closing it
   modelPickerDropdown.addEventListener('click', (e) => {
@@ -4366,33 +6817,344 @@ if (modelPickerSearch) {
 
 if (modelSelect) {
   modelSelect.addEventListener('change', () => {
+    if (modelSelect.value) {
+      localStorage.setItem('nexus_selected_model', modelSelect.value);
+    }
     updateModelPickerDisplay();
   });
 }
-// ==========================================
-// NVIDIA RTX 4060 AI Art Studio Controller
-// ==========================================
+
+// Restore saved model immediately on script load
+try {
+  const initialSavedModel = localStorage.getItem('nexus_selected_model');
+  if (initialSavedModel && modelSelect && Array.from(modelSelect.options).some(o => o.value === initialSavedModel)) {
+    modelSelect.value = initialSavedModel;
+    updateModelPickerDisplay();
+  }
+} catch {}
+
+const modelPickerCustomInput = document.getElementById('modelPickerCustomInput');
+const modelPickerCustomBtn = document.getElementById('modelPickerCustomBtn');
+
+function applyCustomModelPicker() {
+  if (!modelPickerCustomInput || !modelSelect) return;
+  const rawModel = modelPickerCustomInput.value.trim();
+  if (!rawModel) return;
+
+  let opt = Array.from(modelSelect.options).find(o => o.value === rawModel);
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.value = rawModel;
+    opt.textContent = `🎯 ${rawModel}`;
+    const firstGroup = modelSelect.querySelector('optgroup');
+    if (firstGroup) {
+      firstGroup.insertBefore(opt, firstGroup.firstChild);
+    } else {
+      modelSelect.appendChild(opt);
+    }
+  }
+
+  modelSelect.value = rawModel;
+  updateModelPickerDisplay();
+  renderFoldedModelPicker();
+  if (modelPickerDropdown) modelPickerDropdown.classList.add('hidden');
+  modelSelect.dispatchEvent(new Event('change'));
+}
+
+if (modelPickerCustomBtn) {
+  modelPickerCustomBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    applyCustomModelPicker();
+  });
+}
+
+if (modelPickerCustomInput) {
+  modelPickerCustomInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      applyCustomModelPicker();
+    }
+  });
+}
+// ========================================================
+// PromptForge RTX AI Art Studio & Endless Forge Controller
+// ========================================================
 const openArtStudioModalBtn = document.getElementById('openArtStudioModalBtn');
 const closeArtStudioModalBtn = document.getElementById('closeArtStudioModalBtn');
 const artStudioModal = document.getElementById('artStudioModal');
 const studioArtPromptInput = document.getElementById('studioArtPromptInput');
-const studioArtEngineSelect = document.getElementById('studioArtEngineSelect');
+const studioNegativePromptInput = document.getElementById('studioNegativePromptInput');
+const studioRenderModeSelect = document.getElementById('studioRenderModeSelect');
 const studioArtResolutionSelect = document.getElementById('studioArtResolutionSelect');
+const studioGuidanceInput = document.getElementById('studioGuidanceInput');
+const studioSeedInput = document.getElementById('studioSeedInput');
+const studioRandomSeedBtn = document.getElementById('studioRandomSeedBtn');
 const studioArtGenerateBtn = document.getElementById('studioArtGenerateBtn');
 const studioArtStatus = document.getElementById('studioArtStatus');
+const studioArtSpeedBadge = document.getElementById('studioArtSpeedBadge');
 const studioArtPreviewImg = document.getElementById('studioArtPreviewImg');
 const studioArtPlaceholder = document.getElementById('studioArtPlaceholder');
 const studioArtActions = document.getElementById('studioArtActions');
 const studioArtDownloadBtn = document.getElementById('studioArtDownloadBtn');
 const studioArtSetAvatarBtn = document.getElementById('studioArtSetAvatarBtn');
-const studioArtOpenWorkspaceBtn = document.getElementById('studioArtOpenWorkspaceBtn');
+const studioArtFullscreenBtn = document.getElementById('studioArtFullscreenBtn');
+const studioArtMemeBtn = document.getElementById('studioArtMemeBtn');
+const studioOpenFolderBtn = document.getElementById('studioOpenFolderBtn');
+const studioFullscreenWorkstationBtn = document.getElementById('studioFullscreenWorkstationBtn');
+const studioArtViewport = document.getElementById('studioArtViewport');
+const studioProgressBarWrap = document.getElementById('studioProgressBarWrap');
+const studioProgressBarFill = document.getElementById('studioProgressBarFill');
+const studioGpuBadge = document.getElementById('studioGpuBadge');
+const studioGpuVramToggleBtn = document.getElementById('studioGpuVramToggleBtn');
+
+// Canvas badges
+const studioCanvasResBadge = document.getElementById('studioCanvasResBadge');
+const studioCanvasSeedBadge = document.getElementById('studioCanvasSeedBadge');
+const studioCanvasModelBadge = document.getElementById('studioCanvasModelBadge');
+
+// Endless Forge Studio Transport
+const efStudioThemeInput = document.getElementById('efStudioThemeInput');
+const efStudioProgressBadge = document.getElementById('efStudioProgressBadge');
+const efStudioStartBtn = document.getElementById('efStudioStartBtn');
+const efStudioPauseBtn = document.getElementById('efStudioPauseBtn');
+const efStudioStopBtn = document.getElementById('efStudioStopBtn');
+const efStudioSkipBtn = document.getElementById('efStudioSkipBtn');
+const efStudioEvolveBtn = document.getElementById('efStudioEvolveBtn');
+const efStudioPivotBtn = document.getElementById('efStudioPivotBtn');
+
+// Right Gallery & Inspector
+const studioGalleryGrid = document.getElementById('studioGalleryGrid');
+const studioGalleryCountBadge = document.getElementById('studioGalleryCountBadge');
+const studioRefreshGalleryBtn = document.getElementById('studioRefreshGalleryBtn');
+const studioInspectorBox = document.getElementById('studioInspectorBox');
+const studioInspectorPrompt = document.getElementById('studioInspectorPrompt');
+const studioInspectorSeed = document.getElementById('studioInspectorSeed');
+const studioInspectorTime = document.getElementById('studioInspectorTime');
+const studioInspectorReuseBtn = document.getElementById('studioInspectorReuseBtn');
+const studioInspectorDeleteBtn = document.getElementById('studioInspectorDeleteBtn');
 
 let lastGeneratedArtUrl = '';
 let lastGeneratedArtFilename = '';
+let selectedGalleryItem = null;
+let studioGalleryItems = [];
+let currentFilteredGallery = [];
+let selectedGalleryIndex = -1;
+let efStudioPollTimer = null;
+
+// Progress Bar Controller
+let studioProgressInterval = null;
+function startStudioProgressBar(estimatedSec = 2.0) {
+  if (!studioProgressBarWrap || !studioProgressBarFill) return;
+  clearInterval(studioProgressInterval);
+  studioProgressBarWrap.style.display = 'block';
+  studioProgressBarFill.style.width = '5%';
+  const start = Date.now();
+  const durMs = Math.max(1000, estimatedSec * 1000);
+  studioProgressInterval = setInterval(() => {
+    const elapsed = Date.now() - start;
+    const pct = Math.min(94, Math.round((elapsed / durMs) * 90) + 5);
+    studioProgressBarFill.style.width = `${pct}%`;
+  }, 100);
+}
+
+function finishStudioProgressBar() {
+  if (!studioProgressBarWrap || !studioProgressBarFill) return;
+  clearInterval(studioProgressInterval);
+  studioProgressBarFill.style.width = '100%';
+  setTimeout(() => {
+    if (studioProgressBarWrap) studioProgressBarWrap.style.display = 'none';
+    if (studioProgressBarFill) studioProgressBarFill.style.width = '0%';
+  }, 350);
+}
+
+// Quick action bar under picture removed (permanently consolidated into bottom-right inspector panel)
+function showStudioActions() {
+  if (studioArtActions) {
+    studioArtActions.style.display = 'none';
+    studioArtActions.style.opacity = '0';
+    studioArtActions.style.pointerEvents = 'none';
+  }
+}
+
+// Fullscreen button inside viewport
+if (studioArtFullscreenBtn) {
+  studioArtFullscreenBtn.addEventListener('click', () => {
+    if (lastGeneratedArtUrl || (studioArtPreviewImg && studioArtPreviewImg.src)) {
+      enterSlideshow();
+    }
+  });
+}
+
+const studioArtShareBtn = document.getElementById('studioArtShareBtn');
+if (studioArtShareBtn) {
+  studioArtShareBtn.addEventListener('click', () => {
+    const targetUrl = lastGeneratedArtUrl || (studioArtPreviewImg ? studioArtPreviewImg.src : '');
+    if (targetUrl) {
+      const filename = targetUrl.split('/').pop()?.split('?')[0] || 'gpu_art.png';
+      downloadOrShareMedia(targetUrl, filename, 'RTX 4060 Artwork');
+    }
+  });
+}
+
+function formatModelDisplayName(raw) {
+  if (!raw) return 'majicMIX Realistic';
+  const clean = raw.trim();
+  const lower = clean.toLowerCase();
+  if (lower.endsWith('.safetensors') || lower.includes('checkpoints') || lower.startsWith('local:') || lower.includes('models\\') || lower.includes('models/')) {
+    const filename = clean.split(/[\\/]/).pop() || clean;
+    const base = filename.replace(/\.safetensors$/, '').replace(/^local:checkpoints\//, '');
+    return `${base} (Local Checkpoint)`;
+  }
+  if (lower.includes('majicmix')) return 'majicMIX Realistic v7';
+  if (lower.includes('revanimated')) return 'Rev Animated v2';
+  if (lower.includes('dreamshaper_8')) return 'DreamShaper 8';
+  if (lower.includes('ponyrealism')) return 'Pony Realism v2.2';
+  if (lower.includes('ponydiffusion')) return 'Pony Diffusion V6 XL';
+  if (lower.includes('realisticvision')) return 'Realistic Vision V6.0';
+  if (lower.includes('disneypixar')) return 'Disney Pixar Cartoon v1.0';
+  if (lower.includes('realvis')) return 'RealVisXL V5.0';
+  if (lower.includes('sdxl-turbo')) return 'SDXL-Turbo';
+  if (lower.includes('dreamshaper')) return 'DreamShaper XL Turbo';
+  if (lower.includes('juggernaut')) return 'Juggernaut XL V9';
+  if (lower.includes('animagine')) return 'Animagine XL 4.0';
+  if (lower.includes('stable-diffusion-xl-base') || lower === 'sdxl' || lower.includes('base-1.0')) return 'SDXL Base 1.0';
+  if (lower.includes('sd-turbo') || lower === 'turbo' || lower === 'default') return 'majicMIX Realistic';
+  if (lower.includes('wan')) return 'Wan 2.1 Video DiT (1.3B)';
+  if (lower.includes('ltx')) return 'LTX-Video';
+  if (lower.includes('cogvideo')) return 'CogVideoX-2B';
+  return clean.split(/[\\/]/).pop() || clean;
+}
+
+let studioGpuHeartbeatTimer = null;
+function startStudioGpuHeartbeat() {
+  stopStudioGpuHeartbeat();
+  updateStudioGpuStatus();
+  studioGpuHeartbeatTimer = setInterval(updateStudioGpuStatus, 2000);
+}
+function stopStudioGpuHeartbeat() {
+  if (studioGpuHeartbeatTimer) {
+    clearInterval(studioGpuHeartbeatTimer);
+    studioGpuHeartbeatTimer = null;
+  }
+}
+
+// Dynamic Loaded / Unloaded VRAM Management
+async function updateStudioGpuStatus() {
+  if (!studioGpuBadge && !studioGpuVramToggleBtn) return;
+  try {
+    const res = await fetch('/v1/art/gpu-status');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (studioGpuBadge) {
+      if (data.isGenerating && data.activeJob) {
+        const job = data.activeJob;
+        const progressDetail = job.percent > 0 ? ` (${job.percent}%)` : '';
+        const shortModel = formatModelDisplayName(job.model).replace(/ XL.*$/i, ' XL').replace(/ V\d+.*$/i, '');
+        studioGpuBadge.textContent = `⚡ ${shortModel} Synthesizing${progressDetail}`;
+        studioGpuBadge.title = `⚡ ${job.model} Synthesizing${job.percent > 0 ? ` (${job.step}/${job.totalSteps} · ${job.percent}%)` : ''} · RTX 4060`;
+        studioGpuBadge.style.color = '#fbbf24';
+        studioGpuBadge.style.borderColor = 'rgba(245, 158, 11, 0.6)';
+        studioGpuBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+        studioGpuBadge.classList.add('gpu-synthesizing-pulse');
+      } else if (data.isLoaded) {
+        studioGpuBadge.classList.remove('gpu-synthesizing-pulse');
+        const displayModel = formatModelDisplayName(data.warmModel);
+        studioGpuBadge.textContent = `🟢 ${displayModel} (Warm · RTX 4060)`;
+        studioGpuBadge.title = `🟢 ${displayModel} (Warm in VRAM · RTX 4060)`;
+        studioGpuBadge.style.color = '#22c55e';
+        studioGpuBadge.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+        studioGpuBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+      } else {
+        studioGpuBadge.classList.remove('gpu-synthesizing-pulse');
+        studioGpuBadge.textContent = '⚪ GPU Idle (Model Unloaded)';
+        studioGpuBadge.title = '⚪ GPU Idle (Model Unloaded)';
+        studioGpuBadge.style.color = '#94a3b8';
+        studioGpuBadge.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+        studioGpuBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+      }
+    }
+    if (studioGpuVramToggleBtn) {
+      if (data.isLoaded) {
+        studioGpuVramToggleBtn.textContent = '🧹 Unload VRAM';
+        studioGpuVramToggleBtn.style.color = '#f87171';
+        studioGpuVramToggleBtn.style.borderColor = 'rgba(248, 113, 113, 0.3)';
+        studioGpuVramToggleBtn.title = 'Evict diffusion model from GPU to free VRAM';
+      } else {
+        const selModel = studioModelSelect ? formatModelDisplayName(studioModelSelect.value) : 'SD-Turbo';
+        studioGpuVramToggleBtn.textContent = '🔥 Preload Model';
+        studioGpuVramToggleBtn.style.color = '#38bdf8';
+        studioGpuVramToggleBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        studioGpuVramToggleBtn.title = `Preload ${selModel} into GPU VRAM for instant renders`;
+      }
+    }
+  } catch {}
+}
+
+if (studioGpuVramToggleBtn) {
+  studioGpuVramToggleBtn.addEventListener('click', async () => {
+    const isUnload = studioGpuVramToggleBtn.textContent.includes('Unload');
+    studioGpuVramToggleBtn.textContent = '⏳ ...';
+    try {
+      const endpoint = isUnload ? '/v1/art/gpu-unload' : '/v1/art/gpu-preload';
+      const selectedModel = studioModelSelect ? studioModelSelect.value : 'local:checkpoints/majicmixRealistic_v7.safetensors';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isUnload ? {} : { model: selectedModel }),
+      });
+      const data = await res.json();
+      await updateStudioGpuStatus();
+      if (studioArtStatus) {
+        if (!res.ok || data.success === false) {
+          studioArtStatus.innerHTML = `<span style="color: var(--accent-red);">⚠️ ${data.message || data.error || 'Operation failed'}</span>`;
+        } else {
+          studioArtStatus.innerHTML = `<span style="color: #38bdf8;">${data.message || (isUnload ? 'VRAM Freed' : 'Model Preloading...')}</span>`;
+        }
+      }
+    } catch (err) {
+      studioGpuVramToggleBtn.textContent = '⚠ Error';
+      if (studioArtStatus) {
+        studioArtStatus.innerHTML = `<span style="color: var(--accent-red);">⚠️ ${err.message || 'GPU action failed'}</span>`;
+      }
+    }
+  });
+}
+
+// Main Chat Freeze Source Toggle (Decoupled from Connect external app freeze)
+const fixedProviderToggle = document.getElementById('fixedProviderToggle');
+const fixedProviderText = document.getElementById('fixedProviderText');
+if (fixedProviderToggle) {
+  const updateFixedProviderLabel = () => {
+    if (fixedProviderText) {
+      fixedProviderText.textContent = '🔒 Freeze Source';
+      fixedProviderText.style.color = fixedProviderToggle.checked ? '#c084fc' : '';
+      fixedProviderText.style.fontWeight = fixedProviderToggle.checked ? '700' : '';
+    }
+  };
+
+  const savedMainFixed = localStorage.getItem('nexus_main_fixed_mode');
+  if (savedMainFixed !== null) {
+    fixedProviderToggle.checked = savedMainFixed === 'true';
+    updateFixedProviderLabel();
+  }
+
+  fixedProviderToggle.addEventListener('change', () => {
+    localStorage.setItem('nexus_main_fixed_mode', fixedProviderToggle.checked ? 'true' : 'false');
+    updateFixedProviderLabel();
+    console.log(`[MainChatFixedMode] Main chat strict Freeze Source is now: ${fixedProviderToggle.checked}`);
+  });
+}
 
 if (openArtStudioModalBtn && artStudioModal) {
   openArtStudioModalBtn.addEventListener('click', () => {
     artStudioModal.classList.remove('hidden');
+    loadStudioGallery();
+    startEfStudioPolling();
+    startStudioGpuHeartbeat();
+    if (typeof syncCivitaiInstalledToStudio === 'function') {
+      syncCivitaiInstalledToStudio();
+    }
     if (studioArtPromptInput) studioArtPromptInput.focus();
   });
 }
@@ -4400,21 +7162,336 @@ if (openArtStudioModalBtn && artStudioModal) {
 if (closeArtStudioModalBtn && artStudioModal) {
   closeArtStudioModalBtn.addEventListener('click', () => {
     artStudioModal.classList.add('hidden');
+    stopStudioGpuHeartbeat();
+    if (typeof closeMemeStudio === 'function') closeMemeStudio();
+  });
+}
+// Note: studioFullscreenWorkstationBtn is now handled universally by .modal-maximize-btn
+
+if (studioOpenFolderBtn) {
+  studioOpenFolderBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/v1/workspace/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(typeof adminHeaders === 'function' ? adminHeaders() : {}) },
+        body: JSON.stringify({ filename: 'art' }),
+      });
+      const data = await res.json();
+      const originalText = studioOpenFolderBtn.textContent;
+      if (data.success) {
+        studioOpenFolderBtn.textContent = '✅ Opened';
+      } else {
+        studioOpenFolderBtn.textContent = '⚠️ Error';
+        console.warn('Open art folder error:', data.error);
+      }
+      setTimeout(() => { studioOpenFolderBtn.textContent = originalText; }, 2000);
+    } catch (err) {
+      console.error('Failed to open art folder in explorer:', err);
+    }
   });
 }
 
+// Model Selection Adjustments
+const studioModelSelect = document.getElementById('studioModelSelect');
+if (studioModelSelect) {
+  studioModelSelect.addEventListener('change', () => {
+    const m = studioModelSelect.value;
+    try {
+      localStorage.setItem('nexus_studio_selected_model', m);
+    } catch {}
+    if (m.includes('sd-turbo')) {
+      if (studioRenderModeSelect) studioRenderModeSelect.value = 'turbo';
+      if (studioArtResolutionSelect) studioArtResolutionSelect.value = '512x512';
+      if (studioGuidanceInput) studioGuidanceInput.value = '0.0';
+      if (studioArtSpeedBadge) studioArtSpeedBadge.textContent = '⚡ ~0.25s per image';
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = 'SD-Turbo (Instant Fast Stream)';
+    } else if (m.includes('sdxl-turbo') || m.includes('dreamshaper')) {
+      if (studioRenderModeSelect) studioRenderModeSelect.value = 'fast';
+      if (studioArtResolutionSelect) studioArtResolutionSelect.value = '768x768';
+      if (studioGuidanceInput) studioGuidanceInput.value = '2.0';
+      if (studioArtSpeedBadge) studioArtSpeedBadge.textContent = '🚀 ~3-4s per image';
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = `${m.split('/').pop()} (Fast HD)`;
+    } else if (m.startsWith('local:checkpoints/') || m.endsWith('.safetensors')) {
+      const selOpt = studioModelSelect.options[studioModelSelect.selectedIndex];
+      const baseModel = selOpt ? selOpt.getAttribute('data-basemodel') : '';
+      const isSd15 = baseModel === 'SD 1.5' || m.toLowerCase().includes('majicmix') || m.toLowerCase().includes('revanimated');
+      if (studioRenderModeSelect) studioRenderModeSelect.value = 'quality';
+      if (studioArtResolutionSelect) studioArtResolutionSelect.value = isSd15 ? '512x512' : '1024x1024';
+      if (studioGuidanceInput) studioGuidanceInput.value = '6.5';
+      const cleanName = selOpt ? selOpt.text.replace(/^[💾✨📸🎨🚀🌟🌸]\s*/, '').split('(')[0].trim() : m.split('/').pop();
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = `${cleanName} (${isSd15 ? 'SD 1.5' : 'SDXL'} Local Checkpoint)`;
+    } else {
+      // Full HD SDXL Base, RealVisXL, Juggernaut XL, Animagine XL
+      if (studioRenderModeSelect) studioRenderModeSelect.value = 'quality';
+      if (studioArtResolutionSelect) studioArtResolutionSelect.value = '1024x1024';
+      if (studioGuidanceInput) studioGuidanceInput.value = '6.5';
+      if (studioArtSpeedBadge) studioArtSpeedBadge.textContent = '✨ ~25s (~2 HD pics/min)';
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = `${m.split('/').pop()} (Full HD Masterpiece)`;
+    }
+  });
+
+  // Restore saved model immediately if option is present in markup
+  try {
+    const savedModelInit = localStorage.getItem('nexus_studio_selected_model');
+    if (savedModelInit) {
+      const opt = Array.from(studioModelSelect.options).find(o => o.value === savedModelInit);
+      if (opt) {
+        studioModelSelect.value = savedModelInit;
+        studioModelSelect.dispatchEvent(new Event('change'));
+      }
+    }
+  } catch {}
+}
+
+// Mode Selection Adjustments
+if (studioRenderModeSelect) {
+  studioRenderModeSelect.addEventListener('change', () => {
+    const val = studioRenderModeSelect.value;
+    const selModel = studioModelSelect ? formatModelDisplayName(studioModelSelect.value) : 'SDXL Base 1.0';
+    if (val === 'turbo') {
+      if (studioGuidanceInput) studioGuidanceInput.value = '0.0';
+      if (studioArtSpeedBadge) studioArtSpeedBadge.textContent = '⚡ ~1.5s per image';
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = `${selModel} (Turbo · 1 step)`;
+    } else if (val === 'fast') {
+      if (studioGuidanceInput) studioGuidanceInput.value = '3.5';
+      if (studioArtSpeedBadge) studioArtSpeedBadge.textContent = '🚀 ~8s per image';
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = `${selModel} (Fast · 12 steps)`;
+    } else if (val === 'quality') {
+      if (studioGuidanceInput) studioGuidanceInput.value = '6.5';
+      if (studioArtSpeedBadge) studioArtSpeedBadge.textContent = '✨ ~25s per image (~2 HD pics/min)';
+      if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = `${selModel} (Quality · 28 steps)`;
+    }
+  });
+}
+
+if (studioArtResolutionSelect && studioCanvasResBadge) {
+  studioArtResolutionSelect.addEventListener('change', () => {
+    const parts = studioArtResolutionSelect.value.split('x');
+    studioCanvasResBadge.textContent = `${parts[0]} x ${parts[1]}`;
+  });
+}
+
+if (studioRandomSeedBtn && studioSeedInput) {
+  studioRandomSeedBtn.addEventListener('click', () => {
+    studioSeedInput.value = Math.floor(Math.random() * 999999);
+  });
+}
+
+// Slider / LoRA Scale Controls
+const studioLoraScaleInput = document.getElementById('studioLoraScaleInput');
+const studioLoraScaleVal = document.getElementById('studioLoraScaleVal');
+const studioLoraScaleResetBtn = document.getElementById('studioLoraScaleResetBtn');
+const studioLoraTriggerRow = document.getElementById('studioLoraTriggerRow');
+const studioLoraTriggerText = document.getElementById('studioLoraTriggerText');
+const studioLoraAddTriggersBtn = document.getElementById('studioLoraAddTriggersBtn');
+const studioLoraTypeNotice = document.getElementById('studioLoraTypeNotice');
+
+if (studioLoraScaleInput && studioLoraScaleVal) {
+  studioLoraScaleInput.addEventListener('input', () => {
+    const v = parseFloat(studioLoraScaleInput.value);
+    studioLoraScaleVal.textContent = (v > 0 ? '+' : '') + v.toFixed(1) + 'x';
+  });
+}
+
+if (studioLoraScaleResetBtn && studioLoraScaleInput && studioLoraScaleVal) {
+  studioLoraScaleResetBtn.addEventListener('click', () => {
+    studioLoraScaleInput.value = '1.0';
+    studioLoraScaleVal.textContent = '1.0x';
+  });
+}
+
+if (studioLoraAddTriggersBtn && studioLoraTriggerText) {
+  studioLoraAddTriggersBtn.addEventListener('click', () => {
+    const trigText = studioLoraTriggerText.getAttribute('data-raw-triggers') || '';
+    if (!trigText) return;
+    const promptEl = document.getElementById('studioArtPromptInput');
+    if (promptEl) {
+      const cur = promptEl.value.trim();
+      promptEl.value = cur ? `${cur}, ${trigText}` : trigText;
+      promptEl.focus();
+      promptEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    showNotificationToast('✨ Added trigger words to prompt!');
+  });
+}
+
+const studioLoraSelectElem = document.getElementById('studioLoraSelect');
+if (studioLoraSelectElem) {
+  studioLoraSelectElem.addEventListener('change', () => {
+    const selVal = studioLoraSelectElem.value;
+    try {
+      localStorage.setItem('nexus_studio_selected_lora', selVal);
+    } catch {}
+    const isLcm = selVal.toLowerCase().includes('lcm');
+    const notice = document.getElementById('studioLcmNotice');
+    if (notice) notice.style.display = isLcm ? 'block' : 'none';
+    if (isLcm) {
+      if (studioGuidanceInput && parseFloat(studioGuidanceInput.value) > 2.5) {
+        studioGuidanceInput.value = '1.5';
+      }
+      if (studioRenderModeSelect && studioRenderModeSelect.value === 'quality') {
+        studioRenderModeSelect.value = 'fast';
+      }
+    }
+
+    const selOpt = studioLoraSelectElem.options[studioLoraSelectElem.selectedIndex];
+    const rawTriggers = selOpt ? selOpt.getAttribute('data-triggers') : '';
+    const loraType = selOpt ? selOpt.getAttribute('data-type') : '';
+    const loraName = selOpt ? (selOpt.getAttribute('data-name') || selOpt.text) : '';
+    const lowerName = (loraName + ' ' + selVal).toLowerCase();
+
+    // Trigger Words Row
+    if (studioLoraTriggerRow && studioLoraTriggerText) {
+      if (rawTriggers && rawTriggers.trim()) {
+        studioLoraTriggerRow.style.display = 'flex';
+        studioLoraTriggerText.textContent = `Triggers: ${rawTriggers}`;
+        studioLoraTriggerText.setAttribute('data-raw-triggers', rawTriggers);
+      } else {
+        studioLoraTriggerRow.style.display = 'none';
+        studioLoraTriggerText.removeAttribute('data-raw-triggers');
+      }
+    }
+
+    // Type Notice for Sliders & Detailers
+    if (studioLoraTypeNotice) {
+      if (loraType === 'slider' || lowerName.includes('slider')) {
+        studioLoraTypeNotice.style.display = 'block';
+        studioLoraTypeNotice.innerHTML = '🎚️ <strong>Slider LoRA:</strong> Dial up (<strong>+0.5 to +2.0</strong>) to amplify this trait, or negative (<strong>-0.5 to -2.0</strong>) to reduce or invert it.';
+      } else if (loraType === 'detailer' || lowerName.includes('detail') || lowerName.includes('tweaker')) {
+        studioLoraTypeNotice.style.display = 'block';
+        studioLoraTypeNotice.innerHTML = '✨ <strong>Detailer LoRA:</strong> Enhances micro-textures, skin pores, and contrast. Recommended weight: <strong>+0.3 to +0.8</strong>.';
+      } else if (selVal) {
+        studioLoraTypeNotice.style.display = 'block';
+        studioLoraTypeNotice.innerHTML = '🎨 <strong>Style LoRA:</strong> Recommended weight: <strong>0.6 to 1.0</strong>. Adjust scale to balance base model fidelity.';
+      } else {
+        studioLoraTypeNotice.style.display = 'none';
+      }
+    }
+  });
+
+  // Restore saved LoRA immediately if option is present in markup
+  try {
+    const savedLoraInit = localStorage.getItem('nexus_studio_selected_lora');
+    if (savedLoraInit) {
+      const opt = Array.from(studioLoraSelectElem.options).find(o => o.value === savedLoraInit);
+      if (opt) {
+        studioLoraSelectElem.value = savedLoraInit;
+        studioLoraSelectElem.dispatchEvent(new Event('change'));
+      }
+    }
+  } catch {}
+}
+
+// Sync CivitAI Installed Checkpoints & LoRAs to Creative Studio Selects
+async function syncCivitaiInstalledToStudio() {
+  try {
+    const res = await fetch('/v1/civitai/installed');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.models)) return;
+
+    const studioModelSel = document.getElementById('studioModelSelect');
+    const studioLoraSel = document.getElementById('studioLoraSelect');
+    const ckptOptgroup = document.getElementById('studioCivitaiCheckpointsOptgroup');
+    const loraOptgroup = document.getElementById('studioCivitaiLorasOptgroup');
+
+    // 1. Populate Checkpoints
+    if (ckptOptgroup) {
+      const checkpoints = data.models.filter(m => m.type === 'checkpoint' || (!m.type && m.filename.toLowerCase().includes('checkpoint')));
+      if (checkpoints.length > 0) {
+        const curModelVal = studioModelSel?.value;
+        ckptOptgroup.innerHTML = '';
+        checkpoints.forEach(cp => {
+          const opt = document.createElement('option');
+          opt.value = `local:checkpoints/${cp.filename}`;
+          const base = cp.metadata?.baseModel || (cp.filename.toLowerCase().includes('xl') ? 'SDXL' : 'SD 1.5');
+          opt.setAttribute('data-basemodel', base);
+          const name = cp.metadata?.modelName || cp.filename.replace(/\.safetensors$/, '');
+          opt.textContent = `💾 ${name} (${cp.sizeMB} MB · ${base})`;
+          ckptOptgroup.appendChild(opt);
+        });
+        ckptOptgroup.style.display = '';
+        const savedModel = localStorage.getItem('nexus_studio_selected_model');
+        let targetModel = savedModel || curModelVal;
+        if (!targetModel || targetModel.includes('turbo') || targetModel === 'stabilityai/sd-turbo') {
+          const majic = checkpoints.find(c => c.filename.includes('majicmix'));
+          targetModel = majic ? `local:checkpoints/${majic.filename}` : `local:checkpoints/${checkpoints[0].filename}`;
+        }
+        if (targetModel && studioModelSel) {
+          const opt = Array.from(studioModelSel.options).find(o => o.value === targetModel);
+          if (opt) {
+            studioModelSel.value = targetModel;
+            studioModelSel.dispatchEvent(new Event('change'));
+          }
+        }
+      } else {
+        ckptOptgroup.style.display = 'none';
+      }
+    }
+
+    // 2. Populate LoRAs, Sliders, and Detailers
+    if (loraOptgroup) {
+      const loras = data.models.filter(m => m.type === 'lora' || (!m.type && !m.filename.toLowerCase().includes('checkpoint')));
+      if (loras.length > 0) {
+        const curLoraVal = studioLoraSel?.value;
+        loraOptgroup.innerHTML = '';
+        loras.forEach(l => {
+          const opt = document.createElement('option');
+          opt.value = `local:loras/${l.filename}`;
+          const lowerName = (l.metadata?.modelName || l.filename).toLowerCase();
+          const isSlider = lowerName.includes('slider');
+          const isDetailer = lowerName.includes('detail') || lowerName.includes('tweaker');
+          
+          let icon = '🎨';
+          let tag = 'LoRA';
+          if (isSlider) { icon = '🎚️'; tag = 'Slider'; }
+          else if (isDetailer) { icon = '✨'; tag = 'Detailer'; }
+
+          const base = l.metadata?.baseModel || (l.filename.toLowerCase().includes('xl') ? 'SDXL' : '');
+          opt.setAttribute('data-type', isSlider ? 'slider' : (isDetailer ? 'detailer' : 'lora'));
+          opt.setAttribute('data-name', l.metadata?.modelName || l.filename);
+          opt.setAttribute('data-triggers', (l.metadata?.trainedWords || []).join(', '));
+          opt.setAttribute('data-basemodel', base);
+
+          const displayName = l.metadata?.modelName || l.filename.replace(/\.safetensors$/, '');
+          opt.textContent = `${icon} [${tag}] ${displayName} (${l.sizeMB} MB${base ? ' · ' + base : ''})`;
+          loraOptgroup.appendChild(opt);
+        });
+        loraOptgroup.style.display = '';
+        const savedLora = localStorage.getItem('nexus_studio_selected_lora');
+        const targetLora = savedLora || curLoraVal;
+        if (targetLora && studioLoraSel) {
+          const opt = Array.from(studioLoraSel.options).find(o => o.value === targetLora);
+          if (opt) {
+            studioLoraSel.value = targetLora;
+            studioLoraSel.dispatchEvent(new Event('change'));
+          }
+        }
+      } else {
+        loraOptgroup.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to sync installed CivitAI models into studio:', err);
+  }
+}
+
+// Style Presets
 document.querySelectorAll('.studio-preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const style = btn.getAttribute('data-style');
     if (!studioArtPromptInput) return;
-    if (studioArtPromptInput.value.trim()) {
-      studioArtPromptInput.value = `${studioArtPromptInput.value.trim()}, ${style}`;
+    const current = studioArtPromptInput.value.trim();
+    if (current) {
+      studioArtPromptInput.value = `${current}, ${style}`;
     } else {
       studioArtPromptInput.value = style;
     }
+    studioArtPromptInput.focus();
   });
 });
 
+// Render On GPU Button
 if (studioArtGenerateBtn) {
   studioArtGenerateBtn.addEventListener('click', async () => {
     const prompt = (studioArtPromptInput?.value || '').trim();
@@ -4424,25 +7501,48 @@ if (studioArtGenerateBtn) {
       return;
     }
 
-    const engine = studioArtEngineSelect?.value || 'local-gpu';
-    const resValue = studioArtResolutionSelect?.value || '512x512';
+    const negativePrompt = (studioNegativePromptInput?.value || '').trim();
+    const mode = studioRenderModeSelect?.value || 'quality';
+    const steps = mode === 'quality' ? 28 : (mode === 'fast' ? 12 : 1);
+    const guidance = parseFloat(studioGuidanceInput?.value || (mode === 'turbo' ? '0.0' : '6.5'));
+    const seed = studioSeedInput?.value ? parseInt(studioSeedInput.value, 10) : undefined;
+    const resValue = studioArtResolutionSelect?.value || '1024x1024';
     const [wStr, hStr] = resValue.split('x');
-    const width = parseInt(wStr, 10) || 512;
-    const height = parseInt(hStr, 10) || 512;
-    const steps = 1;
+    const width = parseInt(wStr, 10) || 1024;
+    const height = parseInt(hStr, 10) || 1024;
+    const model = studioModelSelect ? studioModelSelect.value : 'stabilityai/stable-diffusion-xl-base-1.0';
+    const studioLoraSelect = document.getElementById('studioLoraSelect');
+    const lora = studioLoraSelect ? studioLoraSelect.value : undefined;
+    const loraScaleInput = document.getElementById('studioLoraScaleInput');
+    const loraScale = loraScaleInput ? parseFloat(loraScaleInput.value || '1.0') : 1.0;
 
     studioArtGenerateBtn.disabled = true;
     studioArtGenerateBtn.innerHTML = '<span>⏳ Rendering on RTX 4060...</span>';
     if (studioArtStatus) {
-      studioArtStatus.textContent = '⚡ Running CUDA Tensor Cores on NVIDIA RTX 4060...';
-      studioArtStatus.style.color = 'var(--accent-cyan)';
+      studioArtStatus.innerHTML = `<span style="color: var(--accent-cyan);">⚡ Synthesizing ${steps}-step diffusion on NVIDIA GeForce RTX 4060...</span>`;
     }
+
+    // Animate realtime progress bar
+    const estSec = mode === 'turbo' ? 1.5 : (mode === 'fast' ? 5.0 : 22.0);
+    startStudioProgressBar(estSec);
 
     try {
       const res = await fetch('/v1/art/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, engine, width, height, steps }),
+        body: JSON.stringify({
+          prompt,
+          negativePrompt,
+          engine: 'local-gpu',
+          width,
+          height,
+          steps,
+          guidance,
+          seed,
+          model,
+          lora: lora || undefined,
+          loraScale,
+        }),
       });
 
       const data = await res.json();
@@ -4450,44 +7550,843 @@ if (studioArtGenerateBtn) {
         lastGeneratedArtUrl = data.url;
         lastGeneratedArtFilename = data.filename || 'gpu_art.png';
 
+        const studioArtPreviewVideo = document.getElementById('studioArtPreviewVideo');
+        if (studioArtPreviewVideo) {
+          studioArtPreviewVideo.pause();
+          studioArtPreviewVideo.src = '';
+          studioArtPreviewVideo.style.display = 'none';
+        }
         if (studioArtPreviewImg) {
           studioArtPreviewImg.src = data.url;
           studioArtPreviewImg.style.display = 'block';
         }
         if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'none';
-        if (studioArtActions) studioArtActions.style.display = 'flex';
-        if (studioArtDownloadBtn) studioArtDownloadBtn.href = data.url;
-
-        if (studioArtStatus) {
-          studioArtStatus.textContent = `✅ ${data.message || `Rendered on ${data.engine || 'RTX 4060'}`}`;
-          studioArtStatus.style.color = '#22c55e';
+        showStudioActions();
+        if (studioArtDownloadBtn) {
+          studioArtDownloadBtn.href = data.url + (data.url.includes('?') ? '&' : '?') + 'download=1';
+          studioArtDownloadBtn.setAttribute('download', data.url.split('/').pop() || 'gpu_art.png');
         }
+
+        const rawFilename = data.url.replace(/^\/?(v1\/workspace\/files\/)?/, '');
+        selectedGalleryItem = {
+          name: rawFilename,
+          filename: rawFilename,
+          prompt: prompt,
+          size: data.sizeBytes || 50000,
+          seed: data.seed || seed,
+          mtime: Date.now(),
+          isVideo: false,
+          isGif: false,
+        };
+        if (studioInspectorBox) studioInspectorBox.style.display = 'flex';
+        if (studioInspectorPrompt) studioInspectorPrompt.textContent = prompt || rawFilename;
+        if (studioInspectorSeed) studioInspectorSeed.textContent = `Image · ${width}x${height} · Seed: ${data.seed || seed || '-'}`;
+        if (studioInspectorTime) studioInspectorTime.textContent = new Date().toLocaleTimeString();
+        const studioInspectorDlBtn = document.getElementById('studioInspectorDownloadBtn');
+        if (studioInspectorDlBtn) {
+          studioInspectorDlBtn.href = data.url + (data.url.includes('?') ? '&' : '?') + 'download=1';
+          studioInspectorDlBtn.setAttribute('download', data.url.split('/').pop() || 'gpu_art.png');
+        }
+
+        if (studioCanvasSeedBadge) studioCanvasSeedBadge.textContent = `Seed: ${data.seed || seed || '-'}`;
+        if (studioCanvasResBadge) studioCanvasResBadge.textContent = `${width} x ${height}`;
+
+        const elapsed = data.elapsedSeconds || 1.4;
+        if (studioArtStatus) {
+          studioArtStatus.innerHTML = `<span style="color: #22c55e;">✅ ${data.message || `Rendered in ${elapsed}s on RTX 4060`}</span>`;
+        }
+
+        // High-speed incremental gallery prepend (instant, zero DOM lag)
+        prependStudioGalleryItem({
+          name: rawFilename,
+          size: data.sizeBytes || 50000,
+          mtime: Date.now(),
+          isVideo: false,
+          isGif: false,
+        });
+
+        if (isSlideshowActive) {
+          slideshowIndex = 0;
+          queueLiveStreamSlideshowImage(data.url);
+        }
+        updateStudioGpuStatus();
       } else {
-        throw new Error(data.error || 'Art generation failed');
+        throw new Error(data.error || 'GPU art generation failed');
       }
     } catch (err) {
       if (studioArtStatus) {
-        studioArtStatus.textContent = `⚠️ ${err.message}`;
-        studioArtStatus.style.color = 'var(--accent-red)';
+        studioArtStatus.innerHTML = `<span style="color: var(--accent-red);">⚠️ ${escapeHtml(err.message)}</span>`;
       }
     } finally {
+      finishStudioProgressBar();
       studioArtGenerateBtn.disabled = false;
       studioArtGenerateBtn.innerHTML = '<span>✨ Render on RTX 4060 GPU</span>';
     }
   });
 }
 
+// Endless Forge Speed Mode Selector Buttons
+const efSpeedFastBtn = document.getElementById('efSpeedFastBtn');
+const efSpeedHdBtn = document.getElementById('efSpeedHdBtn');
+
+function updateEfSpeedButtons(mode) {
+  if (mode === 'hd') {
+    if (efSpeedHdBtn) {
+      efSpeedHdBtn.classList.add('active');
+      efSpeedHdBtn.style.color = '#c084fc';
+      efSpeedHdBtn.style.borderColor = 'rgba(168,85,247,0.4)';
+      efSpeedHdBtn.style.background = 'rgba(168,85,247,0.2)';
+    }
+    if (efSpeedFastBtn) {
+      efSpeedFastBtn.classList.remove('active');
+      efSpeedFastBtn.style.color = 'var(--text-muted)';
+      efSpeedFastBtn.style.borderColor = 'rgba(255,255,255,0.1)';
+      efSpeedFastBtn.style.background = 'rgba(0,0,0,0.3)';
+    }
+  } else {
+    if (efSpeedFastBtn) {
+      efSpeedFastBtn.classList.add('active');
+      efSpeedFastBtn.style.color = '#38bdf8';
+      efSpeedFastBtn.style.borderColor = 'rgba(56,189,248,0.4)';
+      efSpeedFastBtn.style.background = 'rgba(56,189,248,0.15)';
+    }
+    if (efSpeedHdBtn) {
+      efSpeedHdBtn.classList.remove('active');
+      efSpeedHdBtn.style.color = 'var(--text-muted)';
+      efSpeedHdBtn.style.borderColor = 'rgba(255,255,255,0.1)';
+      efSpeedHdBtn.style.background = 'rgba(0,0,0,0.3)';
+    }
+  }
+}
+
+if (efSpeedFastBtn) {
+  efSpeedFastBtn.addEventListener('click', async () => {
+    updateEfSpeedButtons('fast');
+    await fetch('/v1/endless-forge/speed-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'fast' }),
+    }).catch(() => {});
+  });
+}
+if (efSpeedHdBtn) {
+  efSpeedHdBtn.addEventListener('click', async () => {
+    updateEfSpeedButtons('hd');
+    await fetch('/v1/endless-forge/speed-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'hd' }),
+    }).catch(() => {});
+  });
+}
+
+// Integrated Endless Forge Transport Handlers
+async function executeStudioEfAction(action) {
+  const theme = (efStudioThemeInput?.value || '').trim();
+  if (action === 'Start Endless Forge') {
+    if (efStudioProgressBadge) {
+      efStudioProgressBadge.textContent = '● Starting...';
+      efStudioProgressBadge.style.color = '#eab308';
+    }
+    try {
+      const activeEfModel = studioModelSelect ? studioModelSelect.value : undefined;
+      await fetch('/v1/endless-forge/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme, maxArtworks: 50, model: activeEfModel }),
+      });
+      startEfStudioPolling();
+    } catch (err) {
+      console.warn('EF start error:', err);
+    }
+  } else if (action === 'Stop Endless Forge') {
+    await fetch('/v1/endless-forge/stop', { method: 'POST' }).catch(() => {});
+    if (efStudioProgressBadge) {
+      efStudioProgressBadge.textContent = '⏹️ Stopped';
+      efStudioProgressBadge.style.color = '#ef4444';
+    }
+    stopEfStudioPolling();
+  } else if (action === 'Pause Endless Forge') {
+    await fetch('/v1/endless-forge/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'pause' }),
+    }).catch(() => {});
+    if (efStudioProgressBadge) {
+      efStudioProgressBadge.textContent = '⏸️ Paused';
+      efStudioProgressBadge.style.color = '#f59e0b';
+    }
+  } else {
+    await fetch('/v1/endless-forge/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    }).catch(() => {});
+    startEfStudioPolling();
+  }
+}
+
+if (efStudioStartBtn) efStudioStartBtn.addEventListener('click', () => executeStudioEfAction('Start Endless Forge'));
+if (efStudioPauseBtn) efStudioPauseBtn.addEventListener('click', () => executeStudioEfAction('Pause Endless Forge'));
+if (efStudioStopBtn) efStudioStopBtn.addEventListener('click', () => executeStudioEfAction('Stop Endless Forge'));
+if (efStudioSkipBtn) efStudioSkipBtn.addEventListener('click', () => executeStudioEfAction('Skip'));
+if (efStudioEvolveBtn) efStudioEvolveBtn.addEventListener('click', () => executeStudioEfAction('Evolve this'));
+if (efStudioPivotBtn) efStudioPivotBtn.addEventListener('click', () => executeStudioEfAction('Hard pivot'));
+
+let lastSeenStudioEfId = 0;
+let isEfSessionRunning = false;
+let isEfSessionHd = false;
+
+function startEfStudioPolling() {
+  stopEfStudioPolling();
+
+  const pollStatus = async () => {
+    try {
+      const res = await fetch(`/v1/endless-forge/poll?since=${lastSeenStudioEfId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data) return;
+
+      if (data.speedMode) {
+        updateEfSpeedButtons(data.speedMode);
+        isEfSessionHd = (data.speedMode === 'hd');
+      }
+
+      const isRunning = data.isRunning || data.state === 'running';
+      const isPaused = data.isPaused || data.state === 'paused';
+      const isProcessing = !!data.isProcessing;
+      isEfSessionRunning = isRunning;
+      const curProg = data.currentProgress || (data.ledgerLength || 0);
+      const maxArt = data.maxArtworks || 50;
+
+      if (efStudioProgressBadge) {
+        if (isRunning) {
+          efStudioProgressBadge.textContent = isProcessing ? `● RENDERING (${curProg}/${maxArt})` : `● LIVE (${curProg}/${maxArt})`;
+          efStudioProgressBadge.style.color = '#22c55e';
+        } else if (isPaused) {
+          efStudioProgressBadge.textContent = `⏸️ PAUSED (${curProg}/${maxArt})`;
+          efStudioProgressBadge.style.color = '#f59e0b';
+        } else {
+          efStudioProgressBadge.textContent = 'Idle';
+          efStudioProgressBadge.style.color = '#38bdf8';
+        }
+      }
+
+      // Process ALL new entries in order (no skipping / no dropping frames!)
+      if (data.newEntries && Array.isArray(data.newEntries) && data.newEntries.length > 0) {
+        for (const entry of data.newEntries) {
+          if (entry.id > lastSeenStudioEfId) {
+            lastSeenStudioEfId = entry.id;
+          }
+          if (entry.imageUrl) {
+            lastGeneratedArtUrl = entry.imageUrl;
+            if (studioArtPreviewImg) {
+              studioArtPreviewImg.src = lastGeneratedArtUrl;
+              studioArtPreviewImg.style.display = 'block';
+            }
+            if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'none';
+            if (studioArtActions) studioArtActions.style.display = 'none';
+            if (studioArtDownloadBtn) {
+              studioArtDownloadBtn.href = lastGeneratedArtUrl + (lastGeneratedArtUrl.includes('?') ? '&' : '?') + 'download=1';
+              studioArtDownloadBtn.setAttribute('download', lastGeneratedArtUrl.split('/').pop() || 'gpu_art.png');
+            }
+
+            const rawFilename = entry.imageUrl.replace(/^\/?(v1\/workspace\/files\/)?/, '');
+            selectedGalleryItem = {
+              name: rawFilename,
+              filename: rawFilename,
+              prompt: entry.positivePrompt || entry.title,
+              size: entry.sizeBytes || 50000,
+              seed: entry.seed,
+              mtime: Date.now(),
+              isVideo: false,
+              isGif: false,
+            };
+            if (studioInspectorBox) studioInspectorBox.style.display = 'flex';
+            if (studioInspectorPrompt) studioInspectorPrompt.textContent = entry.positivePrompt || entry.title || 'Endless Forge Piece';
+            if (studioInspectorSeed) studioInspectorSeed.textContent = `Image · Seed: ${entry.seed || '-'}`;
+            if (studioInspectorTime) studioInspectorTime.textContent = new Date().toLocaleTimeString();
+            const studioInspectorDlBtn = document.getElementById('studioInspectorDownloadBtn');
+            if (studioInspectorDlBtn) {
+              studioInspectorDlBtn.href = lastGeneratedArtUrl + (lastGeneratedArtUrl.includes('?') ? '&' : '?') + 'download=1';
+              studioInspectorDlBtn.setAttribute('download', lastGeneratedArtUrl.split('/').pop() || 'gpu_art.png');
+            }
+
+            if (studioCanvasSeedBadge) studioCanvasSeedBadge.textContent = `Seed: ${entry.seed || '-'}`;
+            if (studioCanvasModelBadge) studioCanvasModelBadge.textContent = data.speedMode === 'hd' ? 'SDXL Base 1.0 HD · Endless Forge' : 'majicMIX Realistic · Endless Forge';
+            if (studioArtStatus) {
+              studioArtStatus.innerHTML = `<span style="color: #22c55e;">🔥 Synthesized piece ${curProg}: ${escapeHtml(entry.title || 'Artwork')}</span>`;
+            }
+            if (studioArtPromptInput && (entry.positivePrompt || entry.creativeIntent)) {
+              studioArtPromptInput.value = entry.positivePrompt || entry.creativeIntent;
+            }
+
+            // High-speed incremental gallery prepend (instant, 0ms, no DOM wipe)
+            prependStudioGalleryItem({
+              name: rawFilename,
+              size: entry.sizeBytes || 50000,
+              mtime: Date.now(),
+              isVideo: false,
+              isGif: false,
+            });
+
+            // Sync with Fullscreen Slideshow immediately via fast presentation queue!
+            if (isSlideshowActive) {
+              if (slideshowMode === 'live_stream' || data.speedMode === 'fast') {
+                slideshowIndex = 0;
+                queueLiveStreamSlideshowImage(entry.imageUrl);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('poll error:', e);
+    }
+  };
+
+  pollStatus();
+  // Fast mode polling at 250ms; HD mode at 1000ms
+  efStudioPollTimer = setInterval(pollStatus, isEfSessionHd ? 1000 : 250);
+}
+
+function stopEfStudioPolling() {
+  if (efStudioPollTimer) {
+    clearInterval(efStudioPollTimer);
+    efStudioPollTimer = null;
+  }
+}
+
+// Live Gallery & Inspector
+let studioGalleryFilter = 'all'; // 'all' | 'images' | 'gifs'
+
+let isStudioGalleryLoading = false;
+let lastStudioGalleryLoadTime = 0;
+
+function createStudioGalleryThumbNode(f, idx) {
+  const url = `/v1/workspace/files/${f.name}`;
+  const thumb = document.createElement('div');
+  thumb.className = 'studio-gallery-thumb';
+  thumb.dataset.index = idx;
+  thumb.dataset.name = f.name;
+  const isSelected = selectedGalleryIndex === idx;
+  thumb.style.cssText = `height: 105px; width: 100%; border-radius: 6px; overflow: hidden; background: #0b0f19; cursor: pointer; border: 1px solid ${isSelected ? '#c084fc' : 'rgba(255,255,255,0.12)'}; position: relative; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; box-sizing: border-box; flex-shrink: 0; display: block; ${isSelected ? 'box-shadow: 0 0 12px rgba(192, 132, 252, 0.6);' : ''}`;
+
+  let badgeHtml = '';
+  if (f.isVideo) {
+    badgeHtml = '<span style="position: absolute; bottom: 4px; left: 4px; background: rgba(56,189,248,0.9); color: #000; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px;">🎬 60 FPS MP4</span>';
+  } else if (f.isGif) {
+    badgeHtml = '<span style="position: absolute; bottom: 4px; left: 4px; background: rgba(245,158,11,0.85); color: #000; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px;">60 FPS GIF</span>';
+  }
+
+  if (f.isVideo) {
+    const posterUrl = `/v1/workspace/files/${f.poster || f.name.replace(/\.(mp4|webm)$/i, '_poster.jpg')}`;
+    thumb.innerHTML = `
+      <img src="${posterUrl}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.opacity='0.4';" />
+      <video src="${url}" preload="auto" muted loop playsinline style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; pointer-events: none;"></video>
+      ${badgeHtml}
+    `;
+  } else {
+    thumb.innerHTML = `
+      <img src="${url}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+      ${badgeHtml}
+    `;
+  }
+
+  // Quick Delete Button on Hover
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'studio-thumb-del-btn';
+  delBtn.title = `Delete ${f.name.split('/').pop()}`;
+  delBtn.innerHTML = '🗑️';
+  delBtn.style.cssText = 'position: absolute; top: 4px; right: 4px; background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 4px; padding: 2px 5px; font-size: 10px; cursor: pointer; display: none; z-index: 10; line-height: 1; transition: all 0.15s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.6);';
+  delBtn.addEventListener('mouseenter', () => {
+    delBtn.style.background = 'rgba(239, 68, 68, 0.9)';
+    delBtn.style.color = '#ffffff';
+    delBtn.style.borderColor = '#ef4444';
+  });
+  delBtn.addEventListener('mouseleave', () => {
+    delBtn.style.background = 'rgba(15, 23, 42, 0.88)';
+    delBtn.style.color = '#fca5a5';
+    delBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+  });
+  delBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await deleteStudioArtwork(f.name, idx);
+  });
+  thumb.appendChild(delBtn);
+
+  thumb.addEventListener('click', () => {
+    selectGalleryIndex(idx);
+  });
+  thumb.addEventListener('mouseenter', () => {
+    delBtn.style.display = 'block';
+    if (selectedGalleryIndex !== idx) {
+      thumb.style.borderColor = f.isVideo ? '#38bdf8' : (f.isGif ? '#f59e0b' : '#c084fc');
+      thumb.style.transform = 'scale(1.03)';
+    }
+    if (f.isVideo) {
+      const v = thumb.querySelector('video');
+      const img = thumb.querySelector('img');
+      if (v) {
+        v.style.display = 'block';
+        v.play().catch(() => {});
+      }
+      if (img) img.style.display = 'none';
+    }
+  });
+  thumb.addEventListener('mouseleave', () => {
+    delBtn.style.display = 'none';
+    if (selectedGalleryIndex !== idx) {
+      thumb.style.borderColor = 'rgba(255,255,255,0.12)';
+      thumb.style.transform = 'scale(1)';
+    }
+    if (f.isVideo) {
+      const v = thumb.querySelector('video');
+      const img = thumb.querySelector('img');
+      if (v) {
+        v.pause();
+        v.style.display = 'none';
+      }
+      if (img) img.style.display = 'block';
+    }
+  });
+
+  return thumb;
+}
+
+function renderStudioGalleryGrid() {
+  if (!studioGalleryGrid) return;
+
+  const filteredFiles = (studioGalleryItems || []).filter(f => {
+    if (studioGalleryFilter === 'images') return !f.isGif && !f.isVideo;
+    if (studioGalleryFilter === 'gifs') return f.isGif || f.isVideo;
+    return true;
+  });
+
+  currentFilteredGallery = filteredFiles;
+
+  if (filteredFiles.length === 0) {
+    studioGalleryGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 11px; padding: 20px 0;">No ${studioGalleryFilter === 'gifs' ? 'videos or GIFs' : 'artworks'} found.</div>`;
+    clearStudioArtworkPreview();
+    return;
+  }
+
+  // Keep selected index in sync with active item if present
+  if (selectedGalleryItem) {
+    const curName = selectedGalleryItem.name || selectedGalleryItem.filename;
+    const foundIdx = filteredFiles.findIndex(f => (f.name || f.filename) === curName);
+    selectedGalleryIndex = foundIdx !== -1 ? foundIdx : -1;
+  }
+
+  studioGalleryGrid.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+  filteredFiles.forEach((f, idx) => {
+    fragment.appendChild(createStudioGalleryThumbNode(f, idx));
+  });
+  studioGalleryGrid.appendChild(fragment);
+}
+
+function prependStudioGalleryItem(fileObj) {
+  if (!fileObj || !fileObj.name) return;
+  const rawName = fileObj.name.replace(/^\/?(v1\/workspace\/files\/)?/, '');
+  fileObj.name = rawName;
+  fileObj.isGif = fileObj.isGif || /\.(gif)$/i.test(rawName);
+  fileObj.isVideo = fileObj.isVideo || /\.(mp4|webm|mkv|mov)$/i.test(rawName);
+
+  if (!studioGalleryItems) studioGalleryItems = [];
+  const existingIdx = studioGalleryItems.findIndex(i => i.name === rawName);
+  if (existingIdx !== -1) return;
+
+  studioGalleryItems.unshift(fileObj);
+
+  // Update badges
+  if (studioGalleryCountBadge) studioGalleryCountBadge.textContent = studioGalleryItems.length;
+  const navSsBadge = document.getElementById('navSlideshowCountBadge');
+  if (navSsBadge) navSsBadge.textContent = `${studioGalleryItems.length} Pics`;
+  if (slideshowCounter && isSlideshowActive) {
+    slideshowCounter.textContent = `${slideshowIndex + 1} / ${Math.max(1, studioGalleryItems.length)}`;
+  }
+
+  const matchesFilter = (
+    studioGalleryFilter === 'all' ||
+    (studioGalleryFilter === 'images' && !fileObj.isGif && !fileObj.isVideo) ||
+    (studioGalleryFilter === 'gifs' && (fileObj.isGif || fileObj.isVideo))
+  );
+
+  if (!matchesFilter || !studioGalleryGrid) return;
+
+  if (!currentFilteredGallery) currentFilteredGallery = [];
+  currentFilteredGallery.unshift(fileObj);
+
+  // Remove empty state placeholder if present
+  const placeholder = studioGalleryGrid.querySelector('div[style*="grid-column: 1 / -1"]');
+  if (placeholder) placeholder.remove();
+
+  const thumb = createStudioGalleryThumbNode(fileObj, 0);
+  studioGalleryGrid.prepend(thumb);
+
+  // Re-index child elements
+  const thumbs = studioGalleryGrid.querySelectorAll('.studio-gallery-thumb');
+  thumbs.forEach((t, i) => { t.dataset.index = i; });
+}
+
+async function loadStudioGallery(force = false) {
+  const now = Date.now();
+  if (!force && (now - lastStudioGalleryLoadTime < 3000 || isStudioGalleryLoading)) {
+    return;
+  }
+  isStudioGalleryLoading = true;
+  lastStudioGalleryLoadTime = now;
+  try {
+    const res = await fetch('/v1/workspace/files');
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.files)) return;
+
+    const allArtFiles = data.files
+      .filter(f => !f.isDirectory && f.name)
+      .map(f => ({
+        name: f.name || f.filename,
+        size: f.size || 0,
+        mtime: f.modifiedAt ? new Date(f.modifiedAt).getTime() : (f.mtime || 0),
+        poster: f.poster,
+        isGif: /\.(gif)$/i.test(f.name || f.filename),
+        isVideo: /\.(mp4|webm|mkv|mov)$/i.test(f.name || f.filename),
+      }))
+      .filter(f => {
+        if (!f.name) return false;
+        if (!/\.(png|jpe?g|webp|gif|mp4|webm|mkv|mov)$/i.test(f.name)) return false;
+        if (f.name.endsWith('.pyc') || f.name.includes('_poster.jpg')) return false;
+        // Exclude corrupted or tiny 0-byte files
+        if (f.size < 1000) return false;
+        // Exclude empty black screen capture dumps
+        if (f.name.startsWith('screenshots/') && f.size <= 8500) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aIsArt = a.name.startsWith('art/') || a.name.includes('/art/');
+        const bIsArt = b.name.startsWith('art/') || b.name.includes('/art/');
+        if (aIsArt && !bIsArt) return -1;
+        if (!aIsArt && bIsArt) return 1;
+        return b.mtime - a.mtime;
+      });
+
+    studioGalleryItems = allArtFiles;
+    if (studioGalleryCountBadge) studioGalleryCountBadge.textContent = allArtFiles.length;
+    const navSsBadge = document.getElementById('navSlideshowCountBadge');
+    if (navSsBadge) navSsBadge.textContent = `${allArtFiles.length} Pics`;
+    if (slideshowCounter && isSlideshowActive) {
+      slideshowCounter.textContent = `${slideshowIndex + 1} / ${Math.max(1, studioGalleryItems.length)}`;
+    }
+
+    renderStudioGalleryGrid();
+    if (!selectedGalleryItem && allArtFiles.length > 0) {
+      selectGalleryIndex(0, false);
+    }
+  } catch (err) {
+    console.warn('loadStudioGallery error:', err);
+  } finally {
+    isStudioGalleryLoading = false;
+  }
+}
+
+function selectGalleryIndex(index, smoothScroll = true) {
+  if (!currentFilteredGallery || currentFilteredGallery.length === 0) return;
+  if (index < 0) index = 0;
+  if (index >= currentFilteredGallery.length) index = currentFilteredGallery.length - 1;
+
+  selectedGalleryIndex = index;
+  const item = currentFilteredGallery[index];
+  const url = `/v1/workspace/files/${item.name || item.filename}`;
+  selectGalleryItem(item, url, false);
+
+  const thumbs = studioGalleryGrid?.querySelectorAll('.studio-gallery-thumb');
+  thumbs?.forEach((t, i) => {
+    if (i === index) {
+      t.style.borderColor = '#c084fc';
+      t.style.boxShadow = '0 0 14px rgba(192, 132, 252, 0.7)';
+      t.style.transform = 'scale(1.03)';
+      if (smoothScroll) {
+        t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    } else {
+      t.style.borderColor = 'rgba(255,255,255,0.12)';
+      t.style.boxShadow = 'none';
+      t.style.transform = 'scale(1)';
+    }
+  });
+}
+
+function selectGalleryItem(fileObj, url, updateIndex = true) {
+  selectedGalleryItem = fileObj;
+  lastGeneratedArtUrl = url;
+
+  if (updateIndex && currentFilteredGallery && currentFilteredGallery.length > 0) {
+    const idx = currentFilteredGallery.findIndex(f => (f.name || f.filename) === (fileObj.name || fileObj.filename));
+    if (idx !== -1) {
+      selectGalleryIndex(idx, false);
+      return;
+    }
+  }
+
+  const studioArtPreviewImg = document.getElementById('studioArtPreviewImg');
+  const studioArtPreviewVideo = document.getElementById('studioArtPreviewVideo');
+
+  if (fileObj.isVideo) {
+    if (currentStudioTab === 'video') {
+      playVideoInMemeStudio(url, 33, 16, 3, '');
+    } else {
+      if (studioArtPreviewImg) {
+        studioArtPreviewImg.src = '';
+        studioArtPreviewImg.style.display = 'none';
+      }
+      if (studioArtPreviewVideo) {
+        studioArtPreviewVideo.src = url;
+        studioArtPreviewVideo.style.display = 'block';
+        studioArtPreviewVideo.play().catch(() => {});
+      }
+    }
+  } else {
+    if (studioArtPreviewVideo) {
+      studioArtPreviewVideo.pause();
+      studioArtPreviewVideo.src = '';
+      studioArtPreviewVideo.style.display = 'none';
+    }
+    if (memeStudioVideo) {
+      try { memeStudioVideo.pause(); } catch {}
+    }
+    if (studioArtPreviewImg) {
+      studioArtPreviewImg.src = url;
+      studioArtPreviewImg.style.display = 'block';
+    }
+  }
+  if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'none';
+  if (studioArtActions) studioArtActions.style.display = 'none';
+  if (studioArtDownloadBtn) {
+    studioArtDownloadBtn.href = url;
+    studioArtDownloadBtn.download = fileObj.name?.split(/[\\/]/).pop() || 'media';
+  }
+  const studioInspectorDlBtn = document.getElementById('studioInspectorDownloadBtn');
+  if (studioInspectorDlBtn) {
+    studioInspectorDlBtn.href = url + (url.includes('?') ? '&' : '?') + 'download=1';
+    studioInspectorDlBtn.setAttribute('download', fileObj.name?.split(/[\\/]/).pop() || 'media.png');
+  }
+
+  if (studioInspectorBox) studioInspectorBox.style.display = 'flex';
+  const studioInspectorAnimateBtn = document.getElementById('studioInspectorAnimateBtn');
+  if (studioInspectorAnimateBtn) {
+    studioInspectorAnimateBtn.style.display = fileObj.isVideo ? 'none' : 'block';
+  }
+  if (studioInspectorPrompt) {
+    const rawName = (fileObj.name || fileObj.filename || '').replace(/^art\/gpu_\w+_\d+_/, '').replace(/_[a-z0-9]+\.(png|mp4|gif)$/, '').replace(/_/g, ' ');
+    studioInspectorPrompt.textContent = fileObj.prompt || rawName || fileObj.name || fileObj.filename;
+  }
+  if (studioInspectorTime) {
+    studioInspectorTime.textContent = fileObj.mtime ? new Date(fileObj.mtime).toLocaleTimeString() : 'Recent';
+  }
+  if (studioInspectorSeed) {
+    const typeLabel = fileObj.isVideo ? 'MP4 Video' : (fileObj.isGif ? 'GIF' : 'Image');
+    studioInspectorSeed.textContent = `${typeLabel} · ${Math.round((fileObj.size || 0)/1024)} KB`;
+  }
+}
+
+function clearStudioArtworkPreview() {
+  selectedGalleryItem = null;
+  selectedGalleryIndex = -1;
+  lastGeneratedArtUrl = null;
+  const studioInspectorAnimateBtn = document.getElementById('studioInspectorAnimateBtn');
+  if (studioInspectorAnimateBtn) {
+    studioInspectorAnimateBtn.style.display = 'none';
+  }
+  const studioArtPreviewImg = document.getElementById('studioArtPreviewImg');
+  const studioArtPreviewVideo = document.getElementById('studioArtPreviewVideo');
+  if (studioArtPreviewImg) {
+    studioArtPreviewImg.src = '';
+    studioArtPreviewImg.style.display = 'none';
+  }
+  if (studioArtPreviewVideo) {
+    studioArtPreviewVideo.pause();
+    studioArtPreviewVideo.src = '';
+    studioArtPreviewVideo.style.display = 'none';
+  }
+  if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'block';
+  if (studioArtActions) studioArtActions.style.display = 'none';
+  if (studioInspectorBox) {
+    studioInspectorBox.style.display = 'flex';
+    if (studioInspectorPrompt) studioInspectorPrompt.textContent = 'No artwork active — synth a picture or pick from gallery';
+    if (studioInspectorSeed) studioInspectorSeed.textContent = 'Seed: -';
+    if (studioInspectorTime) studioInspectorTime.textContent = 'Ready';
+  }
+}
+
+async function deleteStudioArtwork(fileName, indexHint = -1) {
+  if (!fileName) return;
+  try {
+    const res = await fetch('/v1/workspace/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof adminHeaders === 'function' ? adminHeaders() : {})
+      },
+      body: JSON.stringify({ filename: fileName }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      alert(`Could not delete file: ${data.error || res.statusText}`);
+      return;
+    }
+
+    const wasActive = selectedGalleryItem && (
+      (selectedGalleryItem.name || selectedGalleryItem.filename) === fileName
+    );
+
+    if (wasActive) {
+      clearStudioArtworkPreview();
+    }
+
+    // Reload gallery from workspace
+    await loadStudioGallery();
+
+    // If the active item was deleted and there are remaining items in the gallery,
+    // automatically select the next adjacent item
+    if (wasActive && currentFilteredGallery && currentFilteredGallery.length > 0) {
+      const nextIdx = Math.max(0, Math.min(indexHint >= 0 ? indexHint : 0, currentFilteredGallery.length - 1));
+      selectGalleryIndex(nextIdx);
+    }
+  } catch (err) {
+    console.error('Delete artwork error:', err);
+    alert(`Delete error: ${err.message}`);
+  }
+}
+
+if (studioRefreshGalleryBtn) {
+  studioRefreshGalleryBtn.addEventListener('click', loadStudioGallery);
+}
+
+if (studioInspectorReuseBtn) {
+  studioInspectorReuseBtn.addEventListener('click', () => {
+    if (!selectedGalleryItem) return;
+    const rawName = (selectedGalleryItem.name || selectedGalleryItem.filename || '').replace(/^art\/gpu_\d+_/, '').replace(/_[a-z0-9]+\.png$/, '').replace(/_/g, ' ');
+    if (studioArtPromptInput) {
+      studioArtPromptInput.value = rawName;
+      studioArtPromptInput.focus();
+    }
+  });
+}
+
+if (studioInspectorDeleteBtn) {
+  studioInspectorDeleteBtn.addEventListener('click', async () => {
+    if (!selectedGalleryItem) return;
+    const fileName = selectedGalleryItem.name || selectedGalleryItem.filename;
+    await deleteStudioArtwork(fileName, selectedGalleryIndex);
+  });
+}
+
+const studioInspectorDownloadBtn = document.getElementById('studioInspectorDownloadBtn');
+if (studioInspectorDownloadBtn) {
+  studioInspectorDownloadBtn.addEventListener('click', (e) => {
+    let url = null;
+    let name = 'gpu_artwork.png';
+    if (selectedGalleryItem) {
+      name = selectedGalleryItem.name || selectedGalleryItem.filename || name;
+      url = `/v1/workspace/files/${name.replace(/^\/?(v1\/workspace\/files\/)?/, '')}`;
+    } else if (lastGeneratedArtUrl) {
+      url = lastGeneratedArtUrl;
+      name = url.split('/').pop()?.split('?')[0] || name;
+    } else if (studioArtPreviewImg && studioArtPreviewImg.src) {
+      url = studioArtPreviewImg.src;
+      name = url.split('/').pop()?.split('?')[0] || name;
+    }
+    if (url) {
+      studioInspectorDownloadBtn.href = url + (url.includes('?') ? '&' : '?') + 'download=1';
+      studioInspectorDownloadBtn.setAttribute('download', name.split(/[\\/]/).pop() || 'gpu_artwork.png');
+    } else {
+      e.preventDefault();
+      if (typeof showToast === 'function') showToast('No image available to download', 'warning');
+    }
+  });
+}
+
+const studioInspectorShareBtn = document.getElementById('studioInspectorShareBtn');
+if (studioInspectorShareBtn) {
+  studioInspectorShareBtn.addEventListener('click', () => {
+    let url = null;
+    let name = 'gpu_artwork.png';
+    if (selectedGalleryItem) {
+      name = selectedGalleryItem.name || selectedGalleryItem.filename || name;
+      url = `/v1/workspace/files/${name.replace(/^\/?(v1\/workspace\/files\/)?/, '')}`;
+    } else if (lastGeneratedArtUrl) {
+      url = lastGeneratedArtUrl;
+      name = url.split('/').pop()?.split('?')[0] || name;
+    } else if (studioArtPreviewImg && studioArtPreviewImg.src) {
+      url = studioArtPreviewImg.src;
+      name = url.split('/').pop()?.split('?')[0] || name;
+    }
+    if (url) {
+      downloadOrShareMedia(url, name.split(/[\\/]/).pop() || 'gpu_artwork.png', 'RTX 4060 Artwork');
+    } else {
+      if (typeof showToast === 'function') showToast('No image available to share', 'warning');
+    }
+  });
+}
+
+const studioInspectorFullscreenBtn = document.getElementById('studioInspectorFullscreenBtn');
+if (studioInspectorFullscreenBtn) {
+  studioInspectorFullscreenBtn.addEventListener('click', () => {
+    if (selectedGalleryItem || lastGeneratedArtUrl || (studioArtPreviewImg && studioArtPreviewImg.src)) {
+      enterSlideshow();
+    } else {
+      if (typeof showToast === 'function') showToast('No artwork active for fullscreen', 'warning');
+    }
+  });
+}
+
+const studioInspectorSlideshowBtn = document.getElementById('studioInspectorSlideshowBtn');
+if (studioInspectorSlideshowBtn) {
+  studioInspectorSlideshowBtn.addEventListener('click', () => {
+    enterSlideshow();
+  });
+}
+
+const studioInspectorSetAvatarBtn = document.getElementById('studioInspectorSetAvatarBtn');
+if (studioInspectorSetAvatarBtn) {
+  studioInspectorSetAvatarBtn.addEventListener('click', () => {
+    let url = null;
+    if (selectedGalleryItem) {
+      const name = selectedGalleryItem.name || selectedGalleryItem.filename || '';
+      url = `/v1/workspace/files/${name.replace(/^\/?(v1\/workspace\/files\/)?/, '')}`;
+    } else if (lastGeneratedArtUrl) {
+      url = lastGeneratedArtUrl;
+    } else if (studioArtPreviewImg && studioArtPreviewImg.src) {
+      url = studioArtPreviewImg.src;
+    }
+    if (!url) {
+      if (typeof showToast === 'function') showToast('No image available to set as avatar', 'warning');
+      return;
+    }
+    setStudioAvatarPreview(url);
+    const curName = (document.getElementById('mfModelNameInput')?.value || '').trim();
+    if (curName) {
+      saveModelAvatar(curName, url);
+    }
+    const avatarStatus = document.getElementById('mfAvatarStatus');
+    if (avatarStatus) {
+      avatarStatus.textContent = `✅ Avatar updated with GPU artwork!`;
+      avatarStatus.style.color = '#22c55e';
+    }
+    if (typeof showToast === 'function') showToast('✅ Model avatar set from artwork!', 'success');
+  });
+}
+
 if (studioArtSetAvatarBtn) {
   studioArtSetAvatarBtn.addEventListener('click', () => {
     if (!lastGeneratedArtUrl) return;
-    const avatarImg = document.getElementById('mfAvatarPreviewImg');
-    const avatarPlaceholder = document.getElementById('mfAvatarPlaceholder');
-    const avatarStatus = document.getElementById('mfAvatarStatus');
-    if (avatarImg) {
-      avatarImg.src = lastGeneratedArtUrl;
-      avatarImg.style.display = 'block';
+    setStudioAvatarPreview(lastGeneratedArtUrl);
+    const curName = (document.getElementById('mfModelNameInput')?.value || '').trim();
+    if (curName) {
+      saveModelAvatar(curName, lastGeneratedArtUrl);
     }
-    if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
+    const avatarStatus = document.getElementById('mfAvatarStatus');
     if (avatarStatus) {
       avatarStatus.textContent = `✅ Avatar updated with GPU artwork!`;
       avatarStatus.style.color = '#22c55e';
@@ -4498,13 +8397,14515 @@ if (studioArtSetAvatarBtn) {
   });
 }
 
-if (studioArtOpenWorkspaceBtn) {
-  studioArtOpenWorkspaceBtn.addEventListener('click', () => {
-    if (lastGeneratedArtUrl) {
-      window.open(lastGeneratedArtUrl, '_blank');
+// NVIDIA DLSS 5 Image 4K Boost Handlers
+const studioArtDlssBtn = document.getElementById('studioArtDlssBtn');
+const studioInspectorDlssBtn = document.getElementById('studioInspectorDlssBtn');
+
+async function triggerDlssImageEnhance(customUrl = null) {
+  let targetUrl = customUrl || lastGeneratedArtUrl || (studioArtPreviewImg ? (studioArtPreviewImg.getAttribute('src') || studioArtPreviewImg.src) : '');
+  if (!targetUrl) {
+    if (typeof showToast === 'function') showToast('No image available to boost with DLSS 5', 'warning');
+    return;
+  }
+
+  if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+    try {
+      targetUrl = new URL(targetUrl).pathname;
+    } catch {}
+  }
+
+  const btnOriginalText = studioArtDlssBtn ? studioArtDlssBtn.textContent : '';
+  const inspOriginalText = studioInspectorDlssBtn ? studioInspectorDlssBtn.textContent : '';
+
+  if (studioArtDlssBtn) {
+    studioArtDlssBtn.disabled = true;
+    studioArtDlssBtn.textContent = '⚡ DLSS 5 Boosting...';
+  }
+  if (studioInspectorDlssBtn) {
+    studioInspectorDlssBtn.disabled = true;
+    studioInspectorDlssBtn.textContent = '⚡ DLSS 5 Boosting...';
+  }
+  if (studioArtStatus) {
+    studioArtStatus.innerHTML = '<span style="color: #4ade80;">⚡ DLSS 5: Neural micro-reconstruction running on RTX 4060...</span>';
+  }
+
+  try {
+    const res = await fetch('/v1/art/dlss-enhance-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: targetUrl, mode: '2x' }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'DLSS 5 enhancement failed');
+    }
+
+    lastGeneratedArtUrl = data.url;
+    if (studioArtPreviewImg) {
+      studioArtPreviewImg.src = data.url;
+      studioArtPreviewImg.style.display = 'block';
+    }
+    if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'none';
+    if (studioArtActions) studioArtActions.style.display = 'flex';
+    if (studioArtDownloadBtn) {
+      studioArtDownloadBtn.href = data.url + (data.url.includes('?') ? '&' : '?') + 'download=1';
+      studioArtDownloadBtn.setAttribute('download', data.url.split('/').pop() || 'dlss_art.png');
+    }
+
+    if (studioArtStatus) {
+      studioArtStatus.innerHTML = `<span style="color: #4ade80;">⚡ DLSS 5 4K Boost complete (${data.inputResolution || ''} ➔ ${data.outputResolution || ''} in ${data.elapsedSeconds || ''}s)</span>`;
+    }
+
+    const rawFilename = data.url.replace('/v1/workspace/files/', '');
+    if (!studioGalleryItems.some(i => i.name === rawFilename)) {
+      studioGalleryItems.unshift({
+        name: rawFilename,
+        size: 0,
+        mtime: Date.now(),
+      });
+    }
+    if (typeof loadStudioGallery === 'function') {
+      loadStudioGallery();
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(`⚡ DLSS 5 4K Boost complete! (${data.outputResolution})`, 'success');
+    }
+  } catch (err) {
+    console.error('DLSS 5 image enhance error:', err);
+    if (studioArtStatus) {
+      studioArtStatus.innerHTML = `<span style="color: var(--accent-red);">⚠️ DLSS 5 error: ${escapeHtml(err.message)}</span>`;
+    }
+    if (typeof showToast === 'function') {
+      showToast(`DLSS 5 error: ${err.message}`, 'error');
+    }
+  } finally {
+    if (studioArtDlssBtn) {
+      studioArtDlssBtn.disabled = false;
+      studioArtDlssBtn.textContent = btnOriginalText || '⚡ DLSS 5 4K Boost';
+    }
+    if (studioInspectorDlssBtn) {
+      studioInspectorDlssBtn.disabled = false;
+      studioInspectorDlssBtn.textContent = inspOriginalText || '⚡ DLSS 5 4K Boost';
+    }
+  }
+}
+
+if (studioArtDlssBtn) {
+  studioArtDlssBtn.addEventListener('click', () => triggerDlssImageEnhance());
+}
+if (studioInspectorDlssBtn) {
+  studioInspectorDlssBtn.addEventListener('click', () => {
+    let url = null;
+    if (selectedGalleryItem) {
+      const name = selectedGalleryItem.name || selectedGalleryItem.filename || '';
+      url = name.startsWith('/') ? name : `/v1/workspace/files/${name.replace(/^\/?(v1\/workspace\/files\/)?/, '')}`;
+    }
+    triggerDlssImageEnhance(url);
+  });
+}
+
+// ============================================================================
+// INTERACTIVE CANVAS SPRAY REPAIR & INPAINT ENGINE
+// ============================================================================
+const studioArtRepairBtn = document.getElementById('studioArtRepairBtn');
+const studioInspectorRepairBtn = document.getElementById('studioInspectorRepairBtn');
+const studioRepairOverlay = document.getElementById('studioRepairOverlay');
+const closeRepairOverlayBtn = document.getElementById('closeRepairOverlayBtn');
+const repairBaseCanvas = document.getElementById('repairBaseCanvas');
+const repairMaskCanvas = document.getElementById('repairMaskCanvas');
+const repairCanvasStage = document.getElementById('repairCanvasStage');
+const repairImageDimBadge = document.getElementById('repairImageDimBadge');
+const repairToolSprayBtn = document.getElementById('repairToolSprayBtn');
+const repairToolBrushBtn = document.getElementById('repairToolBrushBtn');
+const repairToolEraserBtn = document.getElementById('repairToolEraserBtn');
+const repairBrushSizeSlider = document.getElementById('repairBrushSizeSlider');
+const repairBrushSizeVal = document.getElementById('repairBrushSizeVal');
+const repairStrengthSlider = document.getElementById('repairStrengthSlider');
+const repairStrengthVal = document.getElementById('repairStrengthVal');
+const repairPromptInput = document.getElementById('repairPromptInput');
+const clearRepairMaskBtn = document.getElementById('clearRepairMaskBtn');
+const executeRepairBtn = document.getElementById('executeRepairBtn');
+const executeRepairBtnText = document.getElementById('executeRepairBtnText');
+const repairLoadingOverlay = document.getElementById('repairLoadingOverlay');
+const repairLoadingStatusText = document.getElementById('repairLoadingStatusText');
+
+let currentRepairSourceUrl = null;
+let repairCurrentTool = 'spray'; // 'spray' | 'brush' | 'eraser'
+let repairBrushSize = 32;
+let repairStrength = 0.85;
+let isRepairDrawing = false;
+let repairMaskHasPixels = false;
+let repairBaseImage = null;
+let sprayAnimationReq = null;
+let sprayCoords = { x: 0, y: 0 };
+
+function openStudioSprayRepair(customUrl = null) {
+  let targetUrl = customUrl || lastGeneratedArtUrl || (studioArtPreviewImg ? (studioArtPreviewImg.getAttribute('src') || studioArtPreviewImg.src) : '');
+  if (!targetUrl) {
+    if (typeof showToast === 'function') showToast('No image selected to repair. Generate or select an artwork first.', 'warning');
+    return;
+  }
+
+  currentRepairSourceUrl = targetUrl;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    repairBaseImage = img;
+    const nw = img.naturalWidth || 512;
+    const nh = img.naturalHeight || 512;
+
+    if (repairImageDimBadge) repairImageDimBadge.textContent = `${nw} x ${nh}`;
+
+    if (repairBaseCanvas) {
+      repairBaseCanvas.width = nw;
+      repairBaseCanvas.height = nh;
+      const bCtx = repairBaseCanvas.getContext('2d');
+      bCtx.clearRect(0, 0, nw, nh);
+      bCtx.drawImage(img, 0, 0, nw, nh);
+    }
+
+    if (repairMaskCanvas) {
+      repairMaskCanvas.width = nw;
+      repairMaskCanvas.height = nh;
+      const mCtx = repairMaskCanvas.getContext('2d');
+      mCtx.clearRect(0, 0, nw, nh);
+    }
+
+    repairMaskHasPixels = false;
+
+    // Pre-fill repair prompt from main studio prompt input if available
+    const mainPromptInput = document.getElementById('studioPromptInput');
+    if (repairPromptInput && (!repairPromptInput.value || repairPromptInput.value.trim() === '')) {
+      if (mainPromptInput && mainPromptInput.value) {
+        repairPromptInput.value = mainPromptInput.value;
+      }
+    }
+
+    if (studioRepairOverlay) {
+      studioRepairOverlay.style.display = 'flex';
+    }
+  };
+
+  img.onerror = (err) => {
+    console.error('Failed to load image for repair:', err);
+    if (typeof showToast === 'function') showToast('Failed to load image for spray repair', 'error');
+  };
+
+  img.src = targetUrl;
+}
+
+function closeStudioSprayRepair() {
+  if (sprayAnimationReq) {
+    cancelAnimationFrame(sprayAnimationReq);
+    sprayAnimationReq = null;
+  }
+  isRepairDrawing = false;
+  if (studioRepairOverlay) {
+    studioRepairOverlay.style.display = 'none';
+  }
+}
+
+function setRepairTool(tool) {
+  repairCurrentTool = tool;
+  [repairToolSprayBtn, repairToolBrushBtn, repairToolEraserBtn].forEach(b => {
+    if (b) b.classList.remove('active');
+  });
+  if (tool === 'spray' && repairToolSprayBtn) repairToolSprayBtn.classList.add('active');
+  if (tool === 'brush' && repairToolBrushBtn) repairToolBrushBtn.classList.add('active');
+  if (tool === 'eraser' && repairToolEraserBtn) repairToolEraserBtn.classList.add('active');
+}
+
+function getCanvasPointerPos(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+function paintBrushStroke(x, y) {
+  if (!repairMaskCanvas) return;
+  const ctx = repairMaskCanvas.getContext('2d');
+  ctx.save();
+  if (repairCurrentTool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, repairBrushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (repairCurrentTool === 'brush') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.75)';
+    ctx.beginPath();
+    ctx.arc(x, y, repairBrushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    repairMaskHasPixels = true;
+  }
+  ctx.restore();
+}
+
+function sprayAirbrushStep() {
+  if (!isRepairDrawing || repairCurrentTool !== 'spray' || !repairMaskCanvas) return;
+  const ctx = repairMaskCanvas.getContext('2d');
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+
+  const radius = repairBrushSize / 2;
+  const density = Math.max(12, Math.floor(radius * 1.5));
+
+  for (let i = 0; i < density; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = (Math.random() + Math.random()) / 2 * radius;
+    const px = sprayCoords.x + Math.cos(angle) * dist;
+    const py = sprayCoords.y + Math.sin(angle) * dist;
+    const pSize = Math.random() * 2.5 + 1.0;
+    const alpha = Math.random() * 0.45 + 0.35;
+
+    ctx.fillStyle = `rgba(236, 72, 153, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(px, py, pSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  repairMaskHasPixels = true;
+
+  sprayAnimationReq = requestAnimationFrame(sprayAirbrushStep);
+}
+
+if (repairMaskCanvas) {
+  repairMaskCanvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    repairMaskCanvas.setPointerCapture(e.pointerId);
+    isRepairDrawing = true;
+    const pos = getCanvasPointerPos(e, repairMaskCanvas);
+    sprayCoords = pos;
+
+    if (repairCurrentTool === 'spray') {
+      if (sprayAnimationReq) cancelAnimationFrame(sprayAnimationReq);
+      sprayAirbrushStep();
+    } else {
+      paintBrushStroke(pos.x, pos.y);
+    }
+  });
+
+  repairMaskCanvas.addEventListener('pointermove', (e) => {
+    if (!isRepairDrawing) return;
+    const pos = getCanvasPointerPos(e, repairMaskCanvas);
+    sprayCoords = pos;
+
+    if (repairCurrentTool !== 'spray') {
+      paintBrushStroke(pos.x, pos.y);
+    }
+  });
+
+  const endDrawing = (e) => {
+    if (isRepairDrawing) {
+      isRepairDrawing = false;
+      if (sprayAnimationReq) {
+        cancelAnimationFrame(sprayAnimationReq);
+        sprayAnimationReq = null;
+      }
+      try {
+        repairMaskCanvas.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
+
+  repairMaskCanvas.addEventListener('pointerup', endDrawing);
+  repairMaskCanvas.addEventListener('pointercancel', endDrawing);
+}
+
+if (repairToolSprayBtn) repairToolSprayBtn.addEventListener('click', () => setRepairTool('spray'));
+if (repairToolBrushBtn) repairToolBrushBtn.addEventListener('click', () => setRepairTool('brush'));
+if (repairToolEraserBtn) repairToolEraserBtn.addEventListener('click', () => setRepairTool('eraser'));
+
+if (repairBrushSizeSlider) {
+  repairBrushSizeSlider.addEventListener('input', () => {
+    repairBrushSize = parseInt(repairBrushSizeSlider.value, 10) || 32;
+    if (repairBrushSizeVal) repairBrushSizeVal.textContent = `${repairBrushSize}px`;
+  });
+}
+
+if (repairStrengthSlider) {
+  repairStrengthSlider.addEventListener('input', () => {
+    repairStrength = parseFloat(repairStrengthSlider.value) || 0.85;
+    if (repairStrengthVal) repairStrengthVal.textContent = repairStrength.toFixed(2);
+  });
+}
+
+if (clearRepairMaskBtn) {
+  clearRepairMaskBtn.addEventListener('click', () => {
+    if (repairMaskCanvas) {
+      const ctx = repairMaskCanvas.getContext('2d');
+      ctx.clearRect(0, 0, repairMaskCanvas.width, repairMaskCanvas.height);
+      repairMaskHasPixels = false;
+      if (typeof showToast === 'function') showToast('Mask cleared', 'info');
     }
   });
 }
 
+if (closeRepairOverlayBtn) {
+  closeRepairOverlayBtn.addEventListener('click', closeStudioSprayRepair);
+}
+
+async function runStudioSprayRepair() {
+  if (!currentRepairSourceUrl || !repairMaskCanvas) {
+    if (typeof showToast === 'function') showToast('No image loaded to repair', 'error');
+    return;
+  }
+
+  // Create binary mask offscreen (pure black background, pure white where painted)
+  const offscreen = document.createElement('canvas');
+  offscreen.width = repairMaskCanvas.width;
+  offscreen.height = repairMaskCanvas.height;
+  const offCtx = offscreen.getContext('2d');
+  offCtx.fillStyle = '#000000';
+  offCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+
+  const maskData = repairMaskCanvas.getContext('2d').getImageData(0, 0, offscreen.width, offscreen.height);
+  const binData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+  let whitePixelCount = 0;
+
+  for (let i = 0; i < maskData.data.length; i += 4) {
+    if (maskData.data[i + 3] > 10) {
+      binData.data[i] = 255;
+      binData.data[i + 1] = 255;
+      binData.data[i + 2] = 255;
+      binData.data[i + 3] = 255;
+      whitePixelCount++;
+    }
+  }
+
+  if (whitePixelCount < 40) {
+    if (typeof showToast === 'function') {
+      showToast('Please spray or paint over the flawed area on the canvas first!', 'warning');
+    }
+    return;
+  }
+
+  offCtx.putImageData(binData, 0, 0);
+  const maskBase64 = offscreen.toDataURL('image/png');
+
+  // Pull settings
+  const prompt = repairPromptInput ? repairPromptInput.value.trim() : '';
+  const modelSelect = document.getElementById('studioModelSelect');
+  const selectedModel = modelSelect ? modelSelect.value : 'default';
+  const loraInput = document.getElementById('studioLoraInput');
+  const selectedLora = loraInput ? loraInput.value.trim() : '';
+
+  const isTurbo = selectedModel.toLowerCase().includes('turbo');
+  const steps = isTurbo ? 4 : 20;
+
+  if (repairLoadingOverlay) repairLoadingOverlay.style.display = 'flex';
+  if (executeRepairBtn) executeRepairBtn.disabled = true;
+
+  try {
+    const res = await fetch('/v1/art/inpaint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: currentRepairSourceUrl,
+        mask: maskBase64,
+        prompt: prompt,
+        strength: repairStrength,
+        steps: steps,
+        model: selectedModel,
+        lora: selectedLora || undefined,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Inpainting failed');
+    }
+
+    lastGeneratedArtUrl = data.url;
+    if (studioArtPreviewImg) {
+      studioArtPreviewImg.src = data.url;
+      studioArtPreviewImg.style.display = 'block';
+    }
+    if (studioArtPlaceholder) studioArtPlaceholder.style.display = 'none';
+    if (studioArtActions) studioArtActions.style.display = 'flex';
+    if (studioArtDownloadBtn) {
+      studioArtDownloadBtn.href = data.url + (data.url.includes('?') ? '&' : '?') + 'download=1';
+      studioArtDownloadBtn.setAttribute('download', data.url.split('/').pop() || 'inpaint_art.png');
+    }
+
+    if (studioArtStatus) {
+      studioArtStatus.innerHTML = `<span style="color: #ec4899;">🖌️ Repaired flaw with ${escapeHtml(data.engine || 'RTX 4060')} in ${data.elapsedSeconds || ''}s</span>`;
+    }
+
+    const rawFilename = data.url.replace('/v1/workspace/files/', '');
+    if (!studioGalleryItems.some(i => i.name === rawFilename)) {
+      studioGalleryItems.unshift({
+        name: rawFilename,
+        size: 0,
+        mtime: Date.now(),
+      });
+    }
+
+    if (typeof loadStudioGallery === 'function') {
+      loadStudioGallery();
+    }
+
+    closeStudioSprayRepair();
+
+    if (typeof showToast === 'function') {
+      showToast(`✨ Flaw repaired in ${data.elapsedSeconds}s!`, 'success');
+    }
+  } catch (err) {
+    console.error('Spray repair error:', err);
+    if (typeof showToast === 'function') {
+      showToast(`Spray repair error: ${err.message}`, 'error');
+    }
+    if (studioArtStatus) {
+      studioArtStatus.innerHTML = `<span style="color: var(--accent-red);">⚠️ Repair error: ${escapeHtml(err.message)}</span>`;
+    }
+  } finally {
+    if (repairLoadingOverlay) repairLoadingOverlay.style.display = 'none';
+    if (executeRepairBtn) executeRepairBtn.disabled = false;
+  }
+}
+
+if (executeRepairBtn) {
+  executeRepairBtn.addEventListener('click', runStudioSprayRepair);
+}
+
+if (studioArtRepairBtn) {
+  studioArtRepairBtn.addEventListener('click', () => openStudioSprayRepair());
+}
+
+if (studioInspectorRepairBtn) {
+  studioInspectorRepairBtn.addEventListener('click', () => {
+    let url = null;
+    if (selectedGalleryItem) {
+      const name = selectedGalleryItem.name || selectedGalleryItem.filename || '';
+      url = name.startsWith('/') ? name : `/v1/workspace/files/${name.replace(/^\/?(v1\/workspace\/files\/)?/, '')}`;
+    }
+    openStudioSprayRepair(url);
+  });
+}
+
+// Fullscreen Picture-Only Slideshow Engine (No notifications, pure artwork)
+const openSlideshowNavBtn = document.getElementById('openSlideshowNavBtn');
+const studioHeaderSlideshowBtn = document.getElementById('studioHeaderSlideshowBtn');
+const studioArtSlideshowBtn = document.getElementById('studioArtSlideshowBtn');
+const slideshowOverlay = document.getElementById('slideshowOverlay');
+const slideshowImg = document.getElementById('slideshowImg');
+const slideshowEmptyState = document.getElementById('slideshowEmptyState');
+const slideshowCounter = document.getElementById('slideshowCounter');
+const slideshowModeBtn = document.getElementById('slideshowModeBtn');
+const slideshowSpeedBtn = document.getElementById('slideshowSpeedBtn');
+const slideshowTogglePlayBtn = document.getElementById('slideshowTogglePlayBtn');
+const slideshowFsBtn = document.getElementById('slideshowFsBtn');
+const slideshowMinimizeBtn = document.getElementById('slideshowMinimizeBtn');
+const slideshowExitBtn = document.getElementById('slideshowExitBtn');
+const slideshowHud = document.getElementById('slideshowHud');
+
+let isSlideshowActive = false;
+let slideshowIndex = 0;
+let slideshowIntervalTimer = null;
+let slideshowIsPlaying = true;
+let slideshowHudTimeout = null;
+let slideshowMode = 'cycle_gallery'; // 'live_stream' (stays locked on live creations) | 'cycle_gallery' (cycles past gallery)
+let slideshowCycleSpeed = 3500; // ms per picture
+
+function updateSlideshowModeButton() {
+  if (!slideshowModeBtn) return;
+  if (slideshowMode === 'live_stream') {
+    slideshowModeBtn.innerHTML = '🔴 Live Feed';
+    slideshowModeBtn.style.color = '#22c55e';
+    slideshowModeBtn.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+    slideshowModeBtn.title = 'Live Forge Feed: Displays new artworks as they render without wandering off (L)';
+  } else {
+    slideshowModeBtn.innerHTML = '🔁 Cycle History';
+    slideshowModeBtn.style.color = '#38bdf8';
+    slideshowModeBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+    slideshowModeBtn.title = 'Cycle Gallery: Automatically cycles through past gallery creations (L)';
+  }
+}
+
+function updateSlideshowSpeedButton() {
+  if (!slideshowSpeedBtn) return;
+  if (slideshowCycleSpeed < 1000) {
+    const sec = (slideshowCycleSpeed / 1000).toFixed(1);
+    slideshowSpeedBtn.innerHTML = `⚡ ${sec}s`;
+    slideshowSpeedBtn.title = `Turbo Speed (${sec}s per image) - Click to cycle speed`;
+    slideshowSpeedBtn.style.color = '#38bdf8';
+    slideshowSpeedBtn.style.borderColor = 'rgba(56, 189, 248, 0.5)';
+  } else {
+    const sec = (slideshowCycleSpeed / 1000).toFixed(1).replace('.0', '');
+    slideshowSpeedBtn.innerHTML = `⏱️ ${sec}s`;
+    slideshowSpeedBtn.title = `Cycle interval: ${sec}s per image - Click to change speed`;
+    slideshowSpeedBtn.style.color = '#e2e8f0';
+    slideshowSpeedBtn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+  }
+}
+
+function cycleSlideshowSpeed() {
+  const speeds = [300, 500, 1000, 2000, 3500, 6000];
+  const curIdx = speeds.indexOf(slideshowCycleSpeed);
+  slideshowCycleSpeed = speeds[(curIdx + 1) % speeds.length];
+  updateSlideshowSpeedButton();
+  if (slideshowIsPlaying && slideshowMode === 'cycle_gallery') {
+    startSlideshowTimer();
+  }
+}
+
+function toggleSlideshowMode() {
+  slideshowMode = (slideshowMode === 'live_stream') ? 'cycle_gallery' : 'live_stream';
+  updateSlideshowModeButton();
+  if (slideshowMode === 'live_stream') {
+    stopSlideshowTimer();
+    showSlideshowImage(0);
+  } else {
+    startSlideshowTimer();
+  }
+}
+
+let slideshowLiveStreamQueue = [];
+let slideshowQueueTimer = null;
+
+function queueLiveStreamSlideshowImage(url) {
+  if (!url) return;
+  slideshowLiveStreamQueue.push(url);
+  processLiveStreamQueue();
+}
+
+function processLiveStreamQueue() {
+  if (slideshowQueueTimer || slideshowLiveStreamQueue.length === 0) return;
+  if (!isSlideshowActive) {
+    slideshowLiveStreamQueue = [];
+    return;
+  }
+
+  const nextUrl = slideshowLiveStreamQueue.shift();
+  if (nextUrl) {
+    showLiveStreamSlideshowImage(nextUrl, true);
+  }
+
+  if (slideshowLiveStreamQueue.length > 0) {
+    const pace = slideshowLiveStreamQueue.length > 3 ? 120 : 250;
+    slideshowQueueTimer = setTimeout(() => {
+      slideshowQueueTimer = null;
+      processLiveStreamQueue();
+    }, pace);
+  }
+}
+
+function showLiveStreamSlideshowImage(url, isFast = true) {
+  if (!slideshowImg) return;
+  if (slideshowEmptyState) slideshowEmptyState.style.display = 'none';
+  slideshowImg.style.display = 'block';
+
+  // Instant zero-black-flicker swap for real-time 0.3s streaming
+  slideshowImg.style.transition = 'none';
+  slideshowImg.style.opacity = '1';
+  slideshowImg.src = url;
+
+  if (slideshowCounter) {
+    slideshowCounter.textContent = `⚡ Live Stream (${Math.max(1, studioGalleryItems.length)} Artworks)`;
+  }
+}
+
+function showSlideshowImage(index) {
+  if (!studioGalleryItems || studioGalleryItems.length === 0) {
+    if (slideshowEmptyState) slideshowEmptyState.style.display = 'flex';
+    if (slideshowImg) slideshowImg.style.display = 'none';
+    if (slideshowCounter) slideshowCounter.textContent = '0 / 0';
+    return;
+  }
+  if (slideshowEmptyState) slideshowEmptyState.style.display = 'none';
+  if (slideshowImg) slideshowImg.style.display = 'block';
+
+  slideshowIndex = (index + studioGalleryItems.length) % studioGalleryItems.length;
+  const item = studioGalleryItems[slideshowIndex];
+  if (!item) return;
+  const cleanName = (item.name || '').replace('/v1/workspace/files/', '');
+  const url = cleanName.startsWith('http') || cleanName.startsWith('data:') ? cleanName : `/v1/workspace/files/${cleanName}`;
+  
+  if (slideshowImg) {
+    if (slideshowCycleSpeed <= 1000) {
+      // Rapid-fire flipbook mode: direct instant swap with zero black blink
+      slideshowImg.style.transition = 'none';
+      slideshowImg.style.opacity = '1';
+      slideshowImg.src = url;
+    } else {
+      const preloader = new Image();
+      preloader.onload = () => {
+        if (!isSlideshowActive) return;
+        slideshowImg.style.transition = 'opacity 0.15s ease-in-out';
+        slideshowImg.style.opacity = '0.3';
+        setTimeout(() => {
+          if (!isSlideshowActive) return;
+          slideshowImg.src = url;
+          slideshowImg.style.opacity = '1';
+        }, 30);
+      };
+      preloader.src = url;
+    }
+  }
+  if (slideshowCounter) {
+    slideshowCounter.textContent = `${slideshowIndex + 1} / ${studioGalleryItems.length}`;
+  }
+
+  // Preload adjacent images for instantaneous zero-stutter cycling
+  const nextItem = studioGalleryItems[(slideshowIndex + 1) % studioGalleryItems.length];
+  if (nextItem) {
+    const nextClean = (nextItem.name || '').replace('/v1/workspace/files/', '');
+    const nextUrl = nextClean.startsWith('http') || nextClean.startsWith('data:') ? nextClean : `/v1/workspace/files/${nextClean}`;
+    const pNext = new Image();
+    pNext.src = nextUrl;
+  }
+  const nextItem2 = studioGalleryItems[(slideshowIndex + 2) % studioGalleryItems.length];
+  if (nextItem2) {
+    const nextClean2 = (nextItem2.name || '').replace('/v1/workspace/files/', '');
+    const nextUrl2 = nextClean2.startsWith('http') || nextClean2.startsWith('data:') ? nextClean2 : `/v1/workspace/files/${nextClean2}`;
+    const pNext2 = new Image();
+    pNext2.src = nextUrl2;
+  }
+}
+
+function nextSlideshowImage() {
+  showSlideshowImage(slideshowIndex + 1);
+}
+
+function prevSlideshowImage() {
+  showSlideshowImage(slideshowIndex - 1);
+}
+
+function startSlideshow() {
+  if (!studioGalleryItems || studioGalleryItems.length === 0) {
+    loadStudioGallery().then(() => {
+      enterSlideshow();
+    });
+    return;
+  }
+  enterSlideshow();
+}
+
+function enterSlideshow() {
+  isSlideshowActive = true;
+  slideshowIsPlaying = true;
+  document.body.classList.add('slideshow-pure-theater');
+
+  // Default to live_stream mode if Endless Forge session is actively synthesizing
+  if (typeof isEfSessionRunning !== 'undefined' && isEfSessionRunning) {
+    slideshowMode = 'live_stream';
+  }
+  updateSlideshowModeButton();
+  updateSlideshowSpeedButton();
+
+  if (slideshowOverlay) {
+    slideshowOverlay.style.display = 'flex';
+    slideshowOverlay.style.cursor = 'none';
+    if (!document.fullscreenElement) {
+      slideshowOverlay.requestFullscreen?.().catch(() => {});
+    }
+  }
+
+  if (!studioGalleryItems || studioGalleryItems.length === 0) {
+    loadStudioGallery().then(() => {
+      if (studioGalleryItems && studioGalleryItems.length > 0) {
+        showSlideshowImage(0);
+      } else {
+        if (slideshowEmptyState) slideshowEmptyState.style.display = 'flex';
+        if (slideshowImg) slideshowImg.style.display = 'none';
+        if (slideshowCounter) slideshowCounter.textContent = '0 / 0';
+      }
+    });
+  } else {
+    // Find index of currently displayed image if available
+    if (lastGeneratedArtUrl) {
+      const currentName = lastGeneratedArtUrl.replace('/v1/workspace/files/', '');
+      const foundIdx = studioGalleryItems.findIndex(item => item.name === currentName);
+      if (foundIdx >= 0) slideshowIndex = foundIdx;
+    }
+    showSlideshowImage(slideshowIndex);
+  }
+
+  startSlideshowTimer();
+}
+
+function startSlideshowTimer() {
+  stopSlideshowTimer();
+  // Only auto-advance timer if in cycle_gallery mode
+  if (slideshowIsPlaying && slideshowMode === 'cycle_gallery') {
+    slideshowIntervalTimer = setInterval(() => {
+      nextSlideshowImage();
+    }, slideshowCycleSpeed);
+  }
+}
+
+function stopSlideshowTimer() {
+  if (slideshowIntervalTimer) {
+    clearInterval(slideshowIntervalTimer);
+    slideshowIntervalTimer = null;
+  }
+}
+
+function toggleSlideshowPlay() {
+  slideshowIsPlaying = !slideshowIsPlaying;
+  if (slideshowTogglePlayBtn) {
+    slideshowTogglePlayBtn.textContent = slideshowIsPlaying ? '⏸️' : '▶️';
+  }
+  if (slideshowIsPlaying) {
+    startSlideshowTimer();
+  } else {
+    stopSlideshowTimer();
+  }
+}
+
+function exitSlideshow() {
+  isSlideshowActive = false;
+  document.body.classList.remove('slideshow-pure-theater');
+  stopSlideshowTimer();
+  if (slideshowOverlay) {
+    slideshowOverlay.style.display = 'none';
+  }
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+// Floating Taskbar Mini-Dock Management
+function checkHideTaskbarDock() {
+  const dock = document.getElementById('floatingTaskbarDock');
+  const ssPill = document.getElementById('minimizedSlideshowPill');
+  const artPill = document.getElementById('minimizedArtStudioPill');
+  const memePill = document.getElementById('minimizedMemeStudioPill');
+  const hasActive = (ssPill && ssPill.style.display !== 'none') ||
+                    (artPill && artPill.style.display !== 'none') ||
+                    (memePill && memePill.style.display !== 'none');
+  if (dock && !hasActive) {
+    dock.style.display = 'none';
+  }
+}
+
+function minimizeSlideshow() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+  if (slideshowOverlay) slideshowOverlay.style.display = 'none';
+  const dock = document.getElementById('floatingTaskbarDock');
+  const pill = document.getElementById('minimizedSlideshowPill');
+  const info = document.getElementById('minimizedSlideshowInfo');
+  if (dock) dock.style.display = 'flex';
+  if (pill) pill.style.display = 'flex';
+  if (info) info.textContent = `${studioGalleryItems.length} images`;
+}
+
+function restoreSlideshow() {
+  const pill = document.getElementById('minimizedSlideshowPill');
+  if (pill) pill.style.display = 'none';
+  checkHideTaskbarDock();
+  startSlideshow();
+}
+
+function closeMinimizedSlideshow() {
+  const pill = document.getElementById('minimizedSlideshowPill');
+  if (pill) pill.style.display = 'none';
+  checkHideTaskbarDock();
+  exitSlideshow();
+}
+
+function minimizeArtStudio() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+  if (artStudioModal) artStudioModal.classList.add('hidden');
+  const dock = document.getElementById('floatingTaskbarDock');
+  const pill = document.getElementById('minimizedArtStudioPill');
+  if (dock) dock.style.display = 'flex';
+  if (pill) pill.style.display = 'flex';
+}
+
+function restoreArtStudio() {
+  const pill = document.getElementById('minimizedArtStudioPill');
+  if (pill) pill.style.display = 'none';
+  checkHideTaskbarDock();
+  if (artStudioModal) artStudioModal.classList.remove('hidden');
+}
+
+function closeMinimizedArtStudio() {
+  const pill = document.getElementById('minimizedArtStudioPill');
+  if (pill) pill.style.display = 'none';
+  checkHideTaskbarDock();
+  if (artStudioModal) artStudioModal.classList.add('hidden');
+}
+
+function minimizeMemeStudio() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+  if (artStudioModal) artStudioModal.classList.add('hidden');
+  if (memeStudioModal) memeStudioModal.classList.add('hidden');
+  const dock = document.getElementById('floatingTaskbarDock');
+  const pill = document.getElementById('minimizedMemeStudioPill');
+  if (dock) dock.style.display = 'flex';
+  if (pill) pill.style.display = 'flex';
+}
+
+function restoreMemeStudio() {
+  const pill = document.getElementById('minimizedMemeStudioPill');
+  if (pill) pill.style.display = 'none';
+  checkHideTaskbarDock();
+  openMemeStudio();
+}
+
+function closeMinimizedMemeStudio() {
+  const pill = document.getElementById('minimizedMemeStudioPill');
+  if (pill) pill.style.display = 'none';
+  checkHideTaskbarDock();
+  closeMemeStudio();
+}
+
+// Wire Dock Buttons
+const restoreSlideshowDockBtn = document.getElementById('restoreSlideshowDockBtn');
+const closeSlideshowDockBtn = document.getElementById('closeSlideshowDockBtn');
+const restoreArtStudioDockBtn = document.getElementById('restoreArtStudioDockBtn');
+const closeArtStudioDockBtn = document.getElementById('closeArtStudioDockBtn');
+const restoreMemeStudioDockBtn = document.getElementById('restoreMemeStudioDockBtn');
+const closeMemeStudioDockBtn = document.getElementById('closeMemeStudioDockBtn');
+
+if (restoreSlideshowDockBtn) restoreSlideshowDockBtn.addEventListener('click', (e) => { e.stopPropagation(); restoreSlideshow(); });
+if (closeSlideshowDockBtn) closeSlideshowDockBtn.addEventListener('click', (e) => { e.stopPropagation(); closeMinimizedSlideshow(); });
+const minSsPill = document.getElementById('minimizedSlideshowPill');
+if (minSsPill) minSsPill.addEventListener('click', restoreSlideshow);
+
+if (restoreArtStudioDockBtn) restoreArtStudioDockBtn.addEventListener('click', (e) => { e.stopPropagation(); restoreArtStudio(); });
+if (closeArtStudioDockBtn) closeArtStudioDockBtn.addEventListener('click', (e) => { e.stopPropagation(); closeMinimizedArtStudio(); });
+const minArtPill = document.getElementById('minimizedArtStudioPill');
+if (minArtPill) minArtPill.addEventListener('click', restoreArtStudio);
+
+if (restoreMemeStudioDockBtn) restoreMemeStudioDockBtn.addEventListener('click', (e) => { e.stopPropagation(); restoreMemeStudio(); });
+if (closeMemeStudioDockBtn) closeMemeStudioDockBtn.addEventListener('click', (e) => { e.stopPropagation(); closeMinimizedMemeStudio(); });
+const minMemePill = document.getElementById('minimizedMemeStudioPill');
+if (minMemePill) minMemePill.addEventListener('click', restoreMemeStudio);
+
+const studioMinimizeWorkstationBtn = document.getElementById('studioMinimizeWorkstationBtn');
+if (studioMinimizeWorkstationBtn) {
+  studioMinimizeWorkstationBtn.addEventListener('click', minimizeArtStudio);
+}
+
+const memeStudioMinimizeBtn = document.getElementById('memeStudioMinimizeBtn');
+if (memeStudioMinimizeBtn) {
+  memeStudioMinimizeBtn.addEventListener('click', minimizeMemeStudio);
+}
+
+const slideshowPrevBtn = document.getElementById('slideshowPrevBtn');
+const slideshowNextBtn = document.getElementById('slideshowNextBtn');
+
+// Mouse movement handling in Slideshow: Briefly show minimal HUD & nav arrows, auto-hide on stillness
+if (slideshowOverlay) {
+  slideshowOverlay.addEventListener('mousemove', () => {
+    if (!isSlideshowActive) return;
+    slideshowOverlay.style.cursor = 'default';
+    if (slideshowHud) slideshowHud.style.opacity = '1';
+    if (slideshowPrevBtn) slideshowPrevBtn.style.opacity = '1';
+    if (slideshowNextBtn) slideshowNextBtn.style.opacity = '1';
+    
+    if (slideshowHudTimeout) clearTimeout(slideshowHudTimeout);
+    slideshowHudTimeout = setTimeout(() => {
+      if (isSlideshowActive) {
+        slideshowOverlay.style.cursor = 'none';
+        if (slideshowHud) slideshowHud.style.opacity = '0';
+        if (slideshowPrevBtn) slideshowPrevBtn.style.opacity = '0';
+        if (slideshowNextBtn) slideshowNextBtn.style.opacity = '0';
+      }
+    }, 1800);
+  });
+
+  slideshowOverlay.addEventListener('click', (e) => {
+    if (e.target === slideshowExitBtn || e.target === slideshowMinimizeBtn || e.target === slideshowTogglePlayBtn || e.target === slideshowPrevBtn || e.target === slideshowNextBtn || e.target === slideshowModeBtn) return;
+    nextSlideshowImage();
+  });
+}
+
+// Global Keyboard Navigation for AI Art Studio Gallery (Left, Right, Up, Down)
+window.addEventListener('keydown', (e) => {
+  const artModal = document.getElementById('artStudioModal');
+  if (!artModal || artModal.classList.contains('hidden')) return;
+  if (isSlideshowActive) return; // Slideshow has its own handler below
+
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+    return;
+  }
+
+  if (!currentFilteredGallery || currentFilteredGallery.length === 0) return;
+
+  const total = currentFilteredGallery.length;
+  const cols = 2; // Studio gallery is a 2-column grid
+
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    const nextIdx = selectedGalleryIndex < 0 ? 0 : Math.min(total - 1, selectedGalleryIndex + 1);
+    selectGalleryIndex(nextIdx);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const prevIdx = selectedGalleryIndex < 0 ? 0 : Math.max(0, selectedGalleryIndex - 1);
+    selectGalleryIndex(prevIdx);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const downIdx = selectedGalleryIndex < 0 ? 0 : Math.min(total - 1, selectedGalleryIndex + cols);
+    selectGalleryIndex(downIdx);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const upIdx = selectedGalleryIndex < 0 ? 0 : Math.max(0, selectedGalleryIndex - cols);
+    selectGalleryIndex(upIdx);
+  }
+});
+
+if (slideshowPrevBtn) {
+  slideshowPrevBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    prevSlideshowImage();
+  });
+}
+
+if (slideshowNextBtn) {
+  slideshowNextBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    nextSlideshowImage();
+  });
+}
+
+if (slideshowMinimizeBtn) {
+  slideshowMinimizeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    minimizeSlideshow();
+  });
+}
+
+if (slideshowExitBtn) {
+  slideshowExitBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    exitSlideshow();
+  });
+}
+
+if (slideshowModeBtn) {
+  slideshowModeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSlideshowMode();
+  });
+}
+
+if (slideshowSpeedBtn) {
+  slideshowSpeedBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cycleSlideshowSpeed();
+  });
+}
+
+if (slideshowFsBtn) {
+  slideshowFsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!document.fullscreenElement) {
+      slideshowOverlay.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  });
+}
+
+if (slideshowTogglePlayBtn) {
+  slideshowTogglePlayBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSlideshowPlay();
+  });
+}
+
+if (studioArtSlideshowBtn) {
+  studioArtSlideshowBtn.addEventListener('click', startSlideshow);
+}
+
+if (studioHeaderSlideshowBtn) {
+  studioHeaderSlideshowBtn.addEventListener('click', startSlideshow);
+}
+
+if (openSlideshowNavBtn) {
+  openSlideshowNavBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    startSlideshow();
+  });
+}
+
+// Workstation & Slideshow Fullscreen Toggle UI Sync
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && isSlideshowActive) {
+    exitSlideshow();
+  }
+  if (studioFullscreenWorkstationBtn) {
+    if (document.fullscreenElement) {
+      studioFullscreenWorkstationBtn.innerHTML = '⤢ Exit Full';
+      studioFullscreenWorkstationBtn.title = 'Exit Fullscreen Workstation (Esc)';
+    } else {
+      studioFullscreenWorkstationBtn.innerHTML = '⤢ Fullscreen';
+      studioFullscreenWorkstationBtn.title = 'Toggle Fullscreen Workstation';
+    }
+  }
+});
+
+// Keyboard shortcuts during slideshow and global Alt+S launcher
+window.addEventListener('keydown', (e) => {
+  if (e.altKey && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    if (isSlideshowActive) {
+      exitSlideshow();
+    } else {
+      startSlideshow();
+    }
+    return;
+  }
+
+  if (!isSlideshowActive) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    exitSlideshow();
+  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    nextSlideshowImage();
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    prevSlideshowImage();
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    toggleSlideshowPlay();
+  } else if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    if (!document.fullscreenElement) {
+      slideshowOverlay.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  } else if (e.key === 'l' || e.key === 'L') {
+    e.preventDefault();
+    toggleSlideshowMode();
+  }
+});
+
+// ============================================================================
+// MEME ROAST MASTER GENERAL · 60 FPS ANIMATED GIF STUDIO ENGINE
+// ============================================================================
+const openMemeStudioBtn = document.getElementById('openMemeStudioBtn');
+const memeStudioModal = document.getElementById('memeStudioModal');
+const closeMemeStudioModalBtn = document.getElementById('closeMemeStudioModalBtn');
+const memeStudioFullscreenBtn = document.getElementById('memeStudioFullscreenBtn');
+const studioInspectorMemeBtn = document.getElementById('studioInspectorMemeBtn');
+
+const memeModeMorphBtn = document.getElementById('memeModeMorphBtn');
+const memeModeStorylineBtn = document.getElementById('memeModeStorylineBtn');
+const memeModeStitchBtn = document.getElementById('memeModeStitchBtn');
+const memePromptGroup = document.getElementById('memePromptGroup');
+const videoStorylineGroup = document.getElementById('videoStorylineGroup');
+const videoStorylinePresetSelect = document.getElementById('videoStorylinePresetSelect');
+const videoStorylineChaptersInput = document.getElementById('videoStorylineChaptersInput');
+const memeStitchGroup = document.getElementById('memeStitchGroup');
+const memePromptInput = document.getElementById('memePromptInput');
+const memeClownPresetBtn = document.getElementById('memeClownPresetBtn');
+const memeStitchPickerGrid = document.getElementById('memeStitchPickerGrid');
+const memeSelectedCount = document.getElementById('memeSelectedCount');
+const memeClearStitchBtn = document.getElementById('memeClearStitchBtn');
+
+const videoAspectRatioSelect = document.getElementById('videoAspectRatioSelect');
+const videoDurationSelect = document.getElementById('videoDurationSelect');
+const videoFpsSelect = document.getElementById('videoFpsSelect');
+const videoModelSelect = document.getElementById('videoModelSelect');
+if (videoModelSelect) {
+  videoModelSelect.addEventListener('change', () => {
+    const sel = videoModelSelect.value || 'default';
+    const isWan = sel.toLowerCase().includes('wan');
+    if (videoFpsSelect) {
+      videoFpsSelect.value = isWan ? '16' : '60';
+    }
+    if (memeCanvasFpsBadge) {
+      const displayName = formatModelDisplayName(sel);
+      const targetFps = isWan ? '16.0' : (videoFpsSelect?.value || '60.0');
+      memeCanvasFpsBadge.textContent = `⚡ ${targetFps} FPS (Ready · ${displayName})`;
+    }
+  });
+}
+
+const memeOpenFolderBtn = document.getElementById('memeOpenFolderBtn');
+const memeGenerateRoastBtn = document.getElementById('memeGenerateRoastBtn');
+const memeRoastCategorySelect = document.getElementById('memeRoastCategorySelect');
+const memeRoastSpicinessSelect = document.getElementById('memeRoastSpicinessSelect');
+const memeStitchSearchInput = document.getElementById('memeStitchSearchInput');
+const memeSelectAllStitchBtn = document.getElementById('memeSelectAllStitchBtn');
+const memeSelectRecentStitchBtn = document.getElementById('memeSelectRecentStitchBtn');
+const memeTopTextInput = document.getElementById('memeTopTextInput');
+const memeBottomTextInput = document.getElementById('memeBottomTextInput');
+const memeFontFamilySelect = document.getElementById('memeFontFamilySelect');
+const memeFontSizeRange = document.getElementById('memeFontSizeRange');
+const memeFontSizeLabel = document.getElementById('memeFontSizeLabel');
+const memeBoldToggleBtn = document.getElementById('memeBoldToggleBtn');
+const memeItalicToggleBtn = document.getElementById('memeItalicToggleBtn');
+let isMemeBold = true;
+let isMemeItalic = false;
+
+const memeFontStyleSelect = document.getElementById('memeFontStyleSelect');
+const memeFrameCountSelect = document.getElementById('memeFrameCountSelect');
+const memeMotionSelect = document.getElementById('memeMotionSelect');
+const memeStickerSelect = document.getElementById('memeStickerSelect');
+const memeSfxSelect = document.getElementById('memeSfxSelect');
+const memeSfxTestBtn = document.getElementById('memeSfxTestBtn');
+const memeSfxToggleBtn = document.getElementById('memeSfxToggleBtn');
+const memeAudioFileInput = document.getElementById('memeAudioFileInput');
+const memeAudioUploadBtn = document.getElementById('memeAudioUploadBtn');
+const memeAudioFileStatus = document.getElementById('memeAudioFileStatus');
+const memeAudioClearBtn = document.getElementById('memeAudioClearBtn');
+let memeCustomAudioUrl = null;
+let memeCustomAudioFilename = null;
+let customAudioPreviewPlayer = null;
+
+const memePhotoFileInput = document.getElementById('memePhotoFileInput');
+const memePhotoUploadBtn = document.getElementById('memePhotoUploadBtn');
+const memePhotoClearBtn = document.getElementById('memePhotoClearBtn');
+const memePhotoPreviewRow = document.getElementById('memePhotoPreviewRow');
+const memePhotoPreviewThumbnail = document.getElementById('memePhotoPreviewThumbnail');
+const memePhotoFileName = document.getElementById('memePhotoFileName');
+let memeCustomPhotoUrl = '';
+let memeCustomPhotoFilename = '';
+
+function stopCustomAudioPreview() {
+  if (customAudioPreviewPlayer) {
+    try {
+      customAudioPreviewPlayer.pause();
+      customAudioPreviewPlayer.currentTime = 0;
+    } catch {}
+    customAudioPreviewPlayer = null;
+  }
+  if (memeSfxTestBtn) {
+    memeSfxTestBtn.innerHTML = '▶ Test Audio';
+    memeSfxTestBtn.style.color = '#38bdf8';
+  }
+}
+const memeComposeFlowBtn = document.getElementById('memeComposeFlowBtn');
+const memeFlowPromptInput = document.getElementById('memeFlowPromptInput');
+const memeFlowTimelineBox = document.getElementById('memeFlowTimelineBox');
+const memeRenderActionBtn = document.getElementById('memeRenderActionBtn');
+
+const memeStudioCanvas = document.getElementById('memeStudioCanvas');
+const memeStudioVideo = document.getElementById('memeStudioVideo');
+const memeVideoMuteBtn = document.getElementById('memeVideoMuteBtn');
+const memeVideoVolumeSlider = document.getElementById('memeVideoVolumeSlider');
+const memeCanvasViewport = document.getElementById('memeCanvasViewport');
+const memeCanvasPlaceholder = document.getElementById('memeCanvasPlaceholder');
+const memeCanvasFpsBadge = document.getElementById('memeCanvasFpsBadge');
+const memeCanvasLoadingOverlay = document.getElementById('memeCanvasLoadingOverlay');
+const memeLoadingStatusText = document.getElementById('memeLoadingStatusText');
+
+const memePlayPauseBtn = document.getElementById('memePlayPauseBtn');
+const memeTimelineCounter = document.getElementById('memeTimelineCounter');
+const memeTimelineScrubber = document.getElementById('memeTimelineScrubber');
+const memeRoastVerdictBox = document.getElementById('memeRoastVerdictBox');
+
+const memeDownloadGifBtn = document.getElementById('memeDownloadGifBtn');
+const memeDownloadWebmBtn = document.getElementById('memeDownloadWebmBtn');
+const memeSetAvatarBtn = document.getElementById('memeSetAvatarBtn');
+const memeSendToChatBtn = document.getElementById('memeSendToChatBtn');
+
+let memeMode = 'morph'; // 'morph' | 'storyline' | 'stitch'
+let memeSelectedGalleryItems = [];
+let memeFrames = [];
+let memeCurrentFrameIndex = 0;
+let memeIsPlaying = true;
+let memeSpeedMultiplier = 1.0;
+let memeLastFrameTime = 0;
+let memeAnimFrameId = null;
+let memeGeneratedGifUrl = '';
+let memeSpiciness = 3;
+let pingPongDirection = 1;
+let lastSfxTriggerFrame = -1;
+
+// Web Audio Procedural Synthesizer & Soundtrack Engine
+let memeAudioCtx = null;
+let isMemeSfxEnabled = true;
+let memeSoundtrackTimer = null;
+let memeSoundtrackOscs = [];
+
+function getMemeAudioContext() {
+  if (!memeAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) memeAudioCtx = new AudioContextClass();
+  }
+  if (memeAudioCtx && memeAudioCtx.state === 'suspended') {
+    memeAudioCtx.resume();
+  }
+  return memeAudioCtx;
+}
+
+function startSoundtrackTrack(vibe, destNode) {
+  stopSoundtrackTrack();
+  if (vibe === 'mute' || vibe === 'bonk' || vibe === 'boom') return;
+  const ctx = getMemeAudioContext();
+  if (!ctx) return;
+
+  const targetDest = destNode || ctx.destination;
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0.28, ctx.currentTime);
+  masterGain.connect(targetDest);
+
+  if (vibe === 'synthwave') {
+    // 80s Driving Bassline + Arpeggiator (A Minor scale)
+    const notes = [110, 130.81, 146.83, 164.81, 196.0, 220, 261.63, 329.63];
+    let noteIdx = 0;
+    memeSoundtrackTimer = setInterval(() => {
+      if (!isMemeSfxEnabled) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      const f = notes[noteIdx % notes.length];
+      osc.frequency.setValueAtTime(f, now);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.005, now + 0.11);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + 0.12);
+      noteIdx = (noteIdx + 1) % notes.length;
+    }, 125);
+  } else if (vibe === 'ambient') {
+    // Deep Cosmic Drone
+    const droneFreqs = [55, 82.41, 110, 164.81];
+    droneFreqs.forEach(f => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start();
+      memeSoundtrackOscs.push(osc);
+    });
+  } else if (vibe === 'lofi') {
+    // Warm Lo-Fi Chill Chords
+    const chord = [146.83, 174.61, 220.0, 261.63];
+    chord.forEach(f => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, ctx.currentTime);
+      gain.gain.setValueAtTime(0.10, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start();
+      memeSoundtrackOscs.push(osc);
+    });
+  } else if (vibe === 'overdrive') {
+    // Heavy Overdrive Saw Bass
+    const notes = [65.41, 73.42, 87.31, 98.0];
+    let nIdx = 0;
+    memeSoundtrackTimer = setInterval(() => {
+      if (!isMemeSfxEnabled) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(notes[nIdx % notes.length], now);
+      gain.gain.setValueAtTime(0.20, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.20);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + 0.22);
+      nIdx++;
+    }, 250);
+  }
+}
+
+function stopSoundtrackTrack() {
+  if (memeSoundtrackTimer) {
+    clearInterval(memeSoundtrackTimer);
+    memeSoundtrackTimer = null;
+  }
+  if (memeSoundtrackOscs && memeSoundtrackOscs.length > 0) {
+    memeSoundtrackOscs.forEach(o => {
+      try { o.stop(); } catch {}
+    });
+    memeSoundtrackOscs = [];
+  }
+}
+
+function playMemeSfx(type) {
+  if (!isMemeSfxEnabled || type === 'mute') return;
+  try {
+    const ctx = getMemeAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    if (type === 'bonk') {
+      // Slapstick cartoon bonk + crash impact
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(340, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.22);
+      gain.gain.setValueAtTime(0.65, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.23);
+
+      const subOsc = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(140, now);
+      subOsc.frequency.exponentialRampToValueAtTime(30, now + 0.18);
+      subGain.gain.setValueAtTime(0.75, now);
+      subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+      subOsc.connect(subGain);
+      subGain.connect(ctx.destination);
+      subOsc.start(now);
+      subOsc.stop(now + 0.19);
+    } else if (type === 'boom') {
+      // Deep Vine Boom sub-drop
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(25, now + 0.75);
+      gain.gain.setValueAtTime(0.9, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.76);
+    } else {
+      startSoundtrackTrack(type);
+    }
+  } catch (e) {
+    console.warn('playMemeSfx error:', e);
+  }
+}
+
+function triggerScreenShake() {
+  if (!memeCanvasViewport) return;
+  const dx = (Math.random() - 0.5) * 12;
+  const dy = (Math.random() - 0.5) * 12;
+  memeCanvasViewport.style.transform = `translate(${dx}px, ${dy}px) scale(1.02)`;
+  setTimeout(() => {
+    if (memeCanvasViewport) memeCanvasViewport.style.transform = 'translate(0, 0) scale(1)';
+  }, 90);
+}
+
+function initMemeStudio() {
+  if (!memeStudioModal) return;
+
+  if (openMemeStudioBtn) openMemeStudioBtn.addEventListener('click', openMemeStudio);
+  if (closeMemeStudioModalBtn) closeMemeStudioModalBtn.addEventListener('click', closeMemeStudio);
+
+  // Creative Studio Mode Switcher Tabs
+  const studioModePictureBtn = document.getElementById('studioModePictureBtn');
+  const studioModeVideoBtn = document.getElementById('studioModeVideoBtn');
+  if (studioModePictureBtn) {
+    studioModePictureBtn.addEventListener('click', () => switchStudioTab('picture'));
+  }
+  if (studioModeVideoBtn) {
+    studioModeVideoBtn.addEventListener('click', () => switchStudioTab('video'));
+  }
+
+  // Viewport 1-click Animate button (Picture -> Video with Wan 2.1)
+  const studioArtAnimateBtn = document.getElementById('studioArtAnimateBtn');
+  if (studioArtAnimateBtn) {
+    studioArtAnimateBtn.addEventListener('click', () => {
+      if (lastGeneratedArtUrl && !lastGeneratedArtUrl.endsWith('.mp4') && !lastGeneratedArtUrl.endsWith('.webm')) {
+        const cleanRel = lastGeneratedArtUrl.replace(/^\/v1\/workspace\/files\//, '').replace(/^\/workspace\//, '');
+        const pInput = document.getElementById('studioArtPromptInput');
+        const p = pInput?.value || '';
+        animateImageWithWan(lastGeneratedArtUrl, cleanRel, p);
+      }
+    });
+  }
+
+  // Inspector 1-click Animate button (Gallery Item or Active Canvas -> Video with Wan 2.1)
+  const studioInspectorAnimateBtn = document.getElementById('studioInspectorAnimateBtn');
+  if (studioInspectorAnimateBtn) {
+    studioInspectorAnimateBtn.addEventListener('click', () => {
+      let relPath = selectedGalleryItem ? (selectedGalleryItem.name || selectedGalleryItem.filename || '') : '';
+      let itemUrl = relPath ? `/v1/workspace/files/${relPath}` : (lastGeneratedArtUrl || (studioArtPreviewImg ? studioArtPreviewImg.src : ''));
+      if (!relPath && itemUrl) {
+        relPath = itemUrl.replace(/^\/?(v1\/workspace\/files\/)?/, '');
+      }
+      if (itemUrl && !itemUrl.endsWith('.mp4') && !itemUrl.endsWith('.webm')) {
+        const pInput = document.getElementById('studioArtPromptInput');
+        const p = (selectedGalleryItem ? selectedGalleryItem.prompt : '') || pInput?.value || '';
+        animateImageWithWan(itemUrl, relPath, p);
+      } else {
+        if (typeof showToast === 'function') showToast('No still image available to animate', 'warning');
+      }
+    });
+  }
+
+  // Bidirectional Prompt Sync between Studio textarea and Meme prompt
+  const studioArtPromptInput = document.getElementById('studioArtPromptInput');
+  if (studioArtPromptInput && memePromptInput) {
+    studioArtPromptInput.addEventListener('input', () => {
+      memePromptInput.value = studioArtPromptInput.value;
+    });
+    memePromptInput.addEventListener('input', () => {
+      studioArtPromptInput.value = memePromptInput.value;
+    });
+  }
+  
+  if (studioArtMemeBtn) {
+    studioArtMemeBtn.addEventListener('click', () => {
+      openMemeStudio();
+      if (lastGeneratedArtUrl && !lastGeneratedArtUrl.endsWith('.mp4') && !lastGeneratedArtUrl.endsWith('.webm')) {
+        memeCustomPhotoUrl = lastGeneratedArtUrl;
+        memeCustomPhotoFilename = lastGeneratedArtUrl.replace(/^\/v1\/workspace\/files\//, '');
+        if (memePhotoPreviewThumbnail) memePhotoPreviewThumbnail.src = lastGeneratedArtUrl;
+        if (memePhotoFileName) memePhotoFileName.textContent = memeCustomPhotoFilename.split(/[\\/]/).pop() || 'photo.png';
+        if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'flex';
+        if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'inline-block';
+        if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '✅ Photo Loaded (Ready to Animate)';
+      }
+      if (lastGeneratedArtUrl) {
+        const item = studioGalleryItems.find(i => `/v1/workspace/files/${i.name}` === lastGeneratedArtUrl);
+        if (item) toggleMemeGallerySelection(item, true);
+      }
+    });
+  }
+  if (studioInspectorMemeBtn) {
+    studioInspectorMemeBtn.addEventListener('click', () => {
+      openMemeStudio();
+      let itemUrl = (selectedGalleryItem ? `/v1/workspace/files/${selectedGalleryItem.name || selectedGalleryItem.filename}` : '') || lastGeneratedArtUrl || (studioArtPreviewImg ? studioArtPreviewImg.src : '');
+      if (itemUrl && !itemUrl.endsWith('.mp4') && !itemUrl.endsWith('.webm')) {
+        memeCustomPhotoUrl = itemUrl;
+        memeCustomPhotoFilename = (selectedGalleryItem ? (selectedGalleryItem.name || selectedGalleryItem.filename) : itemUrl.replace(/^\/?(v1\/workspace\/files\/)?/, ''));
+        if (memePhotoPreviewThumbnail) memePhotoPreviewThumbnail.src = itemUrl;
+        if (memePhotoFileName) memePhotoFileName.textContent = memeCustomPhotoFilename.split(/[\\/]/).pop() || 'photo.png';
+        if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'flex';
+        if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'inline-block';
+        if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '✅ Photo Loaded (Ready to Animate)';
+      }
+      if (selectedGalleryItem) {
+        toggleMemeGallerySelection(selectedGalleryItem, true);
+      }
+      setMemeMode('morph');
+    });
+  }
+  // Note: memeStudioFullscreenBtn is now handled universally by .modal-maximize-btn
+
+
+  // Gallery Filter Tabs
+  document.querySelectorAll('.studio-gallery-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.studio-gallery-tab').forEach(t => {
+        t.classList.remove('active');
+        t.style.color = 'var(--text-muted)';
+        t.style.borderColor = 'rgba(255,255,255,0.1)';
+      });
+      tab.classList.add('active');
+      if (tab.dataset.tab === 'gifs') {
+        tab.style.color = '#fbbf24';
+        tab.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      } else {
+        tab.style.color = '#38bdf8';
+        tab.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+      }
+      studioGalleryFilter = tab.dataset.tab || 'all';
+      loadStudioGallery();
+    });
+  });
+
+  // Mode switching (3 Tabs: Morph, Storyline, Stitch)
+  if (memeModeMorphBtn) memeModeMorphBtn.addEventListener('click', () => setMemeMode('morph'));
+  if (memeModeStorylineBtn) memeModeStorylineBtn.addEventListener('click', () => setMemeMode('storyline'));
+  if (memeModeStitchBtn) memeModeStitchBtn.addEventListener('click', () => setMemeMode('stitch'));
+
+  // Storyline Preset Selector
+  if (videoStorylinePresetSelect && videoStorylineChaptersInput) {
+    videoStorylinePresetSelect.addEventListener('change', () => {
+      const p = videoStorylinePresetSelect.value;
+      if (p === 'cosmic') {
+        videoStorylineChaptersInput.value = 'Cosmic nebula condensing into burning star --> Star collapses into crystalline world --> Alien civilization builds golden spires --> Advanced interstellar portal opens';
+      } else if (p === 'forest') {
+        videoStorylineChaptersInput.value = 'Ancient mystical forest with glowing bioluminescent moss --> Medieval kingdom castle rising above the forest canopy --> Steam engine industrial revolution transformation --> Cyberpunk glass skyscrapers and flying neon traffic';
+      } else if (p === 'dragon') {
+        videoStorylineChaptersInput.value = 'Ancient dragon egg pulsing with lava inside volcanic cavern --> Massive fire-breathing elder dragon ascending above mountaintop --> Cybernetic armor and energy shields grafting onto dragon --> Full titanium cyber mecha dragon in orbital flight';
+      } else if (p === 'solstice') {
+        videoStorylineChaptersInput.value = 'Golden hour serene ocean sunset on futuristic coast --> Twilight violet rain reflections on neon boulevard --> Cyberpunk neon skyline with holographic advertisements in midnight storm';
+      }
+    });
+  }
+
+  // Aspect Ratio Canvas Resizing
+  if (videoAspectRatioSelect && memeStudioCanvas) {
+    videoAspectRatioSelect.addEventListener('change', () => {
+      const val = videoAspectRatioSelect.value;
+      if (val === '16:9') {
+        memeStudioCanvas.width = 1024;
+        memeStudioCanvas.height = 576;
+      } else if (val === '9:16') {
+        memeStudioCanvas.width = 576;
+        memeStudioCanvas.height = 1024;
+      } else {
+        memeStudioCanvas.width = 768;
+        memeStudioCanvas.height = 768;
+      }
+      redrawMemeCanvas();
+    });
+  }
+
+  // Spiciness level buttons
+  document.querySelectorAll('.meme-spice-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.meme-spice-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.color = 'var(--text-muted)';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+      });
+      btn.classList.add('active');
+      const val = parseInt(btn.dataset.spice || '3', 10);
+      memeSpiciness = val;
+      if (val === 4) {
+        btn.style.color = '#ef4444';
+        btn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+      } else {
+        btn.style.color = '#fbbf24';
+        btn.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+      }
+      generateMemeRoast();
+    });
+  });
+
+  // Clown preset
+  if (memeClownPresetBtn) {
+    memeClownPresetBtn.addEventListener('click', () => {
+      if (memePromptInput) memePromptInput.value = 'Clown bumping into brick wall with hilarious slapstick cartoon dynamics';
+      if (memeTopTextInput) memeTopTextInput.value = 'CLOWN SPEEDRUNNING INTO A BRICK WALL';
+      if (memeBottomTextInput) memeBottomTextInput.value = '60 FRAMES OF UNADULTERATED REGRET';
+      if (memeRoastVerdictBox) memeRoastVerdictBox.innerHTML = `"He didn't hit the wall, the wall witnessed comedy history." — <span style="color: #fbbf24; font-weight: 700;">Roast Master General</span>`;
+      playMemeSfx('bonk');
+      triggerScreenShake();
+      redrawMemeCanvas();
+    });
+  }
+
+  // Audio Controls
+  if (memeSfxTestBtn) {
+    memeSfxTestBtn.addEventListener('click', () => {
+      if (!memeCustomAudioUrl) return;
+      if (customAudioPreviewPlayer && !customAudioPreviewPlayer.paused) {
+        stopCustomAudioPreview();
+      } else {
+        if (!customAudioPreviewPlayer) {
+          customAudioPreviewPlayer = new Audio(memeCustomAudioUrl);
+          customAudioPreviewPlayer.addEventListener('ended', () => {
+            stopCustomAudioPreview();
+          });
+          customAudioPreviewPlayer.addEventListener('error', (e) => {
+            console.error('Audio preview playback error:', e);
+            stopCustomAudioPreview();
+            if (typeof showToast === 'function') showToast('Could not play audio preview in browser', 'error');
+          });
+        }
+        customAudioPreviewPlayer.play().then(() => {
+          memeSfxTestBtn.innerHTML = '⏸️ Pause Audio';
+          memeSfxTestBtn.style.color = '#a855f7';
+        }).catch(err => {
+          console.warn('Audio play prevented:', err);
+          stopCustomAudioPreview();
+          if (typeof showToast === 'function') showToast('Audio playback blocked: ' + err.message, 'warning');
+        });
+      }
+    });
+  }
+  if (memeSfxToggleBtn) {
+    memeSfxToggleBtn.addEventListener('click', () => {
+      isMemeSfxEnabled = !isMemeSfxEnabled;
+      memeSfxToggleBtn.textContent = isMemeSfxEnabled ? '🔊 SFX ON' : '🔇 SFX MUTED';
+      memeSfxToggleBtn.style.color = isMemeSfxEnabled ? '#38bdf8' : 'var(--text-muted)';
+      if (!isMemeSfxEnabled) stopSoundtrackTrack();
+    });
+  }
+
+  // Live redraw listeners
+  if (memeTopTextInput) memeTopTextInput.addEventListener('input', redrawMemeCanvas);
+  if (memeBottomTextInput) memeBottomTextInput.addEventListener('input', redrawMemeCanvas);
+  if (memeFontStyleSelect) memeFontStyleSelect.addEventListener('change', redrawMemeCanvas);
+  if (memeFontFamilySelect) memeFontFamilySelect.addEventListener('change', redrawMemeCanvas);
+  if (memeFontSizeRange) {
+    memeFontSizeRange.addEventListener('input', () => {
+      if (memeFontSizeLabel) memeFontSizeLabel.textContent = `${memeFontSizeRange.value}px`;
+      redrawMemeCanvas();
+    });
+  }
+  if (memeBoldToggleBtn) {
+    memeBoldToggleBtn.addEventListener('click', () => {
+      isMemeBold = !isMemeBold;
+      memeBoldToggleBtn.classList.toggle('active', isMemeBold);
+      memeBoldToggleBtn.style.background = isMemeBold ? 'rgba(245,158,11,0.25)' : 'rgba(0,0,0,0.4)';
+      memeBoldToggleBtn.style.color = isMemeBold ? '#fbbf24' : '#94a3b8';
+      memeBoldToggleBtn.style.borderColor = isMemeBold ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.15)';
+      redrawMemeCanvas();
+    });
+  }
+  if (memeItalicToggleBtn) {
+    memeItalicToggleBtn.addEventListener('click', () => {
+      isMemeItalic = !isMemeItalic;
+      memeItalicToggleBtn.classList.toggle('active', isMemeItalic);
+      memeItalicToggleBtn.style.background = isMemeItalic ? 'rgba(245,158,11,0.25)' : 'rgba(0,0,0,0.4)';
+      memeItalicToggleBtn.style.color = isMemeItalic ? '#fbbf24' : '#94a3b8';
+      memeItalicToggleBtn.style.borderColor = isMemeItalic ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.15)';
+      redrawMemeCanvas();
+    });
+  }
+  if (memeStickerSelect) memeStickerSelect.addEventListener('change', redrawMemeCanvas);
+  if (memeMotionSelect) memeMotionSelect.addEventListener('change', redrawMemeCanvas);
+
+  if (memeGenerateRoastBtn) {
+    memeGenerateRoastBtn.addEventListener('click', () => {
+      generateMemeRoast();
+      playMemeSfx('ding');
+    });
+  }
+  if (memeRenderActionBtn) memeRenderActionBtn.addEventListener('click', executeMemeRender);
+
+  // Photo-to-Video (Animate Photo) Event Wiring
+  if (memePhotoUploadBtn && memePhotoFileInput) {
+    memePhotoUploadBtn.addEventListener('click', () => {
+      memePhotoFileInput.click();
+    });
+    memePhotoFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Data = event.target?.result;
+        if (!base64Data) return;
+
+        if (memePhotoPreviewThumbnail) memePhotoPreviewThumbnail.src = base64Data;
+        if (memePhotoFileName) memePhotoFileName.textContent = file.name;
+        if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'flex';
+        if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'inline-block';
+        if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '🔄 Change Photo';
+
+        try {
+          const res = await fetch('/v1/workspace/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: base64Data, filename: file.name }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            memeCustomPhotoUrl = data.url;
+            memeCustomPhotoFilename = data.filename;
+            if (typeof showToast === 'function') showToast(`📸 Photo ready to animate: ${file.name}`, 'info');
+          } else {
+            memeCustomPhotoUrl = base64Data;
+            memeCustomPhotoFilename = '';
+          }
+        } catch (err) {
+          console.warn('Photo upload error, using base64:', err);
+          memeCustomPhotoUrl = base64Data;
+          memeCustomPhotoFilename = '';
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (memePhotoClearBtn) {
+    memePhotoClearBtn.addEventListener('click', () => {
+      memeCustomPhotoUrl = '';
+      memeCustomPhotoFilename = '';
+      if (memePhotoFileInput) memePhotoFileInput.value = '';
+      if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'none';
+      if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'none';
+      if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '📁 Select / Upload Photo to Animate';
+      if (typeof showToast === 'function') showToast('Photo removed. Switched to Text-to-Video mode.', 'info');
+    });
+  }
+
+  if (memePlayPauseBtn) memePlayPauseBtn.addEventListener('click', toggleMemePlayPause);
+  if (memeStudioVideo) {
+    memeStudioVideo.addEventListener('play', () => {
+      if (memePlayPauseBtn) memePlayPauseBtn.textContent = '⏸️';
+    });
+    memeStudioVideo.addEventListener('pause', () => {
+      if (memePlayPauseBtn) memePlayPauseBtn.textContent = '▶️';
+    });
+    memeStudioVideo.addEventListener('ended', () => {
+      if (memePlayPauseBtn) memePlayPauseBtn.textContent = '▶️';
+    });
+    memeStudioVideo.addEventListener('click', toggleMemePlayPause);
+  }
+  if (memeStudioCanvas) {
+    memeStudioCanvas.addEventListener('click', toggleMemePlayPause);
+  }
+
+  const videoModelSelectEl = document.getElementById('videoModelSelect');
+  if (videoModelSelectEl) {
+    videoModelSelectEl.addEventListener('change', syncVideoModelSettings);
+  }
+  const videoAspectSelectEl = document.getElementById('videoAspectRatioSelect');
+  if (videoAspectSelectEl) {
+    videoAspectSelectEl.addEventListener('change', syncVideoModelSettings);
+  }
+  const videoDurationSelectEl = document.getElementById('videoDurationSelect');
+  if (videoDurationSelectEl) {
+    videoDurationSelectEl.addEventListener('change', syncVideoModelSettings);
+  }
+  const videoFpsSelectEl = document.getElementById('videoFpsSelect');
+  if (videoFpsSelectEl) {
+    videoFpsSelectEl.addEventListener('change', syncVideoModelSettings);
+  }
+  const videoResetDefaultsBtn = document.getElementById('videoResetDefaultsBtn');
+  if (videoResetDefaultsBtn) {
+    videoResetDefaultsBtn.addEventListener('click', () => {
+      resetToSafeVideoDefaults();
+      const badge = document.getElementById('videoModelCompatibilityBadge');
+      if (badge) {
+        badge.style.display = 'block';
+        badge.innerHTML = '⚡ <strong>Safe Defaults Restored:</strong> SD-Turbo (Instant Fast Motion · 3s · 60 FPS). Guaranteed render!';
+        setTimeout(() => { syncVideoModelSettings(); }, 3000);
+      }
+    });
+  }
+  const videoRenderErrorDismissBtn = document.getElementById('videoRenderErrorDismissBtn');
+  if (videoRenderErrorDismissBtn) {
+    videoRenderErrorDismissBtn.addEventListener('click', hideVideoError);
+  }
+  const videoRenderErrorRecoverBtn = document.getElementById('videoRenderErrorRecoverBtn');
+  if (videoRenderErrorRecoverBtn) {
+    videoRenderErrorRecoverBtn.addEventListener('click', () => {
+      resetToSafeVideoDefaults();
+      executeMemeRender();
+    });
+  }
+  const studioModelSelectEl = document.getElementById('studioModelSelect');
+  if (studioModelSelectEl) {
+    studioModelSelectEl.addEventListener('change', () => {
+      if (currentStudioTab === 'picture') {
+        const badge = document.getElementById('studioCanvasModelBadge');
+        if (badge) {
+          badge.textContent = `${formatModelDisplayName(studioModelSelectEl.value)} (Local CUDA)`;
+        }
+      }
+    });
+  }
+  const studioArtResolutionSelectEl = document.getElementById('studioArtResolutionSelect');
+  if (studioArtResolutionSelectEl) {
+    studioArtResolutionSelectEl.addEventListener('change', () => {
+      if (currentStudioTab === 'picture') {
+        const badge = document.getElementById('studioCanvasResBadge');
+        if (badge) badge.textContent = studioArtResolutionSelectEl.value || '512 x 512';
+      }
+    });
+  }
+  if (memeOpenFolderBtn) {
+    memeOpenFolderBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/v1/workspace/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(typeof adminHeaders === 'function' ? adminHeaders() : {}) },
+          body: JSON.stringify({ filename: 'art' }),
+        });
+        const data = await res.json();
+        const originalText = memeOpenFolderBtn.textContent;
+        if (data.success) {
+          memeOpenFolderBtn.textContent = '✅ Opened';
+        } else {
+          memeOpenFolderBtn.textContent = '⚠️ Error';
+          console.warn('Open art folder error:', data.error);
+        }
+        setTimeout(() => { memeOpenFolderBtn.textContent = originalText; }, 2000);
+      } catch (err) {
+        console.error('Failed to open art folder in explorer:', err);
+      }
+    });
+  }
+
+  if (memeStitchSearchInput) {
+    memeStitchSearchInput.addEventListener('input', () => {
+      updateMemeStitchPicker();
+    });
+  }
+
+  if (memeSelectAllStitchBtn) {
+    memeSelectAllStitchBtn.addEventListener('click', () => {
+      const imageOnlyGallery = studioGalleryItems.filter(i => !i.isVideo && !i.isGif && /\.(png|jpe?g|webp)$/i.test(i.name));
+      const query = (memeStitchSearchInput?.value || '').trim().toLowerCase();
+      const filtered = query
+        ? imageOnlyGallery.filter(i => (i.name || '').toLowerCase().includes(query) || (i.prompt || '').toLowerCase().includes(query))
+        : imageOnlyGallery;
+      
+      filtered.forEach(item => {
+        if (!memeSelectedGalleryItems.some(i => i.name === item.name)) {
+          memeSelectedGalleryItems.push(item);
+        }
+      });
+      updateMemeStitchPicker();
+      if (memeSelectedGalleryItems.length > 0) {
+        loadImagesIntoMemeFrames(memeSelectedGalleryItems.map(i => `/v1/workspace/files/${i.name}`));
+      }
+    });
+  }
+
+  if (memeSelectRecentStitchBtn) {
+    memeSelectRecentStitchBtn.addEventListener('click', () => {
+      const imageOnlyGallery = studioGalleryItems.filter(i => !i.isVideo && !i.isGif && /\.(png|jpe?g|webp)$/i.test(i.name));
+      memeSelectedGalleryItems = imageOnlyGallery.slice(0, 12);
+      updateMemeStitchPicker();
+      if (memeSelectedGalleryItems.length > 0) {
+        loadImagesIntoMemeFrames(memeSelectedGalleryItems.map(i => `/v1/workspace/files/${i.name}`));
+      }
+    });
+  }
+
+  if (memeClearStitchBtn) {
+    memeClearStitchBtn.addEventListener('click', () => {
+      memeSelectedGalleryItems = [];
+      updateMemeStitchPicker();
+    });
+  }
+
+  if (memeTimelineScrubber) {
+    memeTimelineScrubber.addEventListener('input', () => {
+      if (memeStudioVideo && memeStudioVideo.style.display !== 'none' && memeStudioVideo.duration) {
+        const pct = parseFloat(memeTimelineScrubber.value) / 100;
+        memeStudioVideo.currentTime = pct * memeStudioVideo.duration;
+        return;
+      }
+      memeCurrentFrameIndex = parseInt(memeTimelineScrubber.value, 10) || 0;
+      updateTimelineDisplay();
+      redrawMemeCanvas();
+    });
+  }
+
+  document.querySelectorAll('.meme-speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.meme-speed-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.color = 'var(--text-muted)';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+      });
+      btn.classList.add('active');
+      btn.style.color = '#fbbf24';
+      btn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      const speed = parseFloat(btn.dataset.speed || '1.0') || 1.0;
+      memeSpeedMultiplier = speed;
+      if (memeStudioVideo) memeStudioVideo.playbackRate = speed;
+    });
+  });
+
+  if (memeVideoMuteBtn) {
+    memeVideoMuteBtn.addEventListener('click', () => {
+      if (memeStudioVideo) {
+        memeStudioVideo.muted = !memeStudioVideo.muted;
+        if (memeStudioVideo.muted) {
+          memeVideoMuteBtn.textContent = '🔇 Muted';
+          memeVideoMuteBtn.style.color = 'var(--text-muted)';
+          memeVideoMuteBtn.style.borderColor = 'rgba(255,255,255,0.15)';
+        } else {
+          memeVideoMuteBtn.textContent = '🔊 Sound ON';
+          memeVideoMuteBtn.style.color = '#38bdf8';
+          memeVideoMuteBtn.style.borderColor = 'rgba(56,189,248,0.4)';
+          memeStudioVideo.volume = parseFloat(memeVideoVolumeSlider?.value || '1.0');
+          memeStudioVideo.play().catch(() => {});
+        }
+      }
+    });
+  }
+
+  if (memeVideoVolumeSlider) {
+    memeVideoVolumeSlider.addEventListener('input', () => {
+      if (memeStudioVideo) {
+        memeStudioVideo.volume = parseFloat(memeVideoVolumeSlider.value) || 1.0;
+        if (memeStudioVideo.muted && memeStudioVideo.volume > 0) {
+          memeStudioVideo.muted = false;
+          if (memeVideoMuteBtn) {
+            memeVideoMuteBtn.textContent = '🔊 Sound ON';
+            memeVideoMuteBtn.style.color = '#38bdf8';
+          }
+        }
+      }
+    });
+  }
+
+  if (memeAudioUploadBtn && memeAudioFileInput) {
+    memeAudioUploadBtn.addEventListener('click', () => {
+      memeAudioFileInput.click();
+    });
+
+    memeAudioFileInput.addEventListener('change', async () => {
+      const file = memeAudioFileInput.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          if (memeAudioUploadBtn) memeAudioUploadBtn.textContent = '⏳ Uploading Track...';
+          const res = await fetch('/v1/workspace/upload-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              dataUrl: reader.result,
+            }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            memeCustomAudioUrl = data.url;
+            memeCustomAudioFilename = data.filename;
+            if (memeAudioFileStatus) {
+              memeAudioFileStatus.textContent = `🎵 ${file.name}`;
+              memeAudioFileStatus.style.display = 'inline-block';
+              memeAudioFileStatus.title = `Custom Track: ${file.name}`;
+            }
+            if (memeSfxTestBtn) memeSfxTestBtn.style.display = 'inline-block';
+            if (memeAudioClearBtn) memeAudioClearBtn.style.display = 'inline-block';
+            if (memeAudioUploadBtn) memeAudioUploadBtn.textContent = '✅ Track Loaded';
+            setTimeout(() => {
+              if (memeAudioUploadBtn) memeAudioUploadBtn.textContent = '📁 Change Custom Song (.mp3, .wav, .flac)';
+            }, 2500);
+          } else {
+            alert(`Audio upload failed: ${data.error || 'Unknown error'}`);
+          }
+        } catch (e) {
+          alert(`Audio upload error: ${e.message}`);
+        }
+      };
+      stopCustomAudioPreview();
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (memeAudioClearBtn) {
+    memeAudioClearBtn.addEventListener('click', () => {
+      stopCustomAudioPreview();
+      stopSoundtrackTrack();
+      memeCustomAudioUrl = null;
+      memeCustomAudioFilename = null;
+      if (memeAudioFileInput) memeAudioFileInput.value = '';
+      if (memeAudioFileStatus) {
+        memeAudioFileStatus.textContent = '';
+        memeAudioFileStatus.style.display = 'none';
+      }
+      if (memeSfxTestBtn) memeSfxTestBtn.style.display = 'none';
+      if (memeAudioClearBtn) memeAudioClearBtn.style.display = 'none';
+      if (memeAudioUploadBtn) memeAudioUploadBtn.textContent = '📁 Upload Custom Song / Beat (.mp3, .wav, .flac)';
+    });
+  }
+
+  if (memePhotoUploadBtn && memePhotoFileInput) {
+    memePhotoUploadBtn.addEventListener('click', () => {
+      memePhotoFileInput.click();
+    });
+
+    memePhotoFileInput.addEventListener('change', async () => {
+      const file = memePhotoFileInput.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '⏳ Uploading Photo...';
+          const res = await fetch('/v1/workspace/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              dataUrl: reader.result,
+            }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            memeCustomPhotoUrl = data.url;
+            memeCustomPhotoFilename = data.filename;
+            if (memePhotoPreviewThumbnail) memePhotoPreviewThumbnail.src = data.url;
+            if (memePhotoFileName) memePhotoFileName.textContent = file.name;
+            if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'flex';
+            if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'inline-block';
+            if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '✅ Photo Loaded (Ready to Animate)';
+          } else {
+            alert(`Photo upload failed: ${data.error || 'Unknown error'}`);
+          }
+        } catch (e) {
+          alert(`Photo upload error: ${e.message}`);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (memePhotoClearBtn) {
+    memePhotoClearBtn.addEventListener('click', () => {
+      memeCustomPhotoUrl = '';
+      memeCustomPhotoFilename = '';
+      if (memePhotoFileInput) memePhotoFileInput.value = '';
+      if (memePhotoPreviewThumbnail) memePhotoPreviewThumbnail.src = '';
+      if (memePhotoFileName) memePhotoFileName.textContent = '';
+      if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'none';
+      if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'none';
+      if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '📁 Select / Upload Photo to Animate';
+    });
+  }
+
+  if (memeDownloadWebmBtn) {
+    memeDownloadWebmBtn.addEventListener('click', () => {
+      if (memeGeneratedGifUrl && (memeGeneratedGifUrl.endsWith('.mp4') || memeGeneratedGifUrl.endsWith('.webm'))) {
+        const a = document.createElement('a');
+        a.href = memeGeneratedGifUrl;
+        a.download = memeGeneratedGifUrl.split(/[\\/]/).pop() || 'cinema_video_60fps.mp4';
+        a.click();
+      } else {
+        export60FpsWebm();
+      }
+    });
+  }
+
+  const memeDlssVideoBtn = document.getElementById('memeDlssVideoBtn');
+  if (memeDlssVideoBtn) {
+    memeDlssVideoBtn.addEventListener('click', async () => {
+      let targetVideo = memeGeneratedGifUrl || (memeStudioVideo ? (memeStudioVideo.getAttribute('src') || memeStudioVideo.src) : '');
+      if (!targetVideo && selectedGalleryItem && selectedGalleryItem.isVideo) {
+        const n = selectedGalleryItem.name || selectedGalleryItem.filename || '';
+        targetVideo = n.startsWith('/') ? n : `/v1/workspace/files/${n.replace(/^\/?(v1\/workspace\/files\/)?/, '')}`;
+      }
+      if (targetVideo && (targetVideo.startsWith('http://') || targetVideo.startsWith('https://'))) {
+        try {
+          targetVideo = new URL(targetVideo).pathname;
+        } catch {}
+      }
+      if (!targetVideo) {
+        if (typeof showToast === 'function') showToast('No video available to boost with DLSS 5', 'warning');
+        return;
+      }
+
+      memeDlssVideoBtn.disabled = true;
+      const originalText = memeDlssVideoBtn.textContent;
+      memeDlssVideoBtn.textContent = '⏳ DLSS 5 Boosting Video...';
+      if (typeof showToast === 'function') {
+        showToast('NVIDIA DLSS 5 Video Neural Rendering started...', 'info');
+      }
+
+      try {
+        const res = await fetch('/v1/art/dlss-enhance-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video: targetVideo, mode: '2x', codec: 'HEVC', container: 'MP4' }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'DLSS 5 video enhancement failed');
+        }
+
+        memeGeneratedGifUrl = data.url;
+        playVideoInMemeStudio(data.url, data.framesRendered, 16, 3, 'DLSS 5 4K Boosted');
+
+        const rawFilename = data.url.replace('/v1/workspace/files/', '');
+        if (!studioGalleryItems.some(i => i.name === rawFilename)) {
+          studioGalleryItems.unshift({
+            name: rawFilename,
+            size: 0,
+            isVideo: true,
+            mtime: Date.now(),
+          });
+        }
+        if (typeof loadStudioGallery === 'function') {
+      loadStudioGallery();
+    }
+
+        if (typeof showToast === 'function') {
+          showToast(`⚡ DLSS 5 Video Boost complete! (${data.outputResolution || 'Enhanced'})`, 'success');
+        }
+      } catch (err) {
+        console.error('DLSS 5 video error:', err);
+        if (typeof showToast === 'function') {
+          showToast(`DLSS 5 video error: ${err.message}`, 'error');
+        }
+      } finally {
+        memeDlssVideoBtn.disabled = false;
+        memeDlssVideoBtn.textContent = originalText || '⚡ DLSS 5 Boost';
+      }
+    });
+  }
+
+  if (memeSetAvatarBtn) {
+    memeSetAvatarBtn.addEventListener('click', () => {
+      if (!memeGeneratedGifUrl) return;
+      setStudioAvatarPreview(memeGeneratedGifUrl);
+      const curName = (document.getElementById('mfModelNameInput')?.value || '').trim();
+      if (curName) {
+        saveModelAvatar(curName, memeGeneratedGifUrl);
+      }
+      const avatarStatus = document.getElementById('mfAvatarStatus');
+      if (avatarStatus) {
+        avatarStatus.textContent = `✅ 60 FPS Animated Avatar set!`;
+        avatarStatus.style.color = '#22c55e';
+      }
+      closeMemeStudio();
+    });
+  }
+  if (memeComposeFlowBtn) {
+    memeComposeFlowBtn.addEventListener('click', async () => {
+      const prompt = memePromptInput?.value || videoStorylineChaptersInput?.value || 'High-speed 60 FPS visual cinema animation';
+      const durVal = videoDurationSelect?.value || '60';
+      const durationSec = durVal === 'infinite' ? 30 : (parseFloat(durVal) || 60);
+      const vibe = memeSfxSelect?.value || 'synthwave';
+
+      memeComposeFlowBtn.textContent = '⏳ Composing Flow...';
+      try {
+        const res = await fetch('/v1/meme-studio/compose-flow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, durationSec, vibe }),
+        });
+        const data = await res.json();
+        if (data.success && data.flowPrompt) {
+          if (memeFlowPromptInput) memeFlowPromptInput.value = data.flowPrompt;
+          if (memeFlowTimelineBox) {
+            memeFlowTimelineBox.style.display = 'block';
+            let timelineHtml = `<strong style="color: #c084fc;">🎵 ${data.title || 'Dynamic Flow'}</strong> (${data.bpm || 138} BPM · ${data.key || 'A min'} · ${durationSec}s)<br/>`;
+            if (Array.isArray(data.structure)) {
+              timelineHtml += data.structure.map(s => `<div style="margin-top:2px;">• <span style="color:#fbbf24; font-weight:700;">${s.timeRange || ''}</span>: <em>${s.phase || ''}</em> — ${s.description || ''}</div>`).join('');
+            }
+            memeFlowTimelineBox.innerHTML = timelineHtml;
+          }
+        }
+      } catch (err) {
+        console.warn('memeComposeFlowBtn error:', err);
+      } finally {
+        memeComposeFlowBtn.textContent = '✨ Compose with Gemini';
+      }
+    });
+  }
+
+  if (memeDownloadGifBtn) {
+    memeDownloadGifBtn.addEventListener('click', (e) => {
+      if (memeGeneratedGifUrl) {
+        memeDownloadGifBtn.href = memeGeneratedGifUrl;
+      }
+    });
+  }
+
+  if (memeRenderActionBtn) {
+    memeRenderActionBtn.addEventListener('click', executeMemeRender);
+  }
+
+  if (memeSendToChatBtn) {
+    memeSendToChatBtn.addEventListener('click', () => {
+      if (!memeGeneratedGifUrl) return;
+      const chatInput = document.getElementById('chatInput');
+      if (chatInput) {
+        chatInput.value += ` ![60 FPS Animation](${memeGeneratedGifUrl}) `;
+        closeMemeStudio();
+        chatInput.focus();
+      }
+    });
+  }
+}
+
+function showVideoError(msg) {
+  const banner = document.getElementById('videoRenderErrorBanner');
+  const textEl = document.getElementById('videoRenderErrorText');
+  if (banner && textEl) {
+    let friendly = msg;
+    if (msg.includes('latents') || msg.includes('WanPipeline') || msg.includes('LTXPipeline')) {
+      friendly = '3D Video DiT models (Wan 2.1 / LTX) generate single continuous scenes. AI Storylines require multi-chapter image blending. Click below to switch to RealVisXL or SD-Turbo for Storylines.';
+    } else if (msg.includes('CogVideoX')) {
+      friendly = 'CogVideoX is not downloaded locally. Click below to switch to the fast local SD-Turbo model.';
+    } else if (msg.includes('timed out')) {
+      friendly = 'Render timed out. For fast guaranteed generation on 8GB VRAM, try 3s duration or SD-Turbo.';
+    }
+    textEl.textContent = friendly;
+    banner.style.display = 'block';
+  } else {
+    alert(msg);
+  }
+}
+
+function hideVideoError() {
+  const banner = document.getElementById('videoRenderErrorBanner');
+  if (banner) banner.style.display = 'none';
+}
+
+function resetToSafeVideoDefaults() {
+  hideVideoError();
+  const modelSelect = document.getElementById('videoModelSelect');
+  const durSelect = document.getElementById('videoDurationSelect');
+  const fpsSelect = document.getElementById('videoFpsSelect');
+  const aspectSelect = document.getElementById('videoAspectRatioSelect');
+  if (modelSelect) modelSelect.value = 'default';
+  if (durSelect) durSelect.value = '3';
+  if (fpsSelect) fpsSelect.value = '60';
+  if (aspectSelect) aspectSelect.value = '1:1';
+  setMemeMode('morph');
+  syncVideoModelSettings();
+}
+
+function syncVideoModelSettings() {
+  const modelSelect = document.getElementById('videoModelSelect');
+  const modelGroup = document.getElementById('videoModelSelectGroup');
+  const badge = document.getElementById('videoModelCompatibilityBadge');
+  const fpsSelect = document.getElementById('videoFpsSelect');
+  const durSelect = document.getElementById('videoDurationSelect');
+  const canvasModelBadge = document.getElementById('studioCanvasModelBadge');
+  const canvasResBadge = document.getElementById('studioCanvasResBadge');
+  const aspectSelect = document.getElementById('videoAspectRatioSelect');
+  if (!modelSelect) return;
+
+  const hasPhoto = Boolean(memeCustomPhotoFilename || memeCustomPhotoUrl);
+  let modelVal = (modelSelect.value || 'default').toLowerCase();
+  const currentAspect = aspectSelect?.value || '1:1';
+
+  // Mode 2: AI Storyline mode constraints
+  if (memeMode === 'storyline') {
+    if (modelGroup) modelGroup.style.display = 'block';
+    // If a 3D DiT is selected, auto-switch to RealVisXL or SD-Turbo
+    if (modelVal.includes('wan') || modelVal.includes('ltx') || modelVal.includes('cogvideo')) {
+      modelSelect.value = 'realvis';
+      modelVal = 'realvis';
+    }
+    // Disable DiT options in Storyline mode
+    Array.from(modelSelect.options).forEach(opt => {
+      const v = opt.value.toLowerCase();
+      if (v.includes('wan') || v.includes('ltx') || v.includes('cogvideo')) {
+        opt.disabled = true;
+        if (!opt.text.includes('(Morph Only)')) opt.text += ' (Morph Only)';
+      } else {
+        opt.disabled = false;
+        opt.text = opt.text.replace(' (Morph Only)', '');
+      }
+    });
+
+    if (badge) {
+      badge.style.display = 'block';
+      badge.style.background = 'rgba(56, 189, 248, 0.12)';
+      badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+      badge.style.color = '#38bdf8';
+      badge.innerHTML = `🌌 <strong>AI Storyline Active:</strong> Multi-chapter narrative using <strong>${formatModelDisplayName(modelVal)}</strong>. <em>(3D DiTs like Wan 2.1 are for single continuous shots in Latent Morph).</em>`;
+    }
+    if (fpsSelect && fpsSelect.value !== '60' && fpsSelect.value !== '30') fpsSelect.value = '30';
+    if (canvasModelBadge) {
+      canvasModelBadge.textContent = `${formatModelDisplayName(modelVal)} Storyline (30 FPS)`;
+      canvasModelBadge.style.color = '#38bdf8';
+    }
+    if (canvasResBadge) {
+      canvasResBadge.textContent = currentAspect === '16:9' ? '1024 x 576 (HD)' : (currentAspect === '9:16' ? '576 x 1024 (HD)' : '768 x 768 (HD)');
+    }
+    return;
+  }
+
+  // Mode 3: Gallery Stitch mode
+  if (memeMode === 'stitch') {
+    Array.from(modelSelect.options).forEach(opt => {
+      opt.disabled = false;
+      opt.text = opt.text.replace(' (Morph Only)', '');
+    });
+    if (badge) {
+      badge.style.display = 'block';
+      badge.style.background = 'rgba(245, 158, 11, 0.12)';
+      badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      badge.style.color = '#fbbf24';
+      badge.innerHTML = `🖼️ <strong>Gallery Stitch:</strong> Stitches your selected frames with transitions & soundtrack. (Model synthesis not required).`;
+    }
+    if (canvasModelBadge) {
+      canvasModelBadge.textContent = `Gallery Stitch (${memeSelectedGalleryItems.length} frames · 60 FPS)`;
+      canvasModelBadge.style.color = '#fbbf24';
+    }
+    return;
+  }
+
+  // Mode 1: Latent Morph & Neural Video Mode
+  Array.from(modelSelect.options).forEach(opt => {
+    opt.disabled = false;
+    opt.text = opt.text.replace(' (Morph Only)', '');
+  });
+
+  if (modelVal.includes('wan')) {
+    if (badge) {
+      badge.style.display = 'block';
+      badge.style.background = 'rgba(56, 189, 248, 0.12)';
+      badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+      badge.style.color = '#38bdf8';
+      if (hasPhoto) {
+        badge.innerHTML = `📸 <strong>Wan 2.1 Photo-to-Video:</strong> High-fidelity animation of your uploaded photo using Wan 2.1 3D DiT (16 FPS · 480P).`;
+      } else {
+        badge.innerHTML = `🌊 <strong>Wan 2.1 DiT Active:</strong> Native 16 FPS · Native 480P flow-matching · CFG 5.0. Optimal: 1.5s–3s (17–33 frames). Fits RTX 4060 8GB!`;
+      }
+    }
+    if (fpsSelect) fpsSelect.value = '16';
+    if (canvasModelBadge) {
+      canvasModelBadge.textContent = hasPhoto ? 'Wan 2.1 Photo Animation (16 FPS · Local CUDA)' : 'Wan 2.1 Video DiT (16 FPS · Local CUDA)';
+      canvasModelBadge.style.color = '#38bdf8';
+    }
+    if (canvasResBadge) {
+      if (currentAspect === '16:9') canvasResBadge.textContent = '832 x 480 (16:9 Cinema)';
+      else if (currentAspect === '9:16') canvasResBadge.textContent = '480 x 832 (9:16 Portrait)';
+      else if (currentAspect === '4:3') canvasResBadge.textContent = '704 x 528 (4:3 Classic)';
+      else canvasResBadge.textContent = '624 x 624 (1:1 Square)';
+    }
+  } else if (modelVal.includes('ltx')) {
+    if (badge) {
+      badge.style.display = 'block';
+      badge.style.background = 'rgba(168, 85, 247, 0.12)';
+      badge.style.borderColor = 'rgba(168, 85, 247, 0.4)';
+      badge.style.color = '#c084fc';
+      if (hasPhoto) {
+        badge.innerHTML = `⚠️ <strong>LTX-Video is Text-to-Video only:</strong> Switch to <strong>Wan 2.1</strong> or <strong>SD-Turbo</strong> to animate your uploaded photo!`;
+      } else {
+        badge.innerHTML = `⚡ <strong>LTX-Video DiT Active:</strong> Native 24 FPS · Divisible by 32 (768x448) · Optimal: 1.5s–2s (25–33 frames). Super-fast Lightricks 2B DiT!`;
+      }
+    }
+    if (fpsSelect) fpsSelect.value = '24';
+    if (canvasModelBadge) {
+      canvasModelBadge.textContent = 'LTX-Video 2B DiT (24 FPS · Local CUDA)';
+      canvasModelBadge.style.color = '#c084fc';
+    }
+    if (canvasResBadge) {
+      if (currentAspect === '16:9') canvasResBadge.textContent = '768 x 448 (16:9 Cinema)';
+      else if (currentAspect === '9:16') canvasResBadge.textContent = '448 x 768 (9:16 Portrait)';
+      else canvasResBadge.textContent = '512 x 512 (1:1 Square)';
+    }
+  } else if (modelVal === 'default' || modelVal.includes('turbo')) {
+    if (badge) {
+      badge.style.display = 'block';
+      badge.style.background = 'rgba(34, 197, 94, 0.12)';
+      badge.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+      badge.style.color = '#22c55e';
+      if (hasPhoto) {
+        badge.innerHTML = `📸 <strong>SD-Turbo Photo Flow:</strong> Real-time 60 FPS motion flow animation from uploaded photo (~3s).`;
+      } else {
+        badge.innerHTML = `⚡ <strong>SD-Turbo Morph:</strong> Real-time 60 FPS latent flow morphing (~3s on RTX 4060). Ultra-fast & guaranteed.`;
+      }
+    }
+    if (fpsSelect && fpsSelect.value !== '60' && fpsSelect.value !== '30') fpsSelect.value = '60';
+    if (canvasModelBadge) {
+      canvasModelBadge.textContent = hasPhoto ? 'SD-Turbo Photo Flow (60 FPS · Local CUDA)' : 'SD-Turbo 60 FPS Morph (Local CUDA)';
+      canvasModelBadge.style.color = '#22c55e';
+    }
+    if (canvasResBadge) {
+      canvasResBadge.textContent = '512 x 512 (Real-time Flow)';
+    }
+  } else {
+    if (badge) {
+      badge.style.display = 'block';
+      badge.style.background = 'rgba(245, 158, 11, 0.15)';
+      badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+      badge.style.color = '#fcd34d';
+      badge.innerHTML = `📸 <strong>${formatModelDisplayName(modelVal)} Morph:</strong> High-def 30 FPS latent morph (10–14 HD frames). Recommended: 3s–6s.`;
+    }
+    if (fpsSelect && fpsSelect.value !== '60' && fpsSelect.value !== '30') fpsSelect.value = '30';
+    if (durSelect && (durSelect.value === '30' || durSelect.value === '60' || durSelect.value === 'infinite')) {
+      durSelect.value = '6';
+    }
+    if (canvasModelBadge) {
+      canvasModelBadge.textContent = `${formatModelDisplayName(modelVal)} Latent Morph (30 FPS)`;
+      canvasModelBadge.style.color = '#fcd34d';
+    }
+    if (canvasResBadge) {
+      canvasResBadge.textContent = currentAspect === '16:9' ? '1024 x 576 (HD)' : (currentAspect === '9:16' ? '576 x 1024 (HD)' : '768 x 768 (HD)');
+    }
+  }
+}
+
+let currentStudioTab = 'picture';
+
+function switchStudioTab(tab) {
+  currentStudioTab = tab;
+  const studioModePictureBtn = document.getElementById('studioModePictureBtn');
+  const studioModeVideoBtn = document.getElementById('studioModeVideoBtn');
+  const studioPictureControls = document.getElementById('studioPictureControls');
+  const studioVideoControls = document.getElementById('studioVideoControls');
+  const studioPictureViewport = document.getElementById('studioPictureViewport');
+  const studioVideoViewport = document.getElementById('studioVideoViewport');
+  const studioActiveModeBadge = document.getElementById('studioActiveModeBadge');
+  const memeClownPresetBtn = document.getElementById('memeClownPresetBtn');
+  const studioHeaderIcon = document.getElementById('studioHeaderIcon');
+  const studioCanvasHeaderLabel = document.getElementById('studioCanvasHeaderLabel');
+  const studioArtPromptInput = document.getElementById('studioArtPromptInput');
+  const memePromptInput = document.getElementById('memePromptInput');
+
+  if (tab === 'video') {
+    if (studioModePictureBtn) {
+      studioModePictureBtn.classList.remove('active');
+      studioModePictureBtn.style.color = 'var(--text-muted)';
+      studioModePictureBtn.style.background = 'transparent';
+      studioModePictureBtn.style.borderColor = 'transparent';
+    }
+    if (studioModeVideoBtn) {
+      studioModeVideoBtn.classList.add('active');
+      studioModeVideoBtn.style.color = '#fbbf24';
+      studioModeVideoBtn.style.background = 'rgba(245, 158, 11, 0.18)';
+      studioModeVideoBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    }
+    if (studioPictureControls) studioPictureControls.style.display = 'none';
+    if (studioVideoControls) studioVideoControls.style.display = 'flex';
+    if (studioPictureViewport) studioPictureViewport.style.display = 'none';
+    if (studioVideoViewport) studioVideoViewport.style.display = 'flex';
+    if (studioActiveModeBadge) {
+      studioActiveModeBadge.textContent = '🎬 Video Prompt';
+      studioActiveModeBadge.style.color = '#fbbf24';
+    }
+    if (memeClownPresetBtn) memeClownPresetBtn.style.display = 'inline-block';
+    if (studioHeaderIcon) studioHeaderIcon.textContent = '🎬';
+    if (studioCanvasHeaderLabel) studioCanvasHeaderLabel.textContent = 'Cinema Canvas';
+
+    if (studioArtPromptInput && memePromptInput && studioArtPromptInput.value) {
+      memePromptInput.value = studioArtPromptInput.value;
+    }
+
+    syncVideoModelSettings();
+    updateMemeStitchPicker();
+    start60FpsLoop();
+    redrawMemeCanvas();
+  } else {
+    if (studioModePictureBtn) {
+      studioModePictureBtn.classList.add('active');
+      studioModePictureBtn.style.color = '#c084fc';
+      studioModePictureBtn.style.background = 'rgba(192, 132, 252, 0.15)';
+      studioModePictureBtn.style.borderColor = 'rgba(192, 132, 252, 0.4)';
+    }
+    if (studioModeVideoBtn) {
+      studioModeVideoBtn.classList.remove('active');
+      studioModeVideoBtn.style.color = 'var(--text-muted)';
+      studioModeVideoBtn.style.background = 'transparent';
+      studioModeVideoBtn.style.borderColor = 'transparent';
+    }
+    if (studioPictureControls) studioPictureControls.style.display = 'flex';
+    if (studioVideoControls) studioVideoControls.style.display = 'none';
+    if (studioPictureViewport) studioPictureViewport.style.display = 'flex';
+    if (studioVideoViewport) studioVideoViewport.style.display = 'none';
+    if (studioActiveModeBadge) {
+      studioActiveModeBadge.textContent = '🖼️ Picture Prompt';
+      studioActiveModeBadge.style.color = '#c084fc';
+    }
+    if (memeClownPresetBtn) memeClownPresetBtn.style.display = 'none';
+    if (studioHeaderIcon) studioHeaderIcon.textContent = '🎨';
+    if (studioCanvasHeaderLabel) studioCanvasHeaderLabel.textContent = 'Canvas';
+
+    if (memePromptInput && studioArtPromptInput && memePromptInput.value) {
+      studioArtPromptInput.value = memePromptInput.value;
+    }
+
+    if (memeStudioVideo) {
+      try { memeStudioVideo.pause(); } catch {}
+    }
+    stop60FpsLoop();
+
+    const canvasModelBadge = document.getElementById('studioCanvasModelBadge');
+    const canvasResBadge = document.getElementById('studioCanvasResBadge');
+    const picModelSelect = document.getElementById('studioModelSelect');
+    const picResSelect = document.getElementById('studioArtResolutionSelect');
+    if (canvasModelBadge) {
+      const pModel = picModelSelect?.value || 'SD-Turbo';
+      canvasModelBadge.textContent = `${formatModelDisplayName(pModel)} (Local CUDA)`;
+      canvasModelBadge.style.color = '#c084fc';
+    }
+    if (canvasResBadge && picResSelect) {
+      canvasResBadge.textContent = picResSelect.value || '512 x 512';
+    }
+  }
+}
+
+function animateImageWithWan(imgUrl, filename, prompt) {
+  if (!imgUrl) return;
+  const artModal = document.getElementById('artStudioModal');
+  if (artModal) artModal.classList.remove('hidden');
+  switchStudioTab('video');
+
+  const vSelect = document.getElementById('videoModelSelect');
+  if (vSelect) {
+    vSelect.value = 'wan';
+  }
+
+  const cleanRelative = imgUrl.replace(/^\/v1\/workspace\/files\//, '').replace(/^\/workspace\//, '');
+  memeCustomPhotoUrl = imgUrl;
+  memeCustomPhotoFilename = (filename && filename.includes('/')) ? filename : (cleanRelative || filename || 'photo.png');
+  if (memePhotoPreviewThumbnail) memePhotoPreviewThumbnail.src = imgUrl;
+  if (memePhotoFileName) memePhotoFileName.textContent = (memeCustomPhotoFilename || 'photo.png').split(/[\\/]/).pop() || 'photo.png';
+  if (memePhotoPreviewRow) memePhotoPreviewRow.style.display = 'flex';
+  if (memePhotoClearBtn) memePhotoClearBtn.style.display = 'inline-block';
+  if (memePhotoUploadBtn) memePhotoUploadBtn.textContent = '✅ Photo Loaded (Ready to Animate)';
+
+  if (prompt) {
+    const pInput = document.getElementById('studioArtPromptInput');
+    const mInput = document.getElementById('memePromptInput');
+    if (pInput) pInput.value = prompt;
+    if (mInput) mInput.value = prompt;
+  }
+
+  syncVideoModelSettings();
+
+  const toastMsg = '🎬 Photo loaded into Wan 2.1 Video Studio! Click "Synthesize Cinema Video" to animate.';
+  if (typeof showToast === 'function') {
+    showToast(toastMsg, 'info');
+  }
+}
+
+function openMemeStudio() {
+  const artModal = document.getElementById('artStudioModal');
+  if (artModal) artModal.classList.remove('hidden');
+  if (memeStudioModal) memeStudioModal.classList.remove('hidden');
+  loadStudioGallery();
+  switchStudioTab('video');
+}
+
+function closeMemeStudio() {
+  if (memeStudioModal) memeStudioModal.classList.add('hidden');
+  stop60FpsLoop();
+  stopSoundtrackTrack();
+  if (memeStudioVideo) {
+    try { memeStudioVideo.pause(); } catch {}
+  }
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+function setMemeMode(mode) {
+  memeMode = mode;
+  [memeModeMorphBtn, memeModeStorylineBtn, memeModeStitchBtn].forEach(b => {
+    if (b) {
+      b.classList.remove('active');
+      b.style.color = 'var(--text-muted)';
+      b.style.borderColor = 'rgba(255,255,255,0.1)';
+    }
+  });
+
+  if (memePromptGroup) memePromptGroup.style.display = 'none';
+  if (videoStorylineGroup) videoStorylineGroup.style.display = 'none';
+  if (memeStitchGroup) memeStitchGroup.style.display = 'none';
+
+  if (mode === 'morph') {
+    if (memeModeMorphBtn) {
+      memeModeMorphBtn.classList.add('active');
+      memeModeMorphBtn.style.color = '#fbbf24';
+      memeModeMorphBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    }
+    if (memePromptGroup) memePromptGroup.style.display = 'block';
+  } else if (mode === 'storyline') {
+    if (memeModeStorylineBtn) {
+      memeModeStorylineBtn.classList.add('active');
+      memeModeStorylineBtn.style.color = '#38bdf8';
+      memeModeStorylineBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+    }
+    if (videoStorylineGroup) videoStorylineGroup.style.display = 'block';
+  } else {
+    if (memeModeStitchBtn) {
+      memeModeStitchBtn.classList.add('active');
+      memeModeStitchBtn.style.color = '#fbbf24';
+      memeModeStitchBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    }
+    if (memeStitchGroup) memeStitchGroup.style.display = 'block';
+    updateMemeStitchPicker();
+  }
+  syncVideoModelSettings();
+}
+
+function updateMemeStitchPicker() {
+  if (!memeStitchPickerGrid) return;
+  if (memeSelectedCount) memeSelectedCount.textContent = memeSelectedGalleryItems.length;
+
+  memeStitchPickerGrid.innerHTML = '';
+  const imageOnlyGallery = studioGalleryItems.filter(i => !i.isVideo && !i.isGif && /\.(png|jpe?g|webp)$/i.test(i.name));
+  const query = (memeStitchSearchInput?.value || '').trim().toLowerCase();
+  const itemsToDisplay = query
+    ? imageOnlyGallery.filter(i => (i.name || '').toLowerCase().includes(query) || (i.prompt || '').toLowerCase().includes(query))
+    : imageOnlyGallery;
+
+  if (itemsToDisplay.length === 0) {
+    memeStitchPickerGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); font-size: 10.5px; padding: 16px;">No valid image frames found in gallery${query ? ` matching "${query}"` : ''}.</div>`;
+    return;
+  }
+
+  itemsToDisplay.forEach(item => {
+    const selectedIdx = memeSelectedGalleryItems.findIndex(i => i.name === item.name);
+    const isSelected = selectedIdx >= 0;
+    const thumb = document.createElement('div');
+    thumb.style.cssText = `aspect-ratio: 1; border-radius: 4px; overflow: hidden; cursor: pointer; border: 2px solid ${isSelected ? '#f59e0b' : 'rgba(255,255,255,0.1)'}; position: relative; background: #000; transition: border-color 0.1s ease;`;
+    thumb.title = `${item.name}\n${item.prompt || ''}`;
+    
+    thumb.innerHTML = `
+      <img src="/v1/workspace/files/${item.name}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;" />
+      ${isSelected ? `<span style="position: absolute; top: 2px; right: 2px; background: #f59e0b; color: #000; font-size: 9px; font-weight: 800; border-radius: 4px; padding: 1px 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.8);">#${selectedIdx + 1}</span>` : ''}
+    `;
+
+    thumb.addEventListener('click', () => {
+      toggleMemeGallerySelection(item);
+    });
+
+    memeStitchPickerGrid.appendChild(thumb);
+  });
+}
+
+function toggleMemeGallerySelection(item, forceSelect = false) {
+  const idx = memeSelectedGalleryItems.findIndex(i => i.name === item.name);
+  if (idx >= 0 && !forceSelect) {
+    memeSelectedGalleryItems.splice(idx, 1);
+  } else if (idx < 0) {
+    memeSelectedGalleryItems.push(item);
+  }
+  updateMemeStitchPicker();
+  
+  if (memeSelectedGalleryItems.length > 0) {
+    loadImagesIntoMemeFrames(memeSelectedGalleryItems.map(i => `/v1/workspace/files/${i.name}`));
+  }
+}
+
+async function generateMemeRoast() {
+  const prompt = memePromptInput ? memePromptInput.value : '';
+  const category = memeRoastCategorySelect?.value || 'dev_burn';
+  const spiciness = parseInt(memeRoastSpicinessSelect?.value || '3', 10) || 3;
+  if (memeGenerateRoastBtn) memeGenerateRoastBtn.textContent = '⏳ Roasting...';
+
+  try {
+    const res = await fetch('/v1/meme-studio/roast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, prompt, spiciness }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (memeTopTextInput) memeTopTextInput.value = data.topText || '';
+      if (memeBottomTextInput) memeBottomTextInput.value = data.bottomText || '';
+      if (memeRoastVerdictBox) {
+        memeRoastVerdictBox.style.display = 'block';
+        memeRoastVerdictBox.innerHTML = `"${data.roast}"<br/><span style="color: #fbbf24; font-weight: 700; font-size: 9.5px;">${data.badge || '🔥 ROAST MASTER GENERAL'}</span>`;
+      }
+      redrawMemeCanvas();
+    }
+  } catch (err) {
+    console.warn('generateMemeRoast error:', err);
+  } finally {
+    if (memeGenerateRoastBtn) memeGenerateRoastBtn.textContent = '⚡ Roast Me';
+  }
+}
+
+async function executeMemeRender() {
+  const renderBtn = document.getElementById('memeRenderActionBtn');
+  const spinner = document.getElementById('memeRenderBtnSpinner');
+  const btnText = document.getElementById('memeRenderBtnText');
+  let progressPollTimer = null;
+
+  if (renderBtn) {
+    renderBtn.disabled = true;
+    renderBtn.classList.add('meme-render-btn-active');
+    if (spinner) spinner.style.display = 'inline-block';
+    if (btnText) btnText.textContent = '⏳ Synthesizing Cinema Video on RTX 4060...';
+  }
+  if (memeCanvasLoadingOverlay) memeCanvasLoadingOverlay.style.display = 'flex';
+
+  const topText = memeTopTextInput?.value || '';
+  const bottomText = memeBottomTextInput?.value || '';
+  const style = memeFontStyleSelect?.value || 'impact';
+  const fps = parseInt(videoFpsSelect?.value || '60', 10) || 60;
+  const aspect = videoAspectRatioSelect?.value || '1:1';
+  let width = aspect === '16:9' ? 1024 : (aspect === '9:16' ? 576 : 768);
+  let height = aspect === '16:9' ? 576 : (aspect === '9:16' ? 1024 : 768);
+  const selectedModel = document.getElementById('videoModelSelect')?.value || 'default';
+
+  const durVal = videoDurationSelect?.value || '6';
+  const durationSec = durVal === 'infinite' ? 30 : (parseFloat(durVal) || 6);
+
+  let audioVibe = 'mute';
+  if (memeCustomAudioFilename) {
+    audioVibe = `workspace/${memeCustomAudioFilename}`.replace(/\//g, '\\');
+  }
+  const flowPrompt = '';
+
+  try {
+    let resData;
+    if (memeMode === 'morph') {
+      const pInput = document.getElementById('studioArtPromptInput');
+      const prompt = (pInput?.value || memePromptInput?.value || 'Clown bumping into wall').trim();
+      const isWanModel = selectedModel.toLowerCase().includes('wan');
+      const isLtxModel = selectedModel.toLowerCase().includes('ltx');
+      const isCogModel = selectedModel.toLowerCase().includes('cogvideo');
+      const isSdxlModel = selectedModel.toLowerCase().includes('xl') || selectedModel.toLowerCase().includes('realvis') || selectedModel.toLowerCase().includes('juggernaut');
+
+      let numFrames = 12;
+      let actualTargetFps = fps;
+
+      if (isWanModel) {
+        actualTargetFps = 16;
+        numFrames = (durationSec > 3.5) ? 33 : 17;
+        if (aspect === '16:9') { width = 832; height = 480; }
+        else if (aspect === '9:16') { width = 480; height = 832; }
+        else if (aspect === '4:3') { width = 704; height = 528; }
+        else { width = 624; height = 624; }
+      } else if (isLtxModel) {
+        actualTargetFps = 24;
+        numFrames = (durationSec > 2.0) ? 33 : 25;
+        if (aspect === '16:9') { width = 768; height = 448; }
+        else if (aspect === '9:16') { width = 448; height = 768; }
+        else { width = 512; height = 512; }
+      } else if (isCogModel) {
+        actualTargetFps = 8;
+        numFrames = (durationSec > 4.5) ? 49 : ((durationSec > 2.5) ? 33 : 17);
+        if (aspect === '9:16') { width = 480; height = 720; }
+        else { width = 720; height = 480; }
+      } else if (isSdxlModel) {
+        actualTargetFps = (fps === 60 || fps === 30) ? fps : 30;
+        numFrames = Math.min(14, (durationSec > 6 ? 14 : (durationSec > 3 ? 10 : 8)));
+      } else {
+        if (durationSec > 12) numFrames = 24;
+        else if (durationSec > 6) numFrames = 20;
+        else if (durationSec > 3) numFrames = 16;
+      }
+
+      const isPhotoI2V = Boolean(memeCustomPhotoFilename || memeCustomPhotoUrl);
+      let modelLabel = 'SD-Turbo';
+      let estSeconds = 3;
+      if (isWanModel) {
+        const is33Frames = numFrames >= 25;
+        const estSec = is33Frames ? (isPhotoI2V ? 150 : 165) : (isPhotoI2V ? 50 : 55);
+        const estLabel = is33Frames ? '~2.5-3m' : '~50s';
+        modelLabel = isPhotoI2V ? `Wan 2.1 I2V Photo Animation (${estLabel})` : `Wan 2.1 3D Video DiT (${estLabel})`;
+        estSeconds = estSec;
+      } else if (isLtxModel) {
+        modelLabel = 'LTX-Video 2B DiT (~30s)';
+        estSeconds = 30;
+      } else if (isCogModel) {
+        const estSec = numFrames === 17 ? 35 : (numFrames === 33 ? 55 : 85);
+        modelLabel = `CogVideoX-2B DiT (~${estSec}s)`;
+        estSeconds = estSec;
+      } else if (isSdxlModel) {
+        modelLabel = `${selectedModel.toUpperCase()} Latent Morph (~30s)`;
+        estSeconds = 30;
+      } else if (selectedModel !== 'default') {
+        modelLabel = selectedModel.toUpperCase();
+        estSeconds = 20;
+      }
+
+      const renderStartTime = Date.now();
+      if (btnText) btnText.textContent = `⏳ Synthesizing (${isWanModel ? 'Wan 2.1 DiT' : modelLabel})...`;
+      if (memeLoadingStatusText) {
+        memeLoadingStatusText.innerHTML = `
+          <div style="font-size: 14px; font-weight: 700; color: #fbbf24;">🎬 Synthesizing ${durationSec}s Video (${actualTargetFps} FPS · ${numFrames} frames)</div>
+          <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 3px;">Model: <strong style="color: #38bdf8;">${modelLabel}</strong> on RTX 4060 GPU</div>
+          <div id="memeRenderLiveTicker" style="font-size: 12px; color: #38bdf8; font-family: var(--font-mono, monospace); margin-top: 8px; font-weight: 600;">⏱️ Elapsed: 0s / ~${estSeconds}s · Initializing DiT engine...</div>
+        `;
+      }
+      if (studioProgressBarWrap) studioProgressBarWrap.style.display = 'block';
+      if (studioProgressBarFill) studioProgressBarFill.style.width = '3%';
+
+      progressPollTimer = setInterval(async () => {
+        try {
+          const sRes = await fetch('/v1/art/gpu-status');
+          if (!sRes.ok) return;
+          const sData = await sRes.json();
+          const elapsedSec = Math.floor((Date.now() - renderStartTime) / 1000);
+          const ticker = document.getElementById('memeRenderLiveTicker');
+          if (ticker) {
+            let detail = sData.activeJob?.message || (elapsedSec > 15 ? 'Flow-matching DiT compute active...' : 'Initializing neural weights...');
+            ticker.textContent = `⏱️ Elapsed: ${elapsedSec}s / ~${estSeconds}s · ${detail}`;
+          }
+          if (studioProgressBarFill) {
+            let fillPct = 5;
+            if (sData.activeJob?.percent) {
+              fillPct = Math.max(5, sData.activeJob.percent);
+            } else {
+              fillPct = Math.min(92, Math.floor((elapsedSec / estSeconds) * 90));
+            }
+            studioProgressBarFill.style.width = `${fillPct}%`;
+          }
+        } catch {}
+      }, 1500);
+      let morphModel = selectedModel;
+      if (isPhotoI2V && morphModel.toLowerCase().includes('ltx')) {
+        morphModel = 'wan';
+      }
+
+      const res = await fetch('/v1/meme-studio/generate-gif', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          numFrames,
+          width,
+          height,
+          topText,
+          bottomText,
+          style,
+          fps: actualTargetFps,
+          durationSec,
+          audioVibe,
+          flowPrompt,
+          model: morphModel,
+          image: memeCustomPhotoFilename || memeCustomPhotoUrl || '',
+        }),
+      });
+      resData = await res.json();
+    } else if (memeMode === 'storyline') {
+      const rawChapters = videoStorylineChaptersInput?.value || '';
+      const chapters = rawChapters.split('-->').map(c => c.trim()).filter(c => c.length > 0);
+      if (chapters.length === 0) {
+        showVideoError('Please enter at least 1 storyline chapter separated by -->');
+        if (memeCanvasLoadingOverlay) memeCanvasLoadingOverlay.style.display = 'none';
+        return;
+      }
+      let framesPerChapter = 6;
+      if (durationSec > 12) framesPerChapter = 12;
+      else if (durationSec > 6) framesPerChapter = 8;
+      else if (durationSec <= 3) framesPerChapter = 4;
+
+      let storyModel = selectedModel;
+      if (storyModel.toLowerCase().includes('wan') || storyModel.toLowerCase().includes('ltx')) {
+        storyModel = 'realvis';
+      }
+
+      if (memeLoadingStatusText) memeLoadingStatusText.textContent = `Synthesizing ${chapters.length}-Chapter (${durationSec}s) AI Storyline on RTX 4060...`;
+      const res = await fetch('/v1/meme-studio/storyline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapters, width, height, framesPerChapter, topText, bottomText, style, fps, durationSec, audioVibe, flowPrompt, model: storyModel }),
+      });
+      resData = await res.json();
+    } else {
+      if (memeSelectedGalleryItems.length === 0) {
+        showVideoError('Please select at least 2 gallery images to stitch into a video!');
+        if (memeCanvasLoadingOverlay) memeCanvasLoadingOverlay.style.display = 'none';
+        return;
+      }
+      if (memeLoadingStatusText) memeLoadingStatusText.textContent = `Stitching ${memeSelectedGalleryItems.length} frames into (${durationSec}s) 60 FPS Video with Soundtrack...`;
+      const images = memeSelectedGalleryItems.map(i => i.name);
+      const res = await fetch('/v1/meme-studio/stitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images, topText, bottomText, style, fps, crossfade: 4, durationSec, audioVibe, flowPrompt }),
+      });
+      resData = await res.json();
+    }
+
+    if (resData.success && resData.url) {
+      hideVideoError();
+      memeGeneratedGifUrl = resData.url;
+      const isMp4 = resData.url.toLowerCase().endsWith('.mp4') || resData.url.toLowerCase().endsWith('.webm');
+
+      if (memeDownloadGifBtn) {
+        memeDownloadGifBtn.href = resData.url;
+        memeDownloadGifBtn.textContent = isMp4 ? '🎬 Save 60 FPS Video' : '💾 Save 60 FPS GIF';
+        memeDownloadGifBtn.download = resData.filename?.split(/[\\/]/).pop() || (isMp4 ? 'cinema_video_60fps.mp4' : 'meme_roast_60fps.gif');
+      }
+
+      if (memeCanvasPlaceholder) memeCanvasPlaceholder.style.display = 'none';
+
+      if (isMp4) {
+        playVideoInMemeStudio(resData.url, resData.framesCount || resData.frames_count || (memeSelectedGalleryItems.length || 4000), resData.fps || fps, resData.duration_sec || durationSec, resData.model || selectedModel);
+      } else if (Array.isArray(resData.frame_paths) && resData.frame_paths.length > 0) {
+        const urls = resData.frame_paths.map(p => {
+          const fname = p.split(/[\\/]/).pop();
+          return `/v1/workspace/files/art/${fname}`;
+        });
+        await loadImagesIntoMemeFrames(urls);
+        if (memeCanvasFpsBadge) {
+          const modelTag = formatModelDisplayName(resData.model || selectedModel);
+          memeCanvasFpsBadge.textContent = `⚡ ${resData.fps || fps || 60}.0 FPS (GIF · ${modelTag})`;
+        }
+      } else {
+        await loadImagesIntoMemeFrames([resData.url]);
+        if (memeCanvasFpsBadge) {
+          const modelTag = formatModelDisplayName(resData.model || selectedModel);
+          memeCanvasFpsBadge.textContent = `⚡ ${resData.fps || fps || 60}.0 FPS (GIF · ${modelTag})`;
+        }
+      }
+
+      triggerScreenShake();
+      loadStudioGallery();
+      updateStudioGpuStatus();
+    } else {
+      showVideoError(`Render failed: ${resData.error || 'Unknown error'}`);
+    }
+  } catch (err) {
+    showVideoError(`Render error: ${err.message}`);
+  } finally {
+    if (progressPollTimer) clearInterval(progressPollTimer);
+    if (studioProgressBarWrap) studioProgressBarWrap.style.display = 'none';
+    if (studioProgressBarFill) studioProgressBarFill.style.width = '0%';
+    if (memeCanvasLoadingOverlay) memeCanvasLoadingOverlay.style.display = 'none';
+    if (renderBtn) {
+      renderBtn.disabled = false;
+      renderBtn.classList.remove('meme-render-btn-active');
+      if (spinner) spinner.style.display = 'none';
+      if (btnText) btnText.textContent = '⚡ Synthesize Cinema Video on RTX 4060';
+    }
+  }
+}
+
+function playVideoInMemeStudio(url, framesCount, fps, durationSec, modelName) {
+  stop60FpsLoop();
+  stopSoundtrackTrack();
+  if (typeof stopCustomAudioPreview === 'function') stopCustomAudioPreview();
+  if (memeStudioCanvas) memeStudioCanvas.style.display = 'none';
+  if (memeCanvasPlaceholder) memeCanvasPlaceholder.style.display = 'none';
+  if (memeStudioVideo) {
+    memeStudioVideo.style.display = 'block';
+    memeStudioVideo.src = url;
+    memeStudioVideo.loop = true;
+    memeStudioVideo.muted = false;
+    memeStudioVideo.volume = parseFloat(memeVideoVolumeSlider?.value || '1.0');
+    memeStudioVideo.playbackRate = memeSpeedMultiplier || 1.0;
+    
+    if (memeVideoMuteBtn) {
+      memeVideoMuteBtn.textContent = '🔊 Sound ON';
+      memeVideoMuteBtn.style.color = '#38bdf8';
+    }
+
+    if (memePlayPauseBtn) memePlayPauseBtn.textContent = '⏸️';
+
+    memeStudioVideo.play().then(() => {
+      if (memePlayPauseBtn) memePlayPauseBtn.textContent = '⏸️';
+    }).catch(e => {
+      console.log('Video play notice:', e);
+      if (memePlayPauseBtn) memePlayPauseBtn.textContent = memeStudioVideo.paused ? '▶️' : '⏸️';
+    });
+
+    memeStudioVideo.ontimeupdate = () => {
+      if (memeStudioVideo.duration && memeTimelineScrubber) {
+        memeTimelineScrubber.max = '100';
+        memeTimelineScrubber.value = ((memeStudioVideo.currentTime / memeStudioVideo.duration) * 100).toString();
+      }
+      if (memeTimelineCounter && memeStudioVideo.duration) {
+        memeTimelineCounter.textContent = `${memeStudioVideo.currentTime.toFixed(1)}s / ${memeStudioVideo.duration.toFixed(1)}s (${framesCount || 33} frames @ ${fps || 16} FPS)`;
+      }
+    };
+  }
+  if (memeCanvasFpsBadge) {
+    const modelTag = modelName ? ` · ${formatModelDisplayName(modelName)}` : '';
+    memeCanvasFpsBadge.textContent = `⚡ ${fps || 16}.0 FPS (Video${modelTag})`;
+  }
+}
+
+async function loadImagesIntoMemeFrames(urls) {
+  if (!urls || urls.length === 0) return;
+  if (memeStudioVideo) {
+    memeStudioVideo.pause();
+    memeStudioVideo.style.display = 'none';
+  }
+  if (memeStudioCanvas) memeStudioCanvas.style.display = 'block';
+
+  // If large sequence (e.g. 4,128 images), sample keyframes for instant UI timeline scrubber response
+  const maxUiFrames = 64;
+  let targetUrls = urls;
+  if (urls.length > maxUiFrames) {
+    const step = Math.max(1, Math.floor(urls.length / maxUiFrames));
+    targetUrls = urls.filter((_, i) => i % step === 0).slice(0, maxUiFrames);
+  }
+
+  const loadedPromises = targetUrls.map(url => new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  }));
+
+  const results = await Promise.all(loadedPromises);
+  const loaded = results.filter(Boolean);
+
+  if (loaded.length > 0) {
+    memeFrames = loaded;
+    memeCurrentFrameIndex = 0;
+    pingPongDirection = 1;
+    lastSfxTriggerFrame = -1;
+    memeLoopStartTime = performance.now();
+    if (memeTimelineScrubber) {
+      memeTimelineScrubber.max = (memeFrames.length - 1).toString();
+      memeTimelineScrubber.value = '0';
+    }
+    updateTimelineDisplay();
+    start60FpsLoop();
+    redrawMemeCanvas();
+  }
+}
+
+let memeLoopStartTime = performance.now();
+
+function start60FpsLoop() {
+  stop60FpsLoop();
+  memeLoopStartTime = performance.now();
+  memeLastFrameTime = performance.now();
+  
+  function frameLoop(now) {
+    if (memeIsPlaying && memeFrames.length > 1) {
+      const durVal = videoDurationSelect?.value || '6';
+      const durationSec = durVal === 'infinite' ? 30 : (parseFloat(durVal) || 6);
+      const totalLoopMs = Math.max(500, (durationSec * 1000) / (memeSpeedMultiplier || 1));
+      
+      const elapsed = (now - memeLoopStartTime) % totalLoopMs;
+      const progress = elapsed / totalLoopMs; // 0.0 to 1.0
+      const total = memeFrames.length;
+      const motion = memeMotionSelect?.value || 'linear';
+
+      let virtualIndex = 0;
+      if (motion === 'pingpong') {
+        const pingProgress = progress <= 0.5 ? (progress * 2.0) : ((1.0 - progress) * 2.0);
+        virtualIndex = pingProgress * (total - 1);
+      } else if (motion === 'cubic') {
+        const t = progress;
+        const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        virtualIndex = easeT * total;
+      } else {
+        virtualIndex = progress * total;
+      }
+
+      const frameA = Math.floor(virtualIndex) % total;
+      const frameB = (frameA + 1) % total;
+      const subAlpha = virtualIndex - Math.floor(virtualIndex);
+
+      memeCurrentFrameIndex = frameA;
+
+      // Apex Impact Detection
+      const apexFrame = Math.floor(total / 2);
+      if (frameA === apexFrame && lastSfxTriggerFrame !== apexFrame) {
+        lastSfxTriggerFrame = apexFrame;
+        if (motion === 'bounce' || motion === 'shake') {
+          triggerScreenShake();
+        }
+      } else if (frameA !== apexFrame) {
+        lastSfxTriggerFrame = -1;
+      }
+
+      if (memeTimelineScrubber) memeTimelineScrubber.value = frameA.toString();
+      if (memeTimelineCounter) {
+        const currentSec = (progress * durationSec).toFixed(1);
+        memeTimelineCounter.textContent = `${currentSec}s / ${durationSec.toFixed(0)}s (Frame ${frameA + 1}/${total})`;
+      }
+
+      redrawMemeCanvas(subAlpha, frameB);
+    }
+    
+    memeAnimFrameId = requestAnimationFrame(frameLoop);
+  }
+  
+  memeAnimFrameId = requestAnimationFrame(frameLoop);
+}
+
+function stop60FpsLoop() {
+  if (memeAnimFrameId) {
+    cancelAnimationFrame(memeAnimFrameId);
+    memeAnimFrameId = null;
+  }
+}
+
+function toggleMemePlayPause() {
+  if (memeStudioVideo && memeStudioVideo.style.display !== 'none' && memeStudioVideo.src && !memeStudioVideo.src.endsWith('#')) {
+    if (memeStudioVideo.paused) {
+      memeStudioVideo.play().then(() => {
+        if (memePlayPauseBtn) memePlayPauseBtn.textContent = '⏸️';
+      }).catch((err) => {
+        console.warn('Video play error:', err);
+        if (memePlayPauseBtn) memePlayPauseBtn.textContent = '▶️';
+      });
+    } else {
+      memeStudioVideo.pause();
+      if (memePlayPauseBtn) memePlayPauseBtn.textContent = '▶️';
+    }
+    return;
+  }
+  memeIsPlaying = !memeIsPlaying;
+  if (memePlayPauseBtn) memePlayPauseBtn.textContent = memeIsPlaying ? '⏸️' : '▶️';
+  if (memeIsPlaying) {
+    memeLoopStartTime = performance.now();
+    start60FpsLoop();
+  } else {
+    stop60FpsLoop();
+  }
+}
+
+function updateTimelineDisplay() {
+  if (memeTimelineCounter) {
+    const durVal = videoDurationSelect?.value || '6';
+    const durationSec = durVal === 'infinite' ? 30 : (parseFloat(durVal) || 6);
+    memeTimelineCounter.textContent = `0.0s / ${durationSec.toFixed(0)}s (${memeCurrentFrameIndex + 1} / ${Math.max(1, memeFrames.length)})`;
+  }
+}
+
+function redrawMemeCanvas(subAlpha = 0, nextFrameIndex = null) {
+  if (!memeStudioCanvas) return;
+  const ctx = memeStudioCanvas.getContext('2d');
+  const w = memeStudioCanvas.width;
+  const h = memeStudioCanvas.height;
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, w, h);
+
+  if (memeFrames.length > 0 && memeFrames[memeCurrentFrameIndex]) {
+    const currentImg = memeFrames[memeCurrentFrameIndex];
+    ctx.drawImage(currentImg, 0, 0, w, h);
+
+    // Smooth sub-frame blend for 60 FPS continuous morphing
+    if (subAlpha > 0.01 && nextFrameIndex !== null && memeFrames[nextFrameIndex]) {
+      ctx.save();
+      ctx.globalAlpha = subAlpha;
+      ctx.drawImage(memeFrames[nextFrameIndex], 0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
+  // Draw Sticker & Overlay
+  const sticker = memeStickerSelect?.value || 'none';
+  if (sticker === 'wasted') {
+    // Red radial vignette
+    const grad = ctx.createRadialGradient(w/2, h/2, w*0.2, w/2, h/2, w*0.7);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(180,0,0,0.65)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (sticker === 'sunglasses') {
+    // 8-bit black shades
+    ctx.fillStyle = '#000000';
+    const sy = h * 0.38;
+    const sw = w * 0.5;
+    const sx = (w - sw) / 2;
+    ctx.fillRect(sx, sy, sw * 0.45, h * 0.1);
+    ctx.fillRect(sx + sw * 0.55, sy, sw * 0.45, h * 0.1);
+    ctx.fillRect(sx + sw * 0.4, sy + h * 0.02, sw * 0.2, h * 0.03);
+    // White pixel glare
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(sx + sw * 0.05, sy + h * 0.02, sw * 0.1, h * 0.02);
+    ctx.fillRect(sx + sw * 0.6, sy + h * 0.02, sw * 0.1, h * 0.02);
+  }
+
+  // Draw Top & Bottom Text
+  const topText = (memeTopTextInput?.value || '').trim();
+  const bottomText = (memeBottomTextInput?.value || '').trim();
+  const style = memeFontStyleSelect?.value || 'impact';
+
+  if (!topText && !bottomText && memeFrames.length === 0) {
+    if (memeCanvasPlaceholder) memeCanvasPlaceholder.style.display = 'flex';
+    return;
+  }
+  if (memeCanvasPlaceholder) memeCanvasPlaceholder.style.display = 'none';
+
+  function drawText(text, isTop = true) {
+    if (!text) return;
+    const chosenFamily = memeFontFamilySelect?.value || 'Impact';
+    const chosenSize = parseInt(memeFontSizeRange?.value || '36', 10);
+    const weightStr = isMemeBold ? 'bold' : 'normal';
+    const italicStr = isMemeItalic ? 'italic' : 'normal';
+
+    const txt = chosenFamily === 'Impact' ? text.toUpperCase() : text;
+    const words = txt.split(' ');
+    const maxAllowedW = w * 0.90;
+    const maxAllowedH = h * 0.35;
+
+    let fontSize = Math.min(Math.max(14, chosenSize), 64);
+    let lines = [];
+
+    // Iteratively scale font down if lines exceed width or height
+    for (let fs = fontSize; fs >= 11; fs -= 2) {
+      ctx.font = `${italicStr} ${weightStr} ${fs}px "${chosenFamily}", Impact, sans-serif`;
+      lines = [];
+      let curLine = [];
+      let tooWide = false;
+
+      for (const word of words) {
+        const testLine = [...curLine, word].join(' ');
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxAllowedW) {
+          if (curLine.length > 0) {
+            lines.push(curLine.join(' '));
+            curLine = [word];
+            if (ctx.measureText(word).width > maxAllowedW) {
+              tooWide = true;
+              break;
+            }
+          } else {
+            tooWide = true;
+            break;
+          }
+        } else {
+          curLine.push(word);
+        }
+      }
+      if (curLine.length > 0) lines.push(curLine.join(' '));
+
+      const lineHeight = Math.floor(fs * 1.18);
+      const totalH = lines.length * lineHeight;
+      if (!tooWide && totalH <= maxAllowedH) {
+        fontSize = fs;
+        break;
+      }
+    }
+
+    ctx.font = `${italicStr} ${weightStr} ${fontSize}px "${chosenFamily}", Impact, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    let fillColor = '#ffffff';
+    let strokeColor = '#000000';
+    if (style === 'neon') {
+      fillColor = '#38bdf8';
+      ctx.shadowColor = '#0284c7';
+      ctx.shadowBlur = 12;
+    } else if (style === 'retro') {
+      fillColor = '#facc15';
+    }
+
+    const lineHeight = Math.floor(fontSize * 1.18);
+    const startY = isTop ? (24 + (lineHeight / 2)) : (h - 24 - ((lines.length - 1) * lineHeight) - (lineHeight / 2));
+
+    lines.forEach((line, idx) => {
+      const y = startY + (idx * lineHeight);
+      ctx.lineWidth = Math.max(3, Math.floor(fontSize / 6));
+      ctx.strokeStyle = strokeColor;
+      ctx.strokeText(line, w / 2, y);
+      ctx.fillStyle = fillColor;
+      ctx.fillText(line, w / 2, y);
+    });
+
+    ctx.shadowBlur = 0;
+  }
+
+  drawText(topText, true);
+  drawText(bottomText, false);
+}
+
+function export60FpsWebm() {
+  if (!memeStudioCanvas || memeFrames.length === 0) {
+    alert('Please synthesize a video sequence first!');
+    return;
+  }
+
+  try {
+    const fps = parseInt(videoFpsSelect?.value || '60', 10) || 60;
+    const durVal = videoDurationSelect?.value || '6';
+    const durationSec = durVal === 'infinite' ? 30 : (parseFloat(durVal) || 6);
+    const totalRecMs = durationSec * 1000;
+
+    const canvasStream = memeStudioCanvas.captureStream(fps);
+    
+    // Mix Web Audio Soundtrack into the stream if audio is enabled
+    const ctx = getMemeAudioContext();
+    let combinedStream = canvasStream;
+    let audioDest = null;
+    const sfxVal = memeSfxSelect?.value || 'synthwave';
+
+    if (ctx && isMemeSfxEnabled && sfxVal !== 'mute') {
+      audioDest = ctx.createMediaStreamDestination();
+      startSoundtrackTrack(sfxVal, audioDest);
+      const audioTracks = audioDest.stream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        combinedStream = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...audioTracks,
+        ]);
+      }
+    }
+
+    const mediaRecorder = new MediaRecorder(combinedStream, {
+      mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm',
+      videoBitsPerSecond: 8000000,
+    });
+
+    const chunks = [];
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    const originalBtn = memeExportWebmBtn;
+    const originalBtnHtml = originalBtn ? originalBtn.innerHTML : '🎬 Save 60 FPS Video';
+
+    mediaRecorder.onstop = () => {
+      if (originalBtn) originalBtn.innerHTML = originalBtnHtml;
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nexus_cinema_${durationSec}s_${Date.now()}.webm`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    };
+
+    mediaRecorder.start();
+    memeIsPlaying = true;
+    memeLoopStartTime = performance.now();
+    memeCurrentFrameIndex = 0;
+
+    const recStartTime = Date.now();
+    const progressInterval = setInterval(() => {
+      const elapsedSec = ((Date.now() - recStartTime) / 1000);
+      if (originalBtn) {
+        originalBtn.innerHTML = `🔴 Recording ${elapsedSec.toFixed(1)}s / ${durationSec.toFixed(0)}s...`;
+      }
+    }, 150);
+
+    setTimeout(() => {
+      clearInterval(progressInterval);
+      if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    }, totalRecMs);
+
+  } catch (err) {
+    alert(`WebM export failed: ${err.message}`);
+  }
+}
+
+// ==========================================================================
+// Embedded Web Browser Modal & Native Launcher
+
+
+// Provider Balances & Credits Modal
+function initBalancesModal() {
+  const openBtn = document.getElementById('openBalancesModalBtn');
+  const modal = document.getElementById('balancesModal');
+  const closeBtn = document.getElementById('closeBalancesModalBtn');
+  const doneBtn = document.getElementById('balancesDoneBtn');
+  const refreshBtn = document.getElementById('refreshBalancesBtn');
+  const badge = document.getElementById('navLiveBalanceBadge');
+
+  const summaryTotal = document.getElementById('balanceSummaryTotal');
+  const summarySpent = document.getElementById('balanceSummarySpent');
+  const summaryTokens = document.getElementById('balanceSummaryTokens');
+  const summaryProviders = document.getElementById('balanceSummaryProviders');
+  const grid = document.getElementById('providerBalancesGrid');
+
+  if (!openBtn || !modal) return;
+
+  async function loadBalances() {
+    if (refreshBtn) refreshBtn.textContent = '⏳ Loading...';
+    try {
+      const res = await fetch('/v1/provider-balances', { headers: adminHeaders() });
+      if (!res.ok) throw new Error('Failed to load balances');
+      const data = await res.json();
+      
+      const totalBalanceUsd = data.totalLiveBalanceUsd || 0;
+      const totalSpentUsd = data.totalLifetimeSpentUsd || 0;
+      const totalTokens = data.totalLifetimeTokens || 0;
+      const providers = data.providers || [];
+
+      if (badge) {
+        badge.textContent = formatCurrency(totalBalanceUsd, 2);
+      }
+      if (summaryTotal) summaryTotal.textContent = formatCurrency(totalBalanceUsd, 2);
+      if (summarySpent) summarySpent.textContent = formatCurrency(totalSpentUsd, 2);
+      if (summaryTokens) summaryTokens.textContent = (totalTokens > 1000000 ? (totalTokens / 1000000).toFixed(2) + 'M' : totalTokens.toLocaleString()) + ' tokens';
+      if (summaryProviders) summaryProviders.textContent = providers.length;
+
+      if (grid) {
+        grid.innerHTML = providers.map(p => {
+          const isFree = p.tier && p.tier.includes('Free');
+          const isUnlimited = p.tier && p.tier.includes('Unlimited');
+          
+          let balanceDisplay = '';
+          if (p.hasLiveBalance) {
+            balanceDisplay = `<div style="font-size: 1.25rem; font-weight: 700; color: ${p.balanceUsd > 0.5 ? '#22c55e' : (p.balanceUsd > 0.05 ? '#f59e0b' : '#ef4444')};">
+              ${formatCurrency(p.balanceUsd, 2)} <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 400;">remaining</span>
+            </div>`;
+          } else if (isUnlimited) {
+            balanceDisplay = `<div style="font-size: 1.15rem; font-weight: 700; color: #22c55e;">♾️ Unlimited <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 400;">(Local GPU)</span></div>`;
+          } else if (isFree) {
+            balanceDisplay = `<div style="font-size: 1.15rem; font-weight: 700; color: #38bdf8;">🎁 ${p.tier}</div>`;
+          } else {
+            balanceDisplay = `<div style="font-size: 1.15rem; font-weight: 700; color: #94a3b8;">${p.tier || 'Pay-as-you-go'}</div>`;
+          }
+
+          let extraInfo = '';
+          if (p.totalCreditsUsd !== undefined && p.totalUsageUsd !== undefined) {
+            extraInfo = `<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">
+              Credits: <strong>${formatCurrency(p.totalCreditsUsd, 2)}</strong> · Used: <strong>${formatCurrency(p.totalUsageUsd, 2)}</strong>
+            </div>`;
+          } else if (p.toppedUpUsd !== undefined) {
+            extraInfo = `<div style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">
+              Topped Up: <strong>${formatCurrency(p.toppedUpUsd, 2)}</strong>
+            </div>`;
+          }
+
+          const statusColor = p.status === 'active' ? '#22c55e' : (p.status === 'depleted' ? '#ef4444' : '#f59e0b');
+
+          return `
+            <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                  <div>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">${p.displayName}</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;">${p.badge}</div>
+                  </div>
+                  <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; background: ${statusColor}18; color: ${statusColor}; border: 1px solid ${statusColor}40;">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: ${statusColor};"></span>
+                    ${p.status.toUpperCase()}
+                  </span>
+                </div>
+                
+                <div style="margin-top: 10px; margin-bottom: 8px;">
+                  ${balanceDisplay}
+                  ${extraInfo}
+                </div>
+              </div>
+
+              <div style="border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 10px; margin-top: 8px; font-size: 0.78rem; color: #94a3b8; display: flex; justify-content: space-between;">
+                <span>Spent: <strong style="color: #cbd5e1;">${formatCurrency(p.totalSpentUsd, 4)}</strong></span>
+                <span>Tokens: <strong style="color: #cbd5e1;">${p.totalTokens > 1000 ? (p.totalTokens / 1000).toFixed(1) + 'k' : p.totalTokens}</strong></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } catch (e) {
+      console.error('Failed to load balances:', e);
+    } finally {
+      if (refreshBtn) refreshBtn.textContent = '🔄 Refresh';
+    }
+  }
+
+  openBtn.addEventListener('click', () => {
+    modal.classList.remove('hidden');
+    loadBalances();
+  });
+
+  if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (doneBtn) doneBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadBalances());
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+
+  loadBalances();
+  setInterval(loadBalances, 60000);
+}
+
 init();
+initMemeStudio();
+initBalancesModal();
+initHfHub();
+initCivitaiHub();
+initKeyBait();
+initUniversalModalMaximized();
+
+// ==========================================================================
+// Universal Auto-Select Model in Dropdowns & Pickers
+// ==========================================================================
+function selectModelInDropdowns(targetModelId, friendlyName) {
+  if (!targetModelId) return;
+  const cleanTarget = String(targetModelId).trim();
+  const lowerTarget = cleanTarget.toLowerCase();
+
+  // 1. Update Main Chat Model Select
+  const mainSelect = document.getElementById('modelSelect');
+  if (mainSelect) {
+    let matchedOption = Array.from(mainSelect.options).find(o => 
+      o.value.toLowerCase() === lowerTarget ||
+      o.value.toLowerCase() === `local/${lowerTarget}` ||
+      o.value.toLowerCase().endsWith(`/${lowerTarget}`) ||
+      (lowerTarget.includes('hermes') && o.value.toLowerCase().includes('hermes')) ||
+      (o.textContent && o.textContent.toLowerCase().includes(lowerTarget))
+    );
+
+    if (!matchedOption) {
+      const optgroup = document.getElementById('localModelsOptgroup') || mainSelect.querySelector('optgroup') || mainSelect;
+      matchedOption = document.createElement('option');
+      matchedOption.value = cleanTarget.startsWith('local/') ? cleanTarget : `local/${cleanTarget}`;
+      matchedOption.textContent = friendlyName ? `🧠 ${friendlyName} (Offline Local)` : `🧠 ${cleanTarget} (Offline Local)`;
+      optgroup.appendChild(matchedOption);
+    }
+
+    mainSelect.value = matchedOption.value;
+    try {
+      localStorage.setItem('nexus_selected_model', matchedOption.value);
+    } catch {}
+
+    if (typeof updateModelPickerDisplay === 'function') updateModelPickerDisplay();
+    if (typeof renderFoldedModelPicker === 'function') renderFoldedModelPicker();
+    mainSelect.dispatchEvent(new Event('change'));
+  }
+
+  // 2. Update Studio Lyricist / AI Model Select (if exists in Studio)
+  const studioModelSelect = document.getElementById('studioModelSelect');
+  if (studioModelSelect) {
+    let studioOpt = Array.from(studioModelSelect.options).find(o =>
+      o.value.toLowerCase() === lowerTarget ||
+      o.value.toLowerCase().includes(lowerTarget) ||
+      (lowerTarget.includes('hermes') && o.value.toLowerCase().includes('hermes'))
+    );
+    if (!studioOpt) {
+      studioOpt = document.createElement('option');
+      studioOpt.value = cleanTarget;
+      studioOpt.textContent = `🧠 ${cleanTarget} (Local Offline AI)`;
+      studioModelSelect.appendChild(studioOpt);
+    }
+    studioModelSelect.value = studioOpt.value;
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`🎯 Auto-selected model: ${friendlyName || cleanTarget}`, 'success');
+  }
+}
+
+// ==========================================================================
+// Universal Sub-Screen / Modal Maximize (Fullscreen Zen Mode) Handler
+// ==========================================================================
+function initUniversalModalMaximized() {
+  async function toggleMaximized(maxBtn) {
+    const overlay = maxBtn.closest('.modal-overlay');
+    if (!overlay) return;
+
+    const isMax = overlay.classList.toggle('modal-maximized');
+    if (overlay.id === 'meshModal') {
+      overlay.classList.toggle('zen-mode', isMax);
+      if (typeof isMeshFullscreen !== 'undefined') isMeshFullscreen = isMax;
+    }
+
+    document.body.classList.toggle('modal-zen-active', isMax);
+
+    // HTML5 Fullscreen API Integration for Mobile Phones and Desktop
+    try {
+      const isDocFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (isMax && !isDocFs) {
+        if (overlay.requestFullscreen) {
+          await overlay.requestFullscreen().catch(() => {});
+        } else if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        } else if (document.documentElement.webkitRequestFullscreen) {
+          document.documentElement.webkitRequestFullscreen();
+        }
+      } else if (!isMax && isDocFs) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+    } catch (fsErr) {
+      console.warn('[Fullscreen API]', fsErr);
+    }
+
+    maxBtn.textContent = isMax ? '🗗' : '⛶';
+    maxBtn.title = isMax ? 'Exit Fullscreen' : 'Toggle Fullscreen';
+    maxBtn.classList.toggle('active', isMax);
+
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  document.addEventListener('click', (e) => {
+    const maxBtn = e.target.closest('.modal-maximize-btn');
+    if (!maxBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleMaximized(maxBtn);
+  });
+
+  document.addEventListener('touchend', (e) => {
+    const maxBtn = e.target.closest('.modal-maximize-btn');
+    if (!maxBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleMaximized(maxBtn);
+  }, { passive: false });
+
+  // Sync state if user exits via browser gesture / Escape
+  function handleFullscreenChange() {
+    const isDocFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (!isDocFs) {
+      document.querySelectorAll('.modal-overlay.modal-maximized').forEach(overlay => {
+        const maxBtn = overlay.querySelector('.modal-maximize-btn');
+        if (maxBtn && !overlay.classList.contains('zen-mode')) {
+          overlay.classList.remove('modal-maximized');
+          maxBtn.textContent = '⛶';
+          maxBtn.title = 'Toggle Fullscreen';
+          maxBtn.classList.remove('active');
+        }
+      });
+      document.body.classList.remove('modal-zen-active');
+    }
+  }
+
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+  // Global Escape key exits maximized mode first before closing modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const activeMaxOverlay = document.querySelector('.modal-overlay.modal-maximized:not(.hidden)');
+      if (activeMaxOverlay) {
+        activeMaxOverlay.classList.remove('modal-maximized');
+        document.body.classList.remove('modal-zen-active');
+        if (activeMaxOverlay.id === 'meshModal') {
+          activeMaxOverlay.classList.remove('zen-mode');
+          if (typeof isMeshFullscreen !== 'undefined') isMeshFullscreen = false;
+        }
+        const maxBtn = activeMaxOverlay.querySelector('.modal-maximize-btn');
+        if (maxBtn) {
+          maxBtn.textContent = '⛶';
+          maxBtn.title = 'Toggle Fullscreen';
+          maxBtn.classList.remove('active');
+        }
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          try {
+            if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+          } catch {}
+        }
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        window.dispatchEvent(new Event('resize'));
+      }
+    }
+  }, true);
+}
+
+// ==========================================================================
+// Hugging Face Model Hub Workstation (SDXL, LoRAs & Offline GGUFs)
+// ==========================================================================
+function initHfHub() {
+  const hfModal = document.getElementById('hfHubModal');
+  const openBtn = document.getElementById('openHfHubModalBtn');
+  const closeBtn = document.getElementById('closeHfHubModalBtn');
+  const openCacheFolderBtn = document.getElementById('hfOpenCacheFolderBtn');
+  const categoryTabs = document.getElementById('hfCategoryTabs');
+  const sortSelect = document.getElementById('hfSortSelect');
+  const refreshBtn = document.getElementById('hfRefreshBtn');
+  const searchInput = document.getElementById('hfSearchInput');
+  const searchBtn = document.getElementById('hfSearchBtn');
+  const quickPills = document.getElementById('hfQuickPills');
+  const modelGrid = document.getElementById('hfModelGrid');
+  const modelLoading = document.getElementById('hfModelLoading');
+  const installedBadge = document.getElementById('hfInstalledBadge');
+  const installedCountLabel = document.getElementById('hfInstalledCountLabel');
+
+  // Live download banner elements
+  const downloadBanner = document.getElementById('hfDownloadBanner');
+  const downloadRepoLabel = document.getElementById('hfDownloadRepoLabel');
+  const downloadStatusMsg = document.getElementById('hfDownloadStatusMsg');
+  const downloadPercentLabel = document.getElementById('hfDownloadPercentLabel');
+  const downloadProgressBar = document.getElementById('hfDownloadProgressBar');
+  const cancelDownloadBtn = document.getElementById('hfCancelDownloadBtn');
+
+  // Direct puller & token
+  const directPullInput = document.getElementById('hfDirectPullInput');
+  const directPullType = document.getElementById('hfDirectPullType');
+  const directPullBtn = document.getElementById('hfDirectPullBtn');
+  const userTokenInput = document.getElementById('hfUserTokenInput');
+  const saveUserTokenBtn = document.getElementById('hfSaveUserTokenBtn');
+
+  // 8GB Safe Filter & File Inspector
+  const safe8gbFilter = document.getElementById('hf8gbSafeFilter');
+  const inspectorModal = document.getElementById('hfFileInspectorModal');
+  const inspectorTitle = document.getElementById('hfInspectorRepoTitle');
+  const inspectorFileList = document.getElementById('hfInspectorFileList');
+  const inspectorSummaryText = document.getElementById('hfInspectorSummaryText');
+  const inspector8gbOnlyToggle = document.getElementById('hfInspector8gbOnlyToggle');
+  const closeInspectorBtn = document.getElementById('closeHfInspectorBtn');
+  const closeInspectorFooterBtn = document.getElementById('closeHfInspectorFooterBtn');
+
+  // In-App README & Preview Images Modal Elements
+  const readmeModal = document.getElementById('hfModelReadmeModal');
+  const readmeTitle = document.getElementById('hfReadmeModalRepoTitle');
+  const readmeGatedBadge = document.getElementById('hfReadmeModalGatedBadge');
+  const readmeTypeBadge = document.getElementById('hfReadmeModalTypeBadge');
+  const readmeSubTitle = document.getElementById('hfReadmeModalSubTitle');
+  const closeReadmeBtn = document.getElementById('closeHfReadmeModalBtn');
+  const closeReadmeFooterBtn = document.getElementById('closeHfReadmeModalFooterBtn');
+  const tabPreviewsBtn = document.getElementById('hfTabPreviewsBtn');
+  const tabReadmeBtn = document.getElementById('hfTabReadmeBtn');
+  const previewsContent = document.getElementById('hfReadmePreviewsContent');
+  const previewsLoading = document.getElementById('hfReadmePreviewsLoading');
+  const previewsGrid = document.getElementById('hfReadmePreviewsGrid');
+  const docContent = document.getElementById('hfReadmeDocContent');
+  const docContainer = document.getElementById('hfReadmeDocContainer');
+  const imgCountSpan = document.getElementById('hfReadmeImgCount');
+  const triggerBanner = document.getElementById('hfReadmeTriggerWordsBanner');
+  const triggerList = document.getElementById('hfReadmeTriggerWordsList');
+  const useTriggerInArtBtn = document.getElementById('hfReadmeUseTriggerInArtBtn');
+  const quickActions = document.getElementById('hfReadmeQuickActions');
+  const inspectFilesBtn = document.getElementById('hfReadmeInspectFilesBtn');
+  const externalHfLink = document.getElementById('hfReadmeExternalLink');
+
+  // Lightbox Elements
+  const lightboxModal = document.getElementById('hfImageLightboxModal');
+  const lightboxImg = document.getElementById('hfLightboxImage');
+  const lightboxCaption = document.getElementById('hfLightboxCaption');
+  const lightboxDownloadLink = document.getElementById('hfLightboxDownloadLink');
+  const closeLightboxBtn = document.getElementById('closeHfLightboxBtn');
+
+  if (!hfModal || !openBtn) return;
+
+  let currentCategory = 'all';
+  let currentSearchQuery = '';
+  let currentSort = 'downloads';
+  let downloadPollTimer = null;
+  let cachedInstalledData = null;
+  let cachedFetchedModels = [];
+  let currentInspectorRepo = '';
+  let currentInspectorType = 'auto';
+  let cachedInspectorFiles = [];
+  let cachedInspectorRecommended = null;
+
+  function selectModelForArtStudio(modelId) {
+    const isLora = modelId.toLowerCase().includes('lora');
+    const studioModelSelect = document.getElementById('studioModelSelect');
+    const studioLoraSelect = document.getElementById('studioLoraSelect');
+    const studioLcmNotice = document.getElementById('studioLcmNotice');
+    const studioRenderModeSelect = document.getElementById('studioRenderModeSelect');
+    const studioGuidanceInput = document.getElementById('studioGuidanceInput');
+
+    if (isLora) {
+      if (studioLoraSelect) {
+        let opt = Array.from(studioLoraSelect.options).find(o => o.value === modelId);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = modelId;
+          opt.textContent = `🎭 ${modelId} (GPU Cached LoRA)`;
+          studioLoraSelect.appendChild(opt);
+        }
+        studioLoraSelect.value = modelId;
+      }
+      // Ensure base model is set to an SDXL checkpoint
+      if (studioModelSelect && !studioModelSelect.value.toLowerCase().includes('xl')) {
+        studioModelSelect.value = 'stabilityai/stable-diffusion-xl-base-1.0';
+      }
+      // If LCM-LoRA, optimize settings
+      if (modelId.toLowerCase().includes('lcm')) {
+        if (studioLcmNotice) studioLcmNotice.style.display = 'block';
+        if (studioRenderModeSelect) studioRenderModeSelect.value = 'fast';
+        if (studioGuidanceInput) studioGuidanceInput.value = '1.5';
+      }
+    } else {
+      if (studioModelSelect) {
+        let opt = Array.from(studioModelSelect.options).find(o => o.value === modelId);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = modelId;
+          opt.textContent = `🎨 ${modelId} (GPU Cached)`;
+          studioModelSelect.appendChild(opt);
+        }
+        studioModelSelect.value = modelId;
+      }
+    }
+    hfModal.classList.add('hidden');
+    const artStudioModal = document.getElementById('artStudioModal');
+    if (artStudioModal) {
+      artStudioModal.classList.remove('hidden');
+      const promptInput = document.getElementById('studioArtPromptInput') || document.getElementById('studioPromptInput');
+      if (promptInput) promptInput.focus();
+    }
+  }
+
+  function selectModelForVideoStudio(modelId) {
+    const videoModelSelect = document.getElementById('videoModelSelect');
+    if (videoModelSelect) {
+      let opt = Array.from(videoModelSelect.options).find(o => o.value === modelId || o.value.toLowerCase().includes(modelId.toLowerCase()));
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = modelId;
+        opt.textContent = `🎬 ${modelId} (DiT Video)`;
+        videoModelSelect.appendChild(opt);
+      }
+      videoModelSelect.value = opt.value;
+    }
+    hfModal.classList.add('hidden');
+    const memeStudioModal = document.getElementById('memeStudioModal');
+    if (memeStudioModal) {
+      memeStudioModal.classList.remove('hidden');
+      const promptInput = document.getElementById('memePromptInput');
+      if (promptInput) promptInput.focus();
+    }
+  }
+
+  function selectModelForChat(modelId) {
+    selectModelInDropdowns(modelId);
+    hfModal.classList.add('hidden');
+    const promptInput = document.getElementById('promptInput');
+    if (promptInput) promptInput.focus();
+  }
+
+  async function deleteModel(repoId, type) {
+    const isGguf = type === 'gguf' || repoId.includes(':');
+    const label = isGguf ? `Offline GGUF model "${repoId}"` : `GPU checkpoint "${repoId}"`;
+    if (!confirm(`Are you sure you want to delete ${label} from your disk? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch('/v1/hf/delete', {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({ repoId, type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      await loadHfInstalled();
+      if (currentCategory === 'installed') {
+        renderHfInstalledCards(cachedInstalledData);
+      } else {
+        loadHfModels(currentCategory, currentSearchQuery, currentSort);
+      }
+      if (typeof loadDynamicLocalModels === 'function' && isGguf) {
+        loadDynamicLocalModels();
+      }
+    } catch (err) {
+      alert(`Failed to delete model: ${err.message}`);
+    }
+  }
+
+  async function cleanIncompleteStubs() {
+    if (!confirm('Remove all aborted / 0 MB incomplete download stubs (< 5 MB) from Hugging Face cache?')) {
+      return;
+    }
+    try {
+      const res = await fetch('/v1/hf/clean-incomplete', {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Clean failed');
+      await loadHfInstalled();
+      renderHfInstalledCards(cachedInstalledData);
+    } catch (err) {
+      alert(`Failed to clean incomplete downloads: ${err.message}`);
+    }
+  }
+
+  async function loadHfInstalled() {
+    try {
+      const res = await fetch('/v1/hf/installed', { headers: adminHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) {
+        cachedInstalledData = data;
+        const total = (data.artModelsCount || 0) + (data.ollamaModelsCount || 0);
+        if (installedBadge) installedBadge.textContent = `${total} Models Installed`;
+        if (installedCountLabel) installedCountLabel.textContent = String(total);
+
+        // Populate Art Studio LoRA selector with cached LoRAs in dedicated optgroup
+        const studioLoraSelect = document.getElementById('studioLoraSelect');
+        if (studioLoraSelect && Array.isArray(data.artModels)) {
+          const loras = data.artModels.filter(m => !m.isIncomplete && (m.type === 'lora' || m.repoId.toLowerCase().includes('lora')));
+          let hfOptgroup = document.getElementById('studioHfLorasOptgroup');
+          if (!hfOptgroup) {
+            hfOptgroup = document.createElement('optgroup');
+            hfOptgroup.id = 'studioHfLorasOptgroup';
+            hfOptgroup.label = '🤗 Hugging Face LoRAs';
+            studioLoraSelect.appendChild(hfOptgroup);
+          }
+          hfOptgroup.innerHTML = '';
+          for (const lm of loras) {
+            const isLcm = lm.repoId.toLowerCase().includes('lcm');
+            const opt = document.createElement('option');
+            opt.value = lm.repoId;
+            opt.textContent = `${isLcm ? '⚡' : '🎭'} ${lm.repoId} (${lm.sizeFormatted || 'LoRA'})`;
+            hfOptgroup.appendChild(opt);
+          }
+          hfOptgroup.style.display = loras.length > 0 ? '' : 'none';
+        }
+
+        if (typeof syncCivitaiInstalledToStudio === 'function') {
+          syncCivitaiInstalledToStudio();
+        }
+
+        if (currentCategory === 'installed') {
+          renderHfInstalledCards(cachedInstalledData);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load installed HF models:', err);
+    }
+  }
+
+  function renderHfInstalledCards(data) {
+    if (!modelGrid) return;
+    if (modelLoading) modelLoading.style.display = 'none';
+
+    const artModels = data?.artModels || [];
+    const ollamaModels = data?.ollamaModels || [];
+    const totalCount = artModels.length + ollamaModels.length;
+
+    if (totalCount === 0) {
+      modelGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+          <div style="font-size: 36px; margin-bottom: 12px;">💾</div>
+          <div style="font-weight: 700; font-size: 16px; color: #f8fafc;">No models installed in cache yet</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px; max-width: 500px; margin-left: auto; margin-right: auto;">
+            Use the category tabs above (SDXL, LoRAs, Offline AI LLMs) or the Direct Pull bar below to download models onto your RTX 4060 GPU with 1-click.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    let cardsHtml = '';
+
+    // Notice banner for incomplete stubs if detected
+    if (data.incompleteCount > 0) {
+      cardsHtml += `
+        <div style="grid-column: 1 / -1; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="font-size: 12px; color: #fca5a5; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span>
+            <span>Found <strong>${data.incompleteCount} incomplete/aborted downloads</strong> in cache (under 5 MB, missing weights).</span>
+          </div>
+          <button type="button" id="hfCleanAllIncompleteBtn" class="action-tag-btn" style="color: #f87171; border-color: rgba(248, 113, 113, 0.5); font-size: 11px; font-weight: 700; padding: 4px 12px; cursor: pointer;">🧹 Clean All Incomplete Stubs</button>
+        </div>
+      `;
+    }
+
+    // Render SDXL, DiT, LoRA and GGUF models in HF Hub cache
+    for (const m of artModels) {
+      const isGguf = m.type === 'gguf' || (m.repoId && m.repoId.toLowerCase().includes('gguf')) || !!m.ggufFilePath;
+      const isLora = m.type === 'lora';
+      const isDit = m.type === 'dit' || m.repoId.toLowerCase().includes('wan') || m.repoId.toLowerCase().includes('ltx') || m.repoId.toLowerCase().includes('cogvideo');
+      const isIncomplete = !!m.isIncomplete;
+
+      let badgeClass = 'hf-card-type-sdxl';
+      let badgeLabel = '🎨 SDXL Checkpoint';
+      if (isIncomplete) {
+        badgeClass = '';
+        badgeLabel = '⚠️ Incomplete Download';
+      } else if (isGguf) {
+        badgeClass = 'hf-card-type-gguf';
+        badgeLabel = '🧠 Offline GGUF LLM';
+      } else if (isDit) {
+        badgeClass = 'hf-card-type-dit';
+        badgeLabel = '🎬 Video DiT';
+      } else if (isLora) {
+        badgeClass = 'hf-card-type-lora';
+        badgeLabel = '🎭 LoRA Style';
+      }
+
+      const author = m.repoId.includes('/') ? m.repoId.split('/')[0] : 'huggingface';
+      const name = m.repoId.includes('/') ? m.repoId.split('/')[1] : m.repoId;
+
+      const statusBadge = isIncomplete
+        ? `<span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">${badgeLabel}</span>`
+        : `<span class="badge ${badgeClass}" style="font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">${badgeLabel}</span>`;
+
+      let installedPill = '';
+      if (isIncomplete) {
+        installedPill = `<span style="background: rgba(239, 68, 68, 0.1); color: #fca5a5; font-size: 11px; padding: 2px 8px; border-radius: 10px;">Missing Weights</span>`;
+      } else if (isGguf) {
+        if (m.isRegisteredInOllama) {
+          installedPill = `<span style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ Active in Chat</span>`;
+        } else {
+          installedPill = `<span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">⚡ Downloaded on Disk</span>`;
+        }
+      } else {
+        installedPill = `<span style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ GPU Cached</span>`;
+      }
+
+      let actionButtons = '';
+      if (isIncomplete) {
+        actionButtons = `
+          <button type="button" class="primary-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="font-size: 11px; font-weight: 700; padding: 6px 14px; background: #dc2626; border: none; cursor: pointer; border-radius: 6px;">🗑️ Clean Up</button>
+        `;
+      } else if (isGguf) {
+        const chatModelName = m.registeredModelName || m.suggestedModelName || m.repoId;
+        const mainBtn = m.isRegisteredInOllama
+          ? `<button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(chatModelName)}" style="color: #c084fc; border-color: rgba(168, 85, 247, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(168, 85, 247, 0.08); cursor: pointer;" title="Open Chat with this model">💬 Chat</button>`
+          : `<button type="button" class="action-tag-btn hf-register-gguf-action" data-repo="${escapeHtml(m.repoId)}" data-path="${escapeHtml(m.ggufFilePath || '')}" data-name="${escapeHtml(m.suggestedModelName || '')}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.5); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(245, 158, 11, 0.12); cursor: pointer;" title="1-Click register into local Ollama Chat engine">⚡ 1-Click Activate in Chat</button>`;
+
+        actionButtons = `
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            ${mainBtn}
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.repoId)}" style="color: #a855f7; border-color: rgba(168, 85, 247, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="View README documentation">📖 Docs</button>
+            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="Uninstall / Delete from disk">🗑️</button>
+          </div>
+        `;
+      } else {
+        const useBtn = isDit
+          ? `<button type="button" class="action-tag-btn hf-use-video-action" data-model="${escapeHtml(m.repoId)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Load in PromptForge Video Studio">🎬 Video Studio</button>`
+          : `<button type="button" class="action-tag-btn hf-use-art-action" data-model="${escapeHtml(m.repoId)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(245, 158, 11, 0.08); cursor: pointer;" title="Load this checkpoint in NVIDIA RTX 4060 Art Studio">🎨 Studio</button>`;
+
+        actionButtons = `
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            ${useBtn}
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.repoId)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="View sample output images and README in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="Uninstall / Delete from disk">🗑️</button>
+          </div>
+        `;
+      }
+
+      const thumb = m.thumbnailUrl || (`/v1/hf/thumbnail?repoId=${encodeURIComponent(m.repoId)}`);
+      let bannerIcon = '✨';
+      let bannerClass = 'hf-banner-diffusion';
+      if (isDit) {
+        bannerIcon = '🎬';
+        bannerClass = 'hf-banner-dit';
+      } else if (isSdxl) {
+        bannerIcon = '🎨';
+        bannerClass = 'hf-banner-sdxl';
+      } else if (isLora) {
+        bannerIcon = '🎭';
+        bannerClass = 'hf-banner-lora';
+      } else if (isGguf) {
+        bannerIcon = '🧠';
+        bannerClass = 'hf-banner-gguf';
+      }
+
+      cardsHtml += `
+        <div class="hf-model-card ${isIncomplete ? '' : 'is-installed'}" data-model="${escapeHtml(m.repoId)}" style="${isIncomplete ? 'border-color: rgba(239, 68, 68, 0.35); background: rgba(25, 15, 20, 0.6);' : ''}">
+          <div class="hf-card-media" data-model="${escapeHtml(m.repoId)}" title="Click to view full preview gallery & README">
+            <img class="hf-card-img" src="${escapeHtml(thumb)}" alt="${escapeHtml(name)}" loading="lazy" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+            <div class="hf-card-media-banner ${bannerClass}" style="display: none;">
+              <span class="hf-banner-icon">${bannerIcon}</span>
+              <div class="hf-banner-title">${escapeHtml(name)}</div>
+              <div class="hf-banner-subtitle">${escapeHtml(m.type || 'Model')}</div>
+            </div>
+            <div class="hf-card-badges-top">
+              <div class="hf-card-badges-left">
+                ${statusBadge}
+              </div>
+              <div class="hf-card-badges-right">
+                ${installedPill}
+              </div>
+            </div>
+            <div class="hf-card-hover-overlay">
+              <span>🔍 View Previews</span>
+            </div>
+          </div>
+          <div class="hf-card-body">
+            <div>
+              <div class="hf-card-author">${escapeHtml(author)}</div>
+              <div class="hf-card-title" title="${escapeHtml(m.repoId)}" data-model="${escapeHtml(m.repoId)}">${escapeHtml(name)}</div>
+              <div class="hf-card-stats">
+                <span>💾 <strong style="color: ${isIncomplete ? '#fca5a5' : '#cbd5e1'};">${escapeHtml(m.sizeFormatted)}</strong></span>
+                <span class="hf-pipeline-badge">${isIncomplete ? 'Incomplete' : 'Cached GPU'}</span>
+              </div>
+            </div>
+            <div class="hf-card-actions">
+              ${actionButtons}
+              <a href="https://huggingface.co/${escapeHtml(m.repoId)}" target="_blank" rel="noopener noreferrer" class="action-tag-btn hf-link-btn" title="View model card on Hugging Face">↗ HF</a>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Render Ollama installed GGUF LLMs
+    for (const m of ollamaModels) {
+      const rawName = m.name || m.id || 'unknown';
+      const cleanName = rawName.split(':')[0];
+
+      cardsHtml += `
+        <div class="hf-model-card is-installed" data-model="${escapeHtml(rawName)}">
+          <div class="hf-card-media" data-model="${escapeHtml(rawName)}" title="Click to view details">
+            <div class="hf-card-media-banner hf-banner-gguf">
+              <span class="hf-banner-icon">🧠</span>
+              <div class="hf-banner-title">${escapeHtml(cleanName)}</div>
+              <div class="hf-banner-subtitle">Offline GGUF LLM</div>
+            </div>
+            <div class="hf-card-badges-top">
+              <div class="hf-card-badges-left">
+                <span class="badge hf-card-type-gguf" style="font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">🧠 GGUF LLM</span>
+              </div>
+              <div class="hf-card-badges-right">
+                <span style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ Installed</span>
+              </div>
+            </div>
+            <div class="hf-card-hover-overlay">
+              <span>💬 Open Chat</span>
+            </div>
+          </div>
+          <div class="hf-card-body">
+            <div>
+              <div class="hf-card-author">Local Engine</div>
+              <div class="hf-card-title" title="${escapeHtml(rawName)}" data-model="${escapeHtml(rawName)}">${escapeHtml(cleanName)}</div>
+              <div class="hf-card-stats">
+                <span>💾 <strong style="color: #cbd5e1;">${escapeHtml(m.size ? (m.size / (1024 * 1024 * 1024)).toFixed(1) + ' GB' : '')}</strong></span>
+                <span class="hf-pipeline-badge">${escapeHtml(rawName)}</span>
+              </div>
+            </div>
+            <div class="hf-card-actions">
+              <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                <button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(rawName)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Select this model for offline chat">💬 Chat</button>
+                <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(rawName)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="View documentation in-app">📖 Previews</button>
+                <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(rawName)}" data-type="gguf" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="Delete this model from disk">🗑️</button>
+              </div>
+              <a href="https://huggingface.co/models?search=${encodeURIComponent(cleanName)}" target="_blank" rel="noopener noreferrer" class="action-tag-btn hf-link-btn" title="Search on Hugging Face">↗ HF</a>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    modelGrid.innerHTML = cardsHtml;
+    bindCardActions();
+
+    const cleanAllBtn = document.getElementById('hfCleanAllIncompleteBtn');
+    if (cleanAllBtn) {
+      cleanAllBtn.addEventListener('click', cleanIncompleteStubs);
+    }
+  }
+
+  async function loadHfModels(category = currentCategory, query = currentSearchQuery, sort = currentSort) {
+    currentCategory = category;
+    currentSearchQuery = query;
+    currentSort = sort;
+
+    if (currentCategory === 'installed') {
+      if (cachedInstalledData) {
+        renderHfInstalledCards(cachedInstalledData);
+      } else {
+        await loadHfInstalled();
+      }
+      return;
+    }
+
+    if (modelLoading) modelLoading.style.display = 'block';
+    if (modelGrid) modelGrid.innerHTML = '';
+
+    try {
+      const url = `/v1/hf/models?category=${encodeURIComponent(category)}&q=${encodeURIComponent(query || '')}&sort=${encodeURIComponent(sort || 'downloads')}`;
+      const res = await fetch(url, { headers: adminHeaders() });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      cachedFetchedModels = data.models || [];
+      renderHfModelCards(cachedFetchedModels);
+    } catch (err) {
+      if (modelGrid) {
+        modelGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; color: #f87171;">
+            <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+            <div style="font-weight: 700; font-size: 15px;">Failed to fetch Hugging Face models</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${escapeHtml(err.message)}</div>
+            <button type="button" id="hfRetryBtn" class="action-tag-btn" style="margin-top: 14px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 12px; padding: 6px 16px;">🔄 Retry</button>
+          </div>
+        `;
+        const retryBtn = document.getElementById('hfRetryBtn');
+        if (retryBtn) retryBtn.addEventListener('click', () => loadHfModels());
+      }
+    } finally {
+      if (modelLoading) modelLoading.style.display = 'none';
+    }
+  }
+
+  function renderHfModelCards(models) {
+    if (!modelGrid) return;
+    const is8gbOnly = safe8gbFilter ? safe8gbFilter.checked : true;
+    let filteredModels = models;
+    if (is8gbOnly) {
+      filteredModels = models.filter(m => m.is8GbSafe !== false);
+    }
+
+    if (filteredModels.length === 0) {
+      if (models.length > 0) {
+        modelGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px;">
+            <div style="font-size: 32px; margin-bottom: 10px;">⚡</div>
+            <div style="font-weight: 700; font-size: 15px; color: #f8fafc;">All results exceed 8GB GPU VRAM</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Uncheck "⚡ 8GB GPU Safe Only" in the top bar to display heavier models (>10GB/22B/70B).</div>
+          </div>
+        `;
+      } else {
+        modelGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px;">
+            <div style="font-size: 32px; margin-bottom: 10px;">🔍</div>
+            <div style="font-weight: 700; font-size: 15px; color: #f8fafc;">No models found matching your criteria</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Try searching for a different keyword or check the Popular pills.</div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    let cardsHtml = '';
+    for (const m of filteredModels) {
+      const isSdxl = m.type === 'sdxl';
+      const isLora = m.type === 'lora';
+      const isGguf = m.type === 'gguf';
+      const isDit = m.type === 'dit' || m.id.toLowerCase().includes('wan') || m.id.toLowerCase().includes('ltx') || m.id.toLowerCase().includes('cogvideo') || m.id.toLowerCase().includes('hunyuan');
+
+      let typeBadge = '✨ Diffusion';
+      let typeClass = 'hf-card-type-diffusion';
+      if (isDit) {
+        typeBadge = '🎬 Video DiT';
+        typeClass = 'hf-card-type-dit';
+      } else if (isSdxl) {
+        typeBadge = '🎨 SDXL';
+        typeClass = 'hf-card-type-sdxl';
+      } else if (isLora) {
+        typeBadge = '🎭 LoRA';
+        typeClass = 'hf-card-type-lora';
+      } else if (isGguf) {
+        typeBadge = '🧠 GGUF LLM';
+        typeClass = 'hf-card-type-gguf';
+      }
+
+      const vramBadge = m.is8GbSafe !== false
+        ? `<span style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.35); color: #22c55e; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;" title="Safe for 8GB RTX 4060 GPU">⚡ 8GB Safe</span>`
+        : `<span style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;" title="Exceeds 8GB VRAM">🔴 High VRAM (>10GB)</span>`;
+
+      const gatedBadge = m.gated
+        ? `<a href="https://huggingface.co/${escapeHtml(m.id)}" target="_blank" rel="noopener noreferrer" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Gated model: Requires accepting author's license on Hugging Face & saving token below">🔒 Gated ↗</a>`
+        : '';
+
+      const triggerBadge = m.triggerWord
+        ? `<span style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700; white-space: nowrap;" title="Trigger Word: ${escapeHtml(m.triggerWord)}">🎯 ${escapeHtml(m.triggerWord)}</span>`
+        : '';
+
+      const installedPill = m.isInstalled
+        ? `<span style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ In GPU Cache</span>`
+        : `<span style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); font-size: 11px; padding: 2px 8px; border-radius: 10px;">Cloud</span>`;
+
+      let actionRow = '';
+      if (m.isInstalled) {
+        let useBtn = '';
+        if (isGguf) {
+          useBtn = `<button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(m.id)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; font-weight: 700; padding: 5px 10px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Select this model in chat">💬 Select</button>`;
+        } else if (isDit) {
+          useBtn = `<button type="button" class="action-tag-btn hf-use-video-action" data-model="${escapeHtml(m.id)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; font-weight: 700; padding: 5px 10px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Open in Video Studio">🎬 Video</button>`;
+        } else {
+          useBtn = `<button type="button" class="action-tag-btn hf-use-art-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11px; font-weight: 700; padding: 5px 10px; background: rgba(245, 158, 11, 0.08); cursor: pointer;" title="Open in RTX 4060 Art Studio">🎨 Studio</button>`;
+        }
+
+        actionRow = `
+          <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+            ${useBtn}
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="View sample output images and README documentation in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="Inspect repository files">📂 Files</button>
+            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="Uninstall / Delete model from disk">🗑️</button>
+          </div>
+        `;
+      } else {
+        const pullText = isGguf ? '📥 Pull' : '📥 Download';
+        actionRow = `
+          <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="primary-btn hf-download-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" data-safe="${m.is8GbSafe !== false}" data-gated="${!!m.gated}" style="font-size: 11px; font-weight: 700; padding: 6px 11px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; cursor: pointer; border-radius: 6px;">${pullText}</button>
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="View sample output images, trigger words and README in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="Inspect individual files & pick exact weights for 8GB GPU">📂 Files</button>
+          </div>
+        `;
+      }
+
+      // Visual Media / Thumbnail
+      const thumb = m.thumbnailUrl || (`/v1/hf/thumbnail?repoId=${encodeURIComponent(m.id)}`);
+      let bannerIcon = '✨';
+      let bannerClass = 'hf-banner-diffusion';
+      if (isDit) {
+        bannerIcon = '🎬';
+        bannerClass = 'hf-banner-dit';
+      } else if (isSdxl) {
+        bannerIcon = '🎨';
+        bannerClass = 'hf-banner-sdxl';
+      } else if (isLora) {
+        bannerIcon = '🎭';
+        bannerClass = 'hf-banner-lora';
+      } else if (isGguf) {
+        bannerIcon = '🧠';
+        bannerClass = 'hf-banner-gguf';
+      }
+
+      const mediaHtml = `
+        <div class="hf-card-media" data-model="${escapeHtml(m.id)}" title="Click to view full preview gallery & README">
+          <img class="hf-card-img" src="${escapeHtml(thumb)}" alt="${escapeHtml(m.repoName || m.id)}" loading="lazy" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+          <div class="hf-card-media-banner ${bannerClass}" style="display: none;">
+            <span class="hf-banner-icon">${bannerIcon}</span>
+            <div class="hf-banner-title">${escapeHtml(m.repoName || m.id)}</div>
+            <div class="hf-banner-subtitle">${typeBadge}</div>
+          </div>
+          <div class="hf-card-badges-top">
+            <div class="hf-card-badges-left">
+              <span class="badge ${typeClass}">${typeBadge}</span>
+              ${vramBadge}
+              ${gatedBadge}
+            </div>
+            <div class="hf-card-badges-right">
+              ${installedPill}
+            </div>
+          </div>
+          ${triggerBadge ? `<div class="hf-card-badge-bottom">${triggerBadge}</div>` : ''}
+          <div class="hf-card-hover-overlay">
+            <span>🔍 View Previews</span>
+          </div>
+        </div>
+      `;
+
+      cardsHtml += `
+        <div class="hf-model-card ${m.isInstalled ? 'is-installed' : ''}" data-model="${escapeHtml(m.id)}">
+          ${mediaHtml}
+          <div class="hf-card-body">
+            <div>
+              <div class="hf-card-author">${escapeHtml(m.author || 'huggingface')}</div>
+              <div class="hf-card-title" title="${escapeHtml(m.id)}" data-model="${escapeHtml(m.id)}">${escapeHtml(m.repoName || m.id)}</div>
+              <div class="hf-card-stats">
+                <span title="Downloads">⬇️ <strong style="color: #cbd5e1;">${escapeHtml(m.downloadsFormatted || (m.downloads ? (m.downloads >= 1000 ? (m.downloads / 1000).toFixed(1) + 'k' : String(m.downloads)) : '0'))}</strong></span>
+                <span title="Likes">❤️ <strong style="color: #cbd5e1;">${escapeHtml(m.likesFormatted || (m.likes ? (m.likes >= 1000 ? (m.likes / 1000).toFixed(1) + 'k' : String(m.likes)) : '0'))}</strong></span>
+                <span class="hf-pipeline-badge">${escapeHtml(m.pipeline_tag || m.type)}</span>
+              </div>
+            </div>
+            <div class="hf-card-actions">
+              ${actionRow}
+              <a href="${escapeHtml(m.hfUrl)}" target="_blank" rel="noopener noreferrer" class="action-tag-btn hf-link-btn" title="View model card on Hugging Face">↗ HF</a>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    modelGrid.innerHTML = cardsHtml;
+    bindCardActions();
+  }
+
+  function bindCardActions() {
+    if (!modelGrid) return;
+
+    modelGrid.querySelectorAll('.hf-card-media, .hf-card-title').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('button') || e.target.closest('a')) return;
+        const id = el.getAttribute('data-model');
+        if (id) openHfModelReadme(id);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-use-art-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-model');
+        if (id) selectModelForArtStudio(id);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-use-video-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-model');
+        if (id) selectModelForVideoStudio(id);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-use-chat-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-model');
+        if (id) selectModelForChat(id);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-register-gguf-action').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const repo = btn.getAttribute('data-repo');
+        const ggufPath = btn.getAttribute('data-path');
+        const name = btn.getAttribute('data-name');
+        btn.disabled = true;
+        const origText = btn.innerHTML;
+        btn.innerHTML = '⏳ Activating in Engine...';
+
+        try {
+          const res = await fetch('/v1/hf/register-gguf', {
+            method: 'POST',
+            headers: adminHeaders(),
+            body: JSON.stringify({ repoId: repo, ggufPath, modelName: name }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            btn.innerHTML = '✅ Activated!';
+            btn.style.background = 'rgba(34, 197, 94, 0.15)';
+            btn.style.color = '#22c55e';
+            btn.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+            if (typeof loadDynamicLocalModels === 'function') {
+              await loadDynamicLocalModels();
+            }
+            await loadHfInstalled();
+            renderHfInstalledCards(cachedInstalledData);
+            alert(`🎉 Success! Model "${data.modelName}" is now active in Chat! You can select it directly in the top model picker.`);
+          } else {
+            alert(`Registration failed: ${data.error || 'Unknown error'}`);
+            btn.disabled = false;
+            btn.innerHTML = origText;
+          }
+        } catch (err) {
+          alert(`Registration request error: ${err.message}`);
+          btn.disabled = false;
+          btn.innerHTML = origText;
+        }
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-card-delete-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-model');
+        const type = btn.getAttribute('data-type') || 'auto';
+        if (id) deleteModel(id, type);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-inspect-files-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-model');
+        const type = btn.getAttribute('data-type') || 'auto';
+        if (id) openFileInspector(id, type);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-open-readme-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-model');
+        if (id) openHfModelReadme(id);
+      });
+    });
+
+    modelGrid.querySelectorAll('.hf-download-action').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-model');
+        const type = btn.getAttribute('data-type') || 'auto';
+        const isSafe = btn.getAttribute('data-safe') === 'true';
+        const isGated = btn.getAttribute('data-gated') === 'true';
+
+        // Gated model license & token check
+        if (isGated) {
+          const userToken = userTokenInput ? userTokenInput.value.trim() : '';
+          const hasConfigured = cachedFetchedModels?.hfKeyConfigured;
+          if (!userToken && !hasConfigured) {
+            const openLicense = confirm(
+              `🔒 Gated Model Notice: "${id}"\n\n` +
+              `This model requires accepting the author's license agreement on Hugging Face before downloading.\n\n` +
+              `1. Click OK to open https://huggingface.co/${id} and accept terms.\n` +
+              `2. Ensure your Hugging Face Access Token is pasted into the "HF Token" box below.\n\n` +
+              `Open license agreement page now?`
+            );
+            if (openLicense) {
+              window.open(`https://huggingface.co/${id}`, '_blank');
+            }
+            if (userTokenInput) {
+              userTokenInput.focus();
+              userTokenInput.style.borderColor = '#fbbf24';
+            }
+            return;
+          }
+        }
+
+        // Prevent accidental 44GB download on known massive/multi-variant repositories
+        if (!isSafe || id.toLowerCase().includes('ltx-2.3')) {
+          alert(`⚠️ Notice: Repository "${id}" contains massive multi-model files (up to 44+ GB).\n\nOpening the File Inspector so you can pick an exact 8GB-compatible weight file!`);
+          openFileInspector(id, type);
+          return;
+        }
+
+        if (id) {
+          btn.disabled = true;
+          const origText = btn.textContent;
+          btn.textContent = '🔍 Inspecting...';
+
+          try {
+            // For Hugging Face repositories, inspect the files to target the single primary weight file
+            if (id.includes('/')) {
+              const res = await fetch(`/v1/hf/files?repoId=${encodeURIComponent(id)}`, { headers: adminHeaders() });
+              if (res.ok) {
+                const data = await res.json();
+
+                // 1. If backend identified a recommended file (e.g. Q4_K_M for GGUF or FP16 for SDXL), download it directly!
+                if (data.recommendedFile) {
+                  btn.textContent = '⏳ Starting...';
+                  await startHfDownload(id, type, data.recommendedFile.path);
+                  btn.disabled = false;
+                  btn.textContent = origText;
+                  return;
+                }
+
+                const weightFiles = (data.files || []).filter(f => f.isModelWeight);
+
+                if (weightFiles.length > 1) {
+                  // If there is an unambiguous single root safetensors <= 8GB
+                  const rootWeights = weightFiles.filter(f => !f.path.includes('/') && f.vramTier !== 'heavy');
+                  if (rootWeights.length === 1) {
+                    btn.textContent = '⏳ Starting...';
+                    await startHfDownload(id, type, rootWeights[0].path);
+                    btn.disabled = false;
+                    btn.textContent = origText;
+                    return;
+                  }
+
+                  // Multiple competing variants without recommendation: open File Inspector so user picks
+                  openFileInspector(id, type);
+                  btn.disabled = false;
+                  btn.textContent = origText;
+                  return;
+                } else if (weightFiles.length === 1) {
+                  btn.textContent = '⏳ Starting...';
+                  await startHfDownload(id, type, weightFiles[0].path);
+                  btn.disabled = false;
+                  btn.textContent = origText;
+                  return;
+                }
+              }
+            }
+          } catch (_) {}
+
+          btn.textContent = '⏳ Starting...';
+          await startHfDownload(id, type);
+          btn.disabled = false;
+          btn.textContent = origText;
+        }
+      });
+    });
+  }
+
+  async function openFileInspector(repoId, type = 'auto') {
+    if (!inspectorModal || !inspectorFileList) return;
+    currentInspectorRepo = repoId;
+    currentInspectorType = type;
+    cachedInspectorFiles = [];
+
+    if (inspectorTitle) inspectorTitle.textContent = `${repoId} — Files`;
+    if (inspectorSummaryText) inspectorSummaryText.textContent = 'Querying repository files...';
+    inspectorFileList.innerHTML = `
+      <div style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
+        <div style="font-size: 32px; margin-bottom: 10px;">⏳</div>
+        <div style="font-weight: 700; font-size: 15px; color: #38bdf8;">Inspecting repository tree &amp; file sizes...</div>
+        <div style="font-size: 12px; margin-top: 4px;">Assessing 8GB RTX 4060 VRAM suitability for each file</div>
+      </div>
+    `;
+    inspectorModal.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`/v1/hf/files?repoId=${encodeURIComponent(repoId)}`, { headers: adminHeaders() });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      cachedInspectorFiles = data.files || [];
+      cachedInspectorRecommended = data.recommendedFile || null;
+      renderInspectorFiles();
+    } catch (err) {
+      if (inspectorFileList) {
+        inspectorFileList.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: #f87171;">
+            <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+            <div style="font-weight: 700; font-size: 15px;">Failed to inspect repository files</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${escapeHtml(err.message)}</div>
+          </div>
+        `;
+      }
+      if (inspectorSummaryText) inspectorSummaryText.textContent = 'Error loading files.';
+    }
+  }
+
+  function renderInspectorFiles() {
+    if (!inspectorFileList) return;
+    const show8gbOnly = inspector8gbOnlyToggle ? inspector8gbOnlyToggle.checked : true;
+    
+    let displayFiles = cachedInspectorFiles;
+    if (show8gbOnly) {
+      displayFiles = displayFiles.filter(f => f.vramTier !== 'heavy');
+    }
+
+    if (displayFiles.length === 0) {
+      inspectorFileList.innerHTML = `
+        <div style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
+          <div style="font-size: 32px; margin-bottom: 10px;">⚡</div>
+          <div style="font-weight: 700; font-size: 15px; color: #f8fafc;">No 8GB-compatible files match filter</div>
+          <div style="font-size: 12px; margin-top: 4px;">Uncheck "Show 8GB GPU Safe Only" above to view heavier files (>10 GB).</div>
+        </div>
+      `;
+      if (inspectorSummaryText) inspectorSummaryText.textContent = `Showing 0 of ${cachedInspectorFiles.length} files`;
+      return;
+    }
+
+    let html = '';
+
+    // Prominent Recommendation & Guide Banner at the top of the file inspector
+    if (cachedInspectorRecommended) {
+      const rec = cachedInspectorRecommended;
+      html += `
+        <div class="hf-inspector-rec-banner" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.1)); border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 260px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #fbbf24;">
+              <span>⭐</span> RECOMMENDED FOR RTX 4060 (8GB VRAM)
+            </div>
+            <div style="font-weight: 700; font-size: 14px; color: #f8fafc; margin-top: 3px; font-family: var(--font-mono); word-break: break-all;">
+              ${escapeHtml(rec.path)}
+            </div>
+            <div style="font-size: 11.5px; color: #cbd5e1; margin-top: 4px; line-height: 1.5;">
+              💡 <b>Which file to get?</b> You only need <b>one</b> file! ${escapeHtml(rec.recommendationReason || 'Optimal balance of speed, intelligence, and 8GB VRAM headroom.')}
+            </div>
+          </div>
+          <div style="flex-shrink: 0;">
+            <button type="button" class="primary-btn hf-inspector-quick-rec-btn" data-repo="${escapeHtml(currentInspectorRepo)}" data-file="${escapeHtml(rec.path)}" data-type="${escapeHtml(currentInspectorType)}" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; font-size: 12.5px; font-weight: 800; padding: 9px 18px; border-radius: 8px; cursor: pointer; color: #ffffff; box-shadow: 0 0 16px rgba(245, 158, 11, 0.45); white-space: nowrap;">
+              ⭐ Download Recommended (${escapeHtml(rec.sizeFormatted)})
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    for (const f of displayFiles) {
+      const isRec = f.isRecommended || (cachedInspectorRecommended && cachedInspectorRecommended.path === f.path);
+      const tier = f.vramTier;
+      let tierColor = '#22c55e';
+      let tierBg = 'rgba(34, 197, 94, 0.12)';
+      let tierBorder = 'rgba(34, 197, 94, 0.35)';
+
+      if (tier === 'heavy') {
+        tierColor = '#f87171';
+        tierBg = 'rgba(239, 68, 68, 0.12)';
+        tierBorder = 'rgba(239, 68, 68, 0.35)';
+      } else if (tier === 'caution') {
+        tierColor = '#fbbf24';
+        tierBg = 'rgba(245, 158, 11, 0.12)';
+        tierBorder = 'rgba(245, 158, 11, 0.35)';
+      }
+
+      const fileIcon = f.path.endsWith('.safetensors') ? '📦' : (f.path.endsWith('.gguf') ? '🧠' : '📄');
+
+      let downloadBtn = '';
+      if (f.isCached) {
+        downloadBtn = `
+          <span style="color: #22c55e; font-weight: 700; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px; white-space: nowrap;">
+            ✅ In Cache
+          </span>
+        `;
+      } else {
+        const btnStyle = isRec
+          ? 'background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #ffffff; box-shadow: 0 0 12px rgba(245, 158, 11, 0.4); font-weight: 800;'
+          : (tier === 'heavy'
+            ? 'background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5;'
+            : 'background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #ffffff;');
+
+        const btnLabel = isRec ? `⭐ Download Recommended (${escapeHtml(f.sizeFormatted)})` : `📥 Download (${escapeHtml(f.sizeFormatted)})`;
+
+        downloadBtn = `
+          <button type="button" class="primary-btn hf-inspector-download-file-btn" data-repo="${escapeHtml(currentInspectorRepo)}" data-file="${escapeHtml(f.path)}" data-type="${escapeHtml(currentInspectorType)}" style="font-size: 11.5px; font-weight: 700; padding: 6px 14px; cursor: pointer; border-radius: 6px; white-space: nowrap; ${btnStyle}">
+            ${btnLabel}
+          </button>
+        `;
+      }
+
+      const cardBorder = isRec ? 'rgba(245, 158, 11, 0.55)' : 'rgba(255, 255, 255, 0.08)';
+      const cardBg = isRec ? 'linear-gradient(135deg, rgba(30, 24, 12, 0.85), rgba(15, 23, 42, 0.85))' : 'rgba(15, 23, 42, 0.7)';
+
+      html += `
+        <div style="background: ${cardBg}; border: 1px solid ${cardBorder}; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 14px; ${isRec ? 'box-shadow: 0 0 14px rgba(245, 158, 11, 0.2);' : ''}">
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+              <span style="font-size: 16px;">${fileIcon}</span>
+              <span style="font-weight: 700; font-size: 13.5px; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+              ${isRec ? `<span style="font-size: 10.5px; font-weight: 800; color: #fbbf24; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.5); border-radius: 6px; padding: 2px 8px; white-space: nowrap;">⭐ BEST 8GB CHOICE</span>` : ''}
+              <span style="font-size: 11px; font-weight: 700; color: ${tierColor}; background: ${tierBg}; border: 1px solid ${tierBorder}; border-radius: 6px; padding: 2px 8px; white-space: nowrap;">${escapeHtml(f.vramBadge)}</span>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <span>Size: <strong style="color: #cbd5e1;">${escapeHtml(f.sizeFormatted)}</strong></span>
+              <span>•</span>
+              <span style="color: ${tier === 'safe' ? '#86efac' : (tier === 'caution' ? '#fde047' : '#fca5a5')}; font-weight: 500;">${escapeHtml(f.vramRecommendation)}</span>
+            </div>
+          </div>
+          <div style="flex-shrink: 0;">
+            ${downloadBtn}
+          </div>
+        </div>
+      `;
+    }
+
+    inspectorFileList.innerHTML = html;
+    if (inspectorSummaryText) {
+      inspectorSummaryText.textContent = `Showing ${displayFiles.length} of ${cachedInspectorFiles.length} files in repository`;
+    }
+
+    inspectorFileList.querySelectorAll('.hf-inspector-download-file-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const repo = btn.getAttribute('data-repo');
+        const file = btn.getAttribute('data-file');
+        const type = btn.getAttribute('data-type') || 'auto';
+        if (repo && file) {
+          btn.disabled = true;
+          btn.textContent = '⏳ Starting...';
+          inspectorModal.classList.add('hidden');
+          await startHfDownload(repo, type, file);
+        }
+      });
+    });
+
+    inspectorFileList.querySelectorAll('.hf-inspector-quick-rec-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const repo = btn.getAttribute('data-repo');
+        const file = btn.getAttribute('data-file');
+        const type = btn.getAttribute('data-type') || 'auto';
+        if (repo && file) {
+          btn.disabled = true;
+          btn.textContent = '⏳ Starting...';
+          inspectorModal.classList.add('hidden');
+          await startHfDownload(repo, type, file);
+        }
+      });
+    });
+  }
+
+  async function startHfDownload(repoId, type = 'auto', filename) {
+    try {
+      const res = await fetch('/v1/hf/download', {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({ repoId, type, filename }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Failed to start download');
+        return;
+      }
+      startDownloadPolling();
+    } catch (err) {
+      alert(`Download request failed: ${err.message}`);
+    }
+  }
+
+  function startDownloadPolling() {
+    if (downloadPollTimer) clearInterval(downloadPollTimer);
+    if (downloadBanner) downloadBanner.style.display = 'block';
+
+    downloadPollTimer = setInterval(async () => {
+      try {
+        const res = await fetch('/v1/hf/download/status', { headers: adminHeaders() });
+        if (!res.ok) return;
+        const status = await res.json();
+
+        if (status.active) {
+          if (downloadBanner) downloadBanner.style.display = 'block';
+          if (downloadRepoLabel) {
+            downloadRepoLabel.textContent = `${status.type === 'gguf' ? '🧠 Pulling GGUF ' : '🎨 Downloading '}${status.repoId}...`;
+          }
+          if (downloadStatusMsg) {
+            downloadStatusMsg.textContent = status.message || 'Downloading in progress...';
+            downloadStatusMsg.title = status.message || '';
+          }
+          const pct = Math.max(0, Math.min(100, status.progress || 0));
+          if (downloadPercentLabel) downloadPercentLabel.textContent = `${pct}%`;
+          if (downloadProgressBar) {
+            downloadProgressBar.style.width = `${pct}%`;
+            downloadProgressBar.style.background = 'linear-gradient(90deg, #f59e0b, #38bdf8)';
+          }
+        } else if (status.status === 'completed') {
+          clearInterval(downloadPollTimer);
+          downloadPollTimer = null;
+          if (downloadPercentLabel) downloadPercentLabel.textContent = '100%';
+          if (downloadProgressBar) {
+            downloadProgressBar.style.width = '100%';
+            downloadProgressBar.style.background = '#22c55e';
+          }
+          if (downloadStatusMsg) {
+            downloadStatusMsg.textContent = status.message || 'Download complete! Model ready for use.';
+          }
+          await loadHfInstalled();
+          if (currentCategory === 'installed') {
+            renderHfInstalledCards(cachedInstalledData);
+          } else {
+            loadHfModels(currentCategory, currentSearchQuery, currentSort);
+          }
+          if (typeof loadDynamicLocalModels === 'function' && status.type === 'gguf') {
+            await loadDynamicLocalModels();
+          }
+          const modelToSelect = status.repoId || status.filename || status.modelName;
+          if (modelToSelect) {
+            selectModelInDropdowns(modelToSelect, status.repoId);
+          }
+          setTimeout(() => {
+            if (downloadBanner && !downloadPollTimer) downloadBanner.style.display = 'none';
+          }, 3500);
+        } else if (status.status === 'error') {
+          clearInterval(downloadPollTimer);
+          downloadPollTimer = null;
+          if (downloadProgressBar) downloadProgressBar.style.background = '#ef4444';
+          if (downloadStatusMsg) {
+            downloadStatusMsg.textContent = `⚠️ ${status.error || status.message || 'Download failed'}`;
+          }
+        } else {
+          if (downloadBanner && !status.active) downloadBanner.style.display = 'none';
+        }
+      } catch (e) {
+        console.warn('Error polling HF download status:', e);
+      }
+    }, 1000);
+  }
+
+  // Cancel download button with immediate UI response and background cleanup
+  if (cancelDownloadBtn) {
+    cancelDownloadBtn.addEventListener('click', async () => {
+      cancelDownloadBtn.disabled = true;
+      cancelDownloadBtn.textContent = '⏳ Cancelling...';
+      try {
+        const res = await fetch('/v1/hf/download/cancel', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (downloadStatusMsg) downloadStatusMsg.textContent = data.message || 'Download cancelled.';
+        if (downloadPollTimer) {
+          clearInterval(downloadPollTimer);
+          downloadPollTimer = null;
+        }
+        setTimeout(async () => {
+          if (downloadBanner) downloadBanner.style.display = 'none';
+          cancelDownloadBtn.disabled = false;
+          cancelDownloadBtn.textContent = '✕ Cancel';
+          await loadHfInstalled();
+          if (currentCategory === 'installed') {
+            renderHfInstalledCards(cachedInstalledData);
+          } else {
+            loadHfModels(currentCategory, currentSearchQuery, currentSort);
+          }
+        }, 1200);
+      } catch (err) {
+        console.warn('Failed to cancel download:', err);
+        cancelDownloadBtn.disabled = false;
+        cancelDownloadBtn.textContent = '✕ Cancel';
+      }
+    });
+  }
+
+  // Open modal
+  openBtn.addEventListener('click', () => {
+    hfModal.classList.remove('hidden');
+    loadHfInstalled();
+    loadHfModels(currentCategory, currentSearchQuery, currentSort);
+    startDownloadPolling();
+  });
+
+  // Close modal
+  if (closeBtn) closeBtn.addEventListener('click', () => hfModal.classList.add('hidden'));
+  hfModal.addEventListener('click', (e) => {
+    if (e.target === hfModal) hfModal.classList.add('hidden');
+  });
+
+  // Category tabs
+  if (categoryTabs) {
+    categoryTabs.querySelectorAll('.hf-tab-btn').forEach(tab => {
+      tab.addEventListener('click', () => {
+        categoryTabs.querySelectorAll('.hf-tab-btn').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const cat = tab.getAttribute('data-category') || 'all';
+        loadHfModels(cat, currentSearchQuery, currentSort);
+      });
+    });
+  }
+
+  // Search input & button
+  if (searchBtn && searchInput) {
+    const doSearch = () => {
+      const q = searchInput.value.trim();
+      loadHfModels(currentCategory, q, currentSort);
+    };
+    searchBtn.addEventListener('click', doSearch);
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doSearch();
+      }
+    });
+  }
+
+  // Sort select
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      currentSort = sortSelect.value;
+      loadHfModels(currentCategory, currentSearchQuery, currentSort);
+    });
+  }
+
+  // Refresh button
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      loadHfInstalled();
+      loadHfModels(currentCategory, currentSearchQuery, currentSort);
+    });
+  }
+
+  // Quick search pills
+  if (quickPills) {
+    quickPills.querySelectorAll('.hf-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const query = pill.getAttribute('data-query');
+        if (query) {
+          if (searchInput) searchInput.value = query;
+          loadHfModels(currentCategory, query, currentSort);
+        }
+      });
+    });
+  }
+
+  // Open cache folder button (Windows Explorer)
+  if (openCacheFolderBtn) {
+    openCacheFolderBtn.addEventListener('click', async () => {
+      const originalText = openCacheFolderBtn.textContent;
+      try {
+        openCacheFolderBtn.textContent = '⏳ Opening...';
+        const res = await fetch('/v1/hf/open-folder', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (data && data.success) {
+          openCacheFolderBtn.textContent = '📂 Opened!';
+          if (typeof showToast === 'function') {
+            showToast(`📂 Opened Hugging Face Cache: ${data.path || 'Cache Folder'}`);
+          }
+        } else {
+          openCacheFolderBtn.textContent = '⚠️ Error';
+          if (typeof showToast === 'function') {
+            showToast(`⚠️ Could not open folder: ${(data && data.error) || 'Unknown error'}`);
+          }
+        }
+        setTimeout(() => { openCacheFolderBtn.textContent = originalText; }, 2500);
+      } catch (err) {
+        console.warn('Failed to open cache folder:', err);
+        openCacheFolderBtn.textContent = '⚠️ Error';
+        if (typeof showToast === 'function') showToast('⚠️ Failed to open cache folder');
+        setTimeout(() => { openCacheFolderBtn.textContent = originalText; }, 2500);
+      }
+    });
+  }
+
+  // Direct puller
+  if (directPullBtn && directPullInput) {
+    directPullBtn.addEventListener('click', async () => {
+      const repo = directPullInput.value.trim();
+      if (!repo) {
+        alert('Please enter a Hugging Face repository ID (e.g. Lykon/dreamshaper-xl-v2-turbo)');
+        return;
+      }
+      const type = directPullType ? directPullType.value : 'auto';
+      await startHfDownload(repo, type);
+      directPullInput.value = '';
+    });
+  }
+
+  // Save Hugging Face user token
+  if (saveUserTokenBtn && userTokenInput) {
+    saveUserTokenBtn.addEventListener('click', async () => {
+      const token = userTokenInput.value.trim();
+      if (!token) return;
+      try {
+        const res = await fetch('/v1/hf/token', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ token }),
+        });
+        if (res.ok) {
+          const orig = saveUserTokenBtn.textContent;
+          saveUserTokenBtn.textContent = '✅ Saved!';
+          userTokenInput.value = '';
+          setTimeout(() => { saveUserTokenBtn.textContent = orig; }, 2000);
+        }
+      } catch (err) {
+        alert(`Failed to save token: ${err.message}`);
+      }
+    });
+  }
+
+  // 8GB Safe filter toggle
+  if (safe8gbFilter) {
+    safe8gbFilter.addEventListener('change', () => {
+      renderHfModelCards(cachedFetchedModels);
+    });
+  }
+
+  // File Inspector Modal close & toggle bindings
+  if (closeInspectorBtn) {
+    closeInspectorBtn.addEventListener('click', () => {
+      if (inspectorModal) inspectorModal.classList.add('hidden');
+    });
+  }
+  if (closeInspectorFooterBtn) {
+    closeInspectorFooterBtn.addEventListener('click', () => {
+      if (inspectorModal) inspectorModal.classList.add('hidden');
+    });
+  }
+  if (inspectorModal) {
+    inspectorModal.addEventListener('click', (e) => {
+      if (e.target === inspectorModal) inspectorModal.classList.add('hidden');
+    });
+  }
+  if (inspector8gbOnlyToggle) {
+    inspector8gbOnlyToggle.addEventListener('change', () => {
+      renderInspectorFiles();
+    });
+  }
+
+  // ========================================================
+  // In-App README & Preview Images Modal Controller
+  // ========================================================
+  let currentReadmeData = null;
+
+  function renderSafeMarkdown(markdown) {
+    if (!markdown) return '<p style="color: var(--text-muted); font-style: italic;">No documentation provided.</p>';
+
+    // Strip YAML frontmatter at the beginning
+    let content = markdown.replace(/^---[\s\S]*?---\s*/, '');
+
+    // Escape HTML special characters
+    let html = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Fenced code blocks ```lang ... ```
+    html = html.replace(/```([a-zA-Z0-9_\-]*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
+      return `<pre style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px 16px; overflow-x: auto; margin: 12px 0; font-family: monospace; font-size: 12px; color: #a5f3fc;"><code>${code}</code></pre>`;
+    });
+
+    // Inline code `code`
+    html = html.replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #38bdf8;">$1</code>');
+
+    // Headers
+    html = html.replace(/^#### (.*$)/gim, '<h4 style="color: #fbbf24; font-size: 14px; margin: 14px 0 6px 0; font-weight: 700;">$1</h4>');
+    html = html.replace(/^### (.*$)/gim, '<h3 style="color: #fbbf24; font-size: 16px; margin: 16px 0 8px 0; font-weight: 700;">$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2 style="color: #f8fafc; font-size: 18px; margin: 20px 0 10px 0; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1 style="color: #f8fafc; font-size: 22px; margin: 22px 0 12px 0; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 8px;">$1</h1>');
+
+    // Bold and italic
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong style="color: #f8fafc; font-weight: 700;">$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em style="color: #cbd5e1;">$1</em>');
+
+    // Blockquotes
+    html = html.replace(/^>\s*(.*$)/gim, '<blockquote style="border-left: 3px solid #fbbf24; padding-left: 12px; margin: 10px 0; color: #94a3b8; font-style: italic;">$1</blockquote>');
+
+    // Links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline;">$1 ↗</a>');
+
+    // Markdown tables (| col | col |)
+    const lines = html.split('\n');
+    let inTable = false;
+    let tableHtml = '';
+    const processedLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('|') && line.endsWith('|')) {
+        const cells = line.split('|').slice(1, -1).map(c => c.trim());
+        if (cells.every(c => /^:?-+:?$/.test(c))) {
+          continue;
+        }
+        if (!inTable) {
+          inTable = true;
+          tableHtml = '<table style="width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12.5px; background: rgba(0,0,0,0.3); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);">';
+        }
+        tableHtml += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">';
+        for (const c of cells) {
+          tableHtml += `<td style="padding: 8px 12px; color: #e2e8f0; border-right: 1px solid rgba(255,255,255,0.04);">${c}</td>`;
+        }
+        tableHtml += '</tr>';
+      } else {
+        if (inTable) {
+          tableHtml += '</table>';
+          processedLines.push(tableHtml);
+          inTable = false;
+          tableHtml = '';
+        }
+        if (/^[-*]\s+(.*)$/.test(line)) {
+          processedLines.push(`<li style="margin-left: 20px; list-style-type: disc; margin-bottom: 4px; color: #cbd5e1;">${line.replace(/^[-*]\s+/, '')}</li>`);
+        } else if (/^\d+\.\s+(.*)$/.test(line)) {
+          processedLines.push(`<li style="margin-left: 20px; list-style-type: decimal; margin-bottom: 4px; color: #cbd5e1;">${line.replace(/^\d+\.\s+/, '')}</li>`);
+        } else if (line === '') {
+          processedLines.push('<div style="height: 8px;"></div>');
+        } else if (!line.startsWith('<pre') && !line.startsWith('<h') && !line.startsWith('<blockquote') && !line.startsWith('<table')) {
+          processedLines.push(`<p style="margin: 6px 0; color: #cbd5e1;">${line}</p>`);
+        } else {
+          processedLines.push(line);
+        }
+      }
+    }
+    if (inTable) {
+      tableHtml += '</table>';
+      processedLines.push(tableHtml);
+    }
+
+    return processedLines.join('\n');
+  }
+
+  async function openHfModelReadme(repoId) {
+    if (!readmeModal) return;
+    currentReadmeData = null;
+
+    if (readmeTitle) readmeTitle.textContent = `${repoId}`;
+    if (readmeGatedBadge) readmeGatedBadge.style.display = 'none';
+    if (readmeSubTitle) readmeSubTitle.innerHTML = '<span>Querying repository metadata and sample outputs...</span>';
+    if (triggerBanner) triggerBanner.style.display = 'none';
+    if (triggerList) triggerList.innerHTML = '';
+    if (imgCountSpan) imgCountSpan.textContent = '0';
+    if (previewsLoading) previewsLoading.style.display = 'block';
+    if (previewsGrid) previewsGrid.innerHTML = '';
+    if (docContainer) docContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Loading README...</div>';
+
+    switchReadmeTab('previews');
+    readmeModal.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`/v1/hf/readme?repoId=${encodeURIComponent(repoId)}`, { headers: adminHeaders() });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      currentReadmeData = data;
+      renderHfModelReadme(data);
+    } catch (err) {
+      if (previewsLoading) previewsLoading.style.display = 'none';
+      if (previewsGrid) {
+        previewsGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; color: #f87171;">
+            <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+            <div style="font-weight: 700; font-size: 15px;">Failed to load model documentation</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${escapeHtml(err.message)}</div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  function renderHfModelReadme(data) {
+    if (!data) return;
+
+    // Title & Badges
+    if (readmeTitle) readmeTitle.textContent = data.repoId;
+    if (readmeTypeBadge) {
+      readmeTypeBadge.textContent = data.pipelineTag || 'Model';
+    }
+    if (readmeGatedBadge) {
+      if (data.gated) {
+        readmeGatedBadge.style.display = 'inline-block';
+        readmeGatedBadge.innerHTML = `🔒 Gated Model (<a href="https://huggingface.co/${escapeHtml(data.repoId)}" target="_blank" rel="noopener noreferrer" style="color: #fbbf24; text-decoration: underline;">Accept License on HF ↗</a>)`;
+      } else {
+        readmeGatedBadge.style.display = 'none';
+      }
+    }
+
+    if (readmeSubTitle) {
+      const author = data.author || 'Author';
+      const downloads = data.downloads ? (data.downloads >= 1000 ? (data.downloads / 1000).toFixed(1) + 'k' : data.downloads) : '0';
+      const likes = data.likes ? (data.likes >= 1000 ? (data.likes / 1000).toFixed(1) + 'k' : data.likes) : '0';
+      const license = data.license ? ` • 📜 ${escapeHtml(data.license)}` : '';
+      readmeSubTitle.innerHTML = `
+        <span>Author: <strong style="color: #cbd5e1;">${escapeHtml(author)}</strong></span>
+        <span>•</span>
+        <span>⬇️ <strong style="color: #cbd5e1;">${downloads}</strong></span>
+        <span>•</span>
+        <span>❤️ <strong style="color: #cbd5e1;">${likes}</strong></span>
+        ${license}
+      `;
+    }
+
+    if (externalHfLink) {
+      externalHfLink.href = data.hfUrl || `https://huggingface.co/${data.repoId}`;
+    }
+
+    // Trigger Words / Activation Tags
+    const triggers = data.triggerWords || [];
+    if (triggers.length > 0 && triggerBanner && triggerList) {
+      triggerBanner.style.display = 'flex';
+      let pillsHtml = '';
+      for (const tw of triggers) {
+        pillsHtml += `
+          <button type="button" class="action-tag-btn hf-trigger-word-pill" data-trigger="${escapeHtml(tw)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11.5px; font-weight: 700; padding: 4px 10px; background: rgba(245, 158, 11, 0.12); cursor: pointer;" title="Click to copy trigger word">
+            <span>${escapeHtml(tw)}</span>
+            <span style="font-size: 10px; opacity: 0.8; margin-left: 4px;">📋</span>
+          </button>
+        `;
+      }
+      triggerList.innerHTML = pillsHtml;
+
+      triggerList.querySelectorAll('.hf-trigger-word-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const word = btn.getAttribute('data-trigger');
+          if (word) {
+            navigator.clipboard.writeText(word);
+            const orig = btn.innerHTML;
+            btn.innerHTML = `<span>Copied!</span> <span style="margin-left: 4px;">✅</span>`;
+            setTimeout(() => { btn.innerHTML = orig; }, 1800);
+          }
+        });
+      });
+
+      if (useTriggerInArtBtn) {
+        useTriggerInArtBtn.onclick = () => {
+          const firstWord = triggers[0];
+          if (readmeModal) readmeModal.classList.add('hidden');
+          if (hfModal) hfModal.classList.add('hidden');
+          const artStudioModal = document.getElementById('artStudioModal');
+          if (artStudioModal) {
+            artStudioModal.classList.remove('hidden');
+            const promptInput = document.getElementById('studioArtPromptInput') || document.getElementById('studioPromptInput');
+            if (promptInput) {
+              promptInput.value = promptInput.value ? `${firstWord}, ${promptInput.value}` : firstWord;
+              promptInput.focus();
+            }
+          }
+        };
+      }
+    } else if (triggerBanner) {
+      triggerBanner.style.display = 'none';
+    }
+
+    // Preview Images Gallery
+    const images = data.previewImages || [];
+    if (imgCountSpan) imgCountSpan.textContent = String(images.length);
+    if (previewsLoading) previewsLoading.style.display = 'none';
+
+    if (previewsGrid) {
+      if (images.length === 0) {
+        previewsGrid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; background: rgba(15, 23, 42, 0.4); border-radius: 10px; border: 1px dashed rgba(255,255,255,0.1);">
+            <div style="font-size: 32px; margin-bottom: 8px;">🖼️</div>
+            <div style="font-weight: 700; color: #f8fafc; font-size: 15px;">No standalone preview images found in repository files</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Switch to the <strong>📖 README &amp; Model Card</strong> tab to read usage instructions, sample prompts, and model details.</div>
+            <button type="button" id="hfSwitchToReadmeTabBtn" class="action-tag-btn" style="margin-top: 14px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11.5px; padding: 6px 14px;">📖 View Model README</button>
+          </div>
+        `;
+        const switchBtn = document.getElementById('hfSwitchToReadmeTabBtn');
+        if (switchBtn) switchBtn.addEventListener('click', () => switchReadmeTab('readme'));
+      } else {
+        let cardsHtml = '';
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          const isRepo = img.source === 'repo';
+          const sourceBadge = isRepo
+            ? `<span style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 700;">📁 Repo File</span>`
+            : `<span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 700;">📖 README Sample</span>`;
+
+          cardsHtml += `
+            <div class="hf-preview-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.18s ease, border-color 0.18s ease;" data-img-idx="${i}">
+              <div style="position: relative; height: 180px; background: rgba(0,0,0,0.5); overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.caption)}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none';" />
+                <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #f8fafc; font-size: 10.5px; padding: 3px 8px; border-radius: 6px; backdrop-filter: blur(4px);">🔍 Zoom</span>
+              </div>
+              <div style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="font-size: 11.5px; font-weight: 600; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(img.caption)}">${escapeHtml(img.caption)}</span>
+                ${sourceBadge}
+              </div>
+            </div>
+          `;
+        }
+        previewsGrid.innerHTML = cardsHtml;
+
+        previewsGrid.querySelectorAll('.hf-preview-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const idx = parseInt(card.getAttribute('data-img-idx') || '0', 10);
+            const img = images[idx];
+            if (img) openHfImageLightbox(img.url, img.caption);
+          });
+        });
+      }
+    }
+
+    // Render README Markdown
+    if (docContainer) {
+      docContainer.innerHTML = renderSafeMarkdown(data.readmeMarkdown || '');
+    }
+
+    // Quick Actions in tab bar
+    if (quickActions) {
+      quickActions.innerHTML = `
+        <button type="button" class="action-tag-btn" id="hfReadmeUseInArtTopBtn" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 700;">🎨 Use in Art Studio</button>
+      `;
+      const useTopBtn = document.getElementById('hfReadmeUseInArtTopBtn');
+      if (useTopBtn) {
+        useTopBtn.addEventListener('click', () => {
+          if (readmeModal) readmeModal.classList.add('hidden');
+          selectModelForArtStudio(data.repoId);
+        });
+      }
+    }
+
+    if (inspectFilesBtn) {
+      inspectFilesBtn.onclick = () => {
+        if (readmeModal) readmeModal.classList.add('hidden');
+        openFileInspector(data.repoId, 'auto');
+      };
+    }
+  }
+
+  function switchReadmeTab(tab) {
+    if (tab === 'previews') {
+      if (tabPreviewsBtn) tabPreviewsBtn.classList.add('active');
+      if (tabReadmeBtn) tabReadmeBtn.classList.remove('active');
+      if (previewsContent) previewsContent.style.display = 'block';
+      if (docContent) docContent.style.display = 'none';
+    } else {
+      if (tabPreviewsBtn) tabPreviewsBtn.classList.remove('active');
+      if (tabReadmeBtn) tabReadmeBtn.classList.add('active');
+      if (previewsContent) previewsContent.style.display = 'none';
+      if (docContent) docContent.style.display = 'block';
+    }
+  }
+
+  function openHfImageLightbox(url, caption) {
+    if (!lightboxModal || !lightboxImg) return;
+    lightboxImg.src = url;
+    if (lightboxCaption) lightboxCaption.textContent = caption || url;
+    if (lightboxDownloadLink) {
+      lightboxDownloadLink.href = url;
+    }
+    lightboxModal.classList.remove('hidden');
+  }
+
+  // Tab switcher events
+  if (tabPreviewsBtn) {
+    tabPreviewsBtn.addEventListener('click', () => switchReadmeTab('previews'));
+  }
+  if (tabReadmeBtn) {
+    tabReadmeBtn.addEventListener('click', () => switchReadmeTab('readme'));
+  }
+
+  // Modal close handlers
+  if (closeReadmeBtn) {
+    closeReadmeBtn.addEventListener('click', () => {
+      if (readmeModal) readmeModal.classList.add('hidden');
+    });
+  }
+  if (closeReadmeFooterBtn) {
+    closeReadmeFooterBtn.addEventListener('click', () => {
+      if (readmeModal) readmeModal.classList.add('hidden');
+    });
+  }
+  if (readmeModal) {
+    readmeModal.addEventListener('click', (e) => {
+      if (e.target === readmeModal) readmeModal.classList.add('hidden');
+    });
+  }
+
+  // Lightbox close handlers
+  if (closeLightboxBtn) {
+    closeLightboxBtn.addEventListener('click', () => {
+      if (lightboxModal) lightboxModal.classList.add('hidden');
+    });
+  }
+  if (lightboxModal) {
+    lightboxModal.addEventListener('click', (e) => {
+      if (e.target === lightboxModal) lightboxModal.classList.add('hidden');
+    });
+  }
+
+  // Initial silent fetch of installed models for badge count
+  loadHfInstalled();
+}
+
+// ========================================================
+// KeyBait Lab & Awkward Prompt Testbench Controller
+// ========================================================
+function initKeyBait() {
+  const openBtn = document.getElementById('openKeyBaitModalBtn');
+  const modal = document.getElementById('keyBaitModal');
+  const closeBtn = document.getElementById('closeKeyBaitModalBtn');
+  const providerSelect = document.getElementById('kbProviderSelect');
+  const modelInput = document.getElementById('kbModelInput');
+  const rollBtn = document.getElementById('kbRollBtn');
+  const testAllBtn = document.getElementById('kbTestAllBtn');
+  const fullscreenBtn = document.getElementById('kbFullscreenBtn');
+
+  const promptCountLabel = document.getElementById('kbPromptCount');
+  const categoryChips = document.querySelectorAll('.kb-cat-chip');
+  const searchInput = document.getElementById('kbSearchInput');
+  const promptListContainer = document.getElementById('kbPromptList');
+
+  const activeBadge = document.getElementById('kbActivePromptBadge');
+  const activeTitle = document.getElementById('kbActivePromptTitle');
+  const activeTrapDesc = document.getElementById('kbActiveTrapDesc');
+  const promptEditor = document.getElementById('kbPromptEditor');
+  const copyPromptBtn = document.getElementById('kbCopyPromptBtn');
+  const resetPromptBtn = document.getElementById('kbResetPromptBtn');
+  const fireBtn = document.getElementById('kbFireBtn');
+
+  const statusBadge = document.getElementById('kbStatusBadge');
+  const latencyPill = document.getElementById('kbLatencyPill');
+  const tokensPill = document.getElementById('kbTokensPill');
+  const targetPill = document.getElementById('kbTargetPill');
+  const toggleRawBtn = document.getElementById('kbToggleRawBtn');
+  const copyResultBtn = document.getElementById('kbCopyResultBtn');
+  const evalBanner = document.getElementById('kbEvaluationBanner');
+  const outputContainer = document.getElementById('kbOutputContainer');
+  const rawJsonView = document.getElementById('kbRawJsonView');
+
+  const scoreboardCard = document.getElementById('kbScoreboardCard');
+  const scoreboardTable = document.getElementById('kbScoreboardTable');
+  const closeScoreboardBtn = document.getElementById('kbCloseScoreboardBtn');
+
+  if (!openBtn || !modal) return;
+
+  let allPrompts = [];
+  let currentCategory = 'all';
+  let searchQuery = '';
+  let activePrompt = null;
+  let lastResult = null;
+  let isRawJson = false;
+  let testTimer = null;
+
+  const categoryNames = {
+    traps: '🦝 TRAP',
+    pings: '⚡ PING',
+    formats: '📐 FORMAT',
+    ideas: '💡 IDEA',
+    useful: '🛠️ USEFUL',
+    meta: '🧠 META'
+  };
+
+  const categoryColors = {
+    traps: '#f59e0b',
+    pings: '#38bdf8',
+    formats: '#a855f7',
+    ideas: '#22c55e',
+    useful: '#06b6d4',
+    meta: '#ec4899'
+  };
+
+  async function loadPrompts() {
+    try {
+      const res = await fetch('/api/keybait/prompts', { headers: adminHeaders() });
+      if (!res.ok) throw new Error('Failed to load prompts');
+      const data = await res.json();
+      allPrompts = data.prompts || [];
+      renderPromptList();
+      if (allPrompts.length > 0 && !activePrompt) {
+        selectPrompt(allPrompts[0]);
+      }
+    } catch (e) {
+      console.error('[KeyBait] Error loading prompts:', e);
+    }
+  }
+
+  function getFilteredPrompts() {
+    return allPrompts.filter(p => {
+      const matchCat = currentCategory === 'all' || p.category === currentCategory;
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = !q ||
+        p.title.toLowerCase().includes(q) ||
+        p.prompt.toLowerCase().includes(q) ||
+        p.tags.some(t => t.toLowerCase().includes(q));
+      return matchCat && matchSearch;
+    });
+  }
+
+  function renderPromptList() {
+    if (!promptListContainer) return;
+    const filtered = getFilteredPrompts();
+    if (promptCountLabel) {
+      promptCountLabel.textContent = `${filtered.length} Prompt${filtered.length === 1 ? '' : 's'}`;
+    }
+
+    if (filtered.length === 0) {
+      promptListContainer.innerHTML = '<div style="color:var(--text-muted); font-size:11.5px; text-align:center; padding:20px 0;">No matching prompts</div>';
+      return;
+    }
+
+    promptListContainer.innerHTML = filtered.map(p => {
+      const isSelected = activePrompt && activePrompt.id === p.id;
+      const catColor = categoryColors[p.category] || '#06b6d4';
+      const catName = categoryNames[p.category] || p.category.toUpperCase();
+
+      return `
+        <div class="kb-prompt-card ${isSelected ? 'selected' : ''}" data-id="${p.id}">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:700; color:#f1f5f9;">${escapeHtml(p.title)}</span>
+            <span style="font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:4px; background:${catColor}20; color:${catColor}; border:1px solid ${catColor}40;">
+              ${catName}
+            </span>
+          </div>
+          <div style="font-size:10.5px; color:var(--text-muted); line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">
+            ${escapeHtml(p.trap_description || p.prompt)}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    promptListContainer.querySelectorAll('.kb-prompt-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.getAttribute('data-id');
+        const found = allPrompts.find(p => p.id === id);
+        if (found) selectPrompt(found);
+      });
+    });
+  }
+
+  function selectPrompt(p) {
+    activePrompt = p;
+    if (activeBadge) {
+      const catColor = categoryColors[p.category] || '#06b6d4';
+      const catName = categoryNames[p.category] || p.category.toUpperCase();
+      activeBadge.textContent = catName;
+      activeBadge.style.background = `${catColor}20`;
+      activeBadge.style.borderColor = `${catColor}60`;
+      activeBadge.style.color = catColor;
+    }
+    if (activeTitle) activeTitle.textContent = p.title;
+    if (activeTrapDesc) activeTrapDesc.textContent = p.trap_description || 'Custom challenge prompt';
+    if (promptEditor) promptEditor.value = p.prompt;
+
+    // Highlight active card
+    if (promptListContainer) {
+      promptListContainer.querySelectorAll('.kb-prompt-card').forEach(c => {
+        if (c.getAttribute('data-id') === p.id) {
+          c.classList.add('selected');
+          c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          c.classList.remove('selected');
+        }
+      });
+    }
+  }
+
+  function rollPrompt() {
+    const list = getFilteredPrompts();
+    if (list.length === 0) return;
+    const currentId = activePrompt ? activePrompt.id : null;
+    let pool = list.filter(p => p.id !== currentId);
+    if (pool.length === 0) pool = list;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    selectPrompt(pick);
+
+    if (promptEditor) {
+      promptEditor.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.5)';
+      promptEditor.style.borderColor = '#06b6d4';
+      setTimeout(() => {
+        promptEditor.style.boxShadow = '';
+        promptEditor.style.borderColor = '';
+      }, 350);
+    }
+  }
+
+  async function fireTest() {
+    if (!promptEditor || !promptEditor.value.trim()) return;
+
+    if (fireBtn) {
+      fireBtn.disabled = true;
+      fireBtn.innerHTML = '<span>⏳ Testing...</span>';
+    }
+
+    if (statusBadge) {
+      statusBadge.textContent = 'RUNNING';
+      statusBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+      statusBadge.style.borderColor = 'rgba(56, 189, 248, 0.5)';
+      statusBadge.style.color = '#38bdf8';
+    }
+
+    if (evalBanner) {
+      evalBanner.className = 'hidden';
+      evalBanner.textContent = '';
+    }
+
+    const startTime = Date.now();
+    if (latencyPill) latencyPill.textContent = '⏱️ 0 ms';
+    if (testTimer) clearInterval(testTimer);
+    testTimer = setInterval(() => {
+      if (latencyPill) latencyPill.textContent = `⏱️ ${Date.now() - startTime} ms`;
+    }, 50);
+
+    const payload = {
+      prompt_id: activePrompt ? activePrompt.id : undefined,
+      prompt_text: promptEditor.value.trim(),
+      provider: providerSelect ? providerSelect.value : 'auto',
+      model: modelInput && modelInput.value.trim() !== 'auto' ? modelInput.value.trim() : undefined
+    };
+
+    try {
+      const res = await fetch('/api/keybait/test', {
+        method: 'POST',
+        headers: adminHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload)
+      });
+
+      clearInterval(testTimer);
+      const data = await res.json();
+      lastResult = data;
+
+      const elapsed = data.latency_ms || (Date.now() - startTime);
+      if (latencyPill) latencyPill.textContent = `⏱️ ${elapsed} ms`;
+
+      if (data.ok) {
+        if (statusBadge) {
+          statusBadge.textContent = '200 OK';
+          statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+          statusBadge.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+          statusBadge.style.color = '#22c55e';
+        }
+      } else {
+        if (statusBadge) {
+          statusBadge.textContent = `ERR ${data.status_code || 500}`;
+          statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+          statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+          statusBadge.style.color = '#f87171';
+        }
+      }
+
+      if (tokensPill) {
+        const total = data.tokens?.total || 0;
+        tokensPill.textContent = `🔤 ${total} tokens`;
+      }
+
+      if (targetPill) {
+        targetPill.textContent = `🎯 ${data.provider || payload.provider} · ${data.model || 'auto'}`;
+      }
+
+      // Render output
+      renderOutput(data.text || data.error || 'No output received.');
+      if (rawJsonView) {
+        rawJsonView.textContent = JSON.stringify(data, null, 2);
+      }
+
+      // Render Evaluation Trap Banner
+      if (evalBanner && data.evaluation) {
+        evalBanner.classList.remove('hidden', 'kb-eval-pass', 'kb-eval-fail', 'kb-eval-unverified');
+        if (data.evaluation.status === 'passed') {
+          evalBanner.classList.add('kb-eval-pass');
+          evalBanner.innerHTML = `<span>🟢</span> <div><strong>TRAP AVOIDED:</strong> ${escapeHtml(data.evaluation.message)}</div>`;
+        } else if (data.evaluation.status === 'failed') {
+          evalBanner.classList.add('kb-eval-fail');
+          evalBanner.innerHTML = `<span>🔴</span> <div><strong>TRAPPED / FAILED:</strong> ${escapeHtml(data.evaluation.message)}</div>`;
+        } else {
+          evalBanner.classList.add('kb-eval-unverified');
+          evalBanner.innerHTML = `<span>⚪</span> <div><strong>RESULT:</strong> ${escapeHtml(data.evaluation.message)}</div>`;
+        }
+      }
+
+    } catch (err) {
+      clearInterval(testTimer);
+      if (statusBadge) {
+        statusBadge.textContent = 'FAILED';
+        statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+        statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+        statusBadge.style.color = '#f87171';
+      }
+      renderOutput(`Request error: ${err.message}`);
+    } finally {
+      if (fireBtn) {
+        fireBtn.disabled = false;
+        fireBtn.innerHTML = '<span>⚡ Fire Test</span>';
+      }
+    }
+  }
+
+  function renderOutput(text) {
+    if (!outputContainer) return;
+    let safe = escapeHtml(text);
+    safe = safe.replace(/```([a-z]*)\n([\s\S]*?)```/g, (m, lang, code) => {
+      return `<pre style="background:rgba(0,0,0,0.6); padding:8px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); font-family:'JetBrains Mono', monospace; font-size:11.5px; color:#38bdf8; overflow-x:auto;"><code>${code}</code></pre>`;
+    });
+    safe = safe.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 5px; border-radius:4px; font-family:\'JetBrains Mono\', monospace; font-size:11px; color:#38bdf8;">$1</code>');
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    safe = safe.replace(/\n/g, '<br/>');
+    outputContainer.innerHTML = safe;
+  }
+
+  async function runScoreboard() {
+    if (!scoreboardCard || !scoreboardTable) return;
+    scoreboardCard.classList.remove('hidden');
+    scoreboardTable.innerHTML = '<div style="color:#38bdf8; text-align:center; padding:15px; font-size:12px;">⚡ Pinging all active providers in parallel...</div>';
+
+    const pId = activePrompt ? activePrompt.id : 'ping_pong';
+
+    try {
+      const res = await fetch('/api/keybait/test-all', {
+        method: 'POST',
+        headers: adminHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ prompt_id: pId })
+      });
+      const data = await res.json();
+      const results = data.results || [];
+
+      if (results.length === 0) {
+        scoreboardTable.innerHTML = '<div style="color:var(--text-muted); padding:10px;">No provider results returned.</div>';
+        return;
+      }
+
+      let html = `
+        <table class="kb-scoreboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Provider</th>
+              <th>Model</th>
+              <th>Status</th>
+              <th>Latency</th>
+              <th>Preview / Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      results.forEach((r, idx) => {
+        const okBadge = r.ok
+          ? '<span style="color:#22c55e; font-weight:700;">🟢 200 OK</span>'
+          : `<span style="color:#f87171; font-weight:700;">🔴 ${r.status_code || 'ERR'}</span>`;
+
+        let latColor = '#22c55e';
+        if (r.latency_ms > 1500) latColor = '#f59e0b';
+        if (r.latency_ms > 3000) latColor = '#a855f7';
+
+        const previewText = r.preview || r.error || '';
+
+        html += `
+          <tr>
+            <td style="color:var(--text-muted); font-weight:700;">${idx + 1}</td>
+            <td style="font-weight:700; color:#f1f5f9;">${escapeHtml(r.provider)}</td>
+            <td style="color:#94a3b8; font-family:'JetBrains Mono', monospace; font-size:11px;">${escapeHtml(r.model)}</td>
+            <td>${okBadge}</td>
+            <td style="color:${latColor}; font-family:'JetBrains Mono', monospace; font-weight:700;">${r.latency_ms} ms</td>
+            <td style="color:#cbd5e1; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(previewText)}">
+              ${escapeHtml(previewText)}
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      scoreboardTable.innerHTML = html;
+    } catch (err) {
+      scoreboardTable.innerHTML = `<div style="color:#f87171; padding:10px;">Failed to run scoreboard: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // Bind Event Handlers
+  openBtn.addEventListener('click', () => {
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    if (allPrompts.length === 0) {
+      loadPrompts();
+    }
+  });
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+  });
+  // Note: kbFullscreenBtn is now handled universally by .modal-maximize-btn
+
+
+  categoryChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      categoryChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentCategory = chip.getAttribute('data-category') || 'all';
+      renderPromptList();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      renderPromptList();
+    });
+  }
+
+  if (rollBtn) {
+    rollBtn.addEventListener('click', rollPrompt);
+  }
+
+  if (fireBtn) {
+    fireBtn.addEventListener('click', fireTest);
+  }
+
+  if (copyPromptBtn && promptEditor) {
+    copyPromptBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(promptEditor.value);
+      copyPromptBtn.textContent = '✓ Copied';
+      setTimeout(() => { copyPromptBtn.textContent = '📋 Copy'; }, 1500);
+    });
+  }
+
+  if (resetPromptBtn && promptEditor) {
+    resetPromptBtn.addEventListener('click', () => {
+      if (activePrompt) promptEditor.value = activePrompt.prompt;
+    });
+  }
+
+  if (toggleRawBtn) {
+    toggleRawBtn.addEventListener('click', () => {
+      isRawJson = !isRawJson;
+      if (isRawJson) {
+        toggleRawBtn.textContent = 'VIEW';
+        if (outputContainer) outputContainer.classList.add('hidden');
+        if (rawJsonView) rawJsonView.classList.remove('hidden');
+      } else {
+        toggleRawBtn.textContent = 'JSON';
+        if (outputContainer) outputContainer.classList.remove('hidden');
+        if (rawJsonView) rawJsonView.classList.add('hidden');
+      }
+    });
+  }
+
+  if (copyResultBtn) {
+    copyResultBtn.addEventListener('click', () => {
+      const textToCopy = isRawJson
+        ? (rawJsonView ? rawJsonView.textContent : '')
+        : (lastResult?.text || (outputContainer ? outputContainer.innerText : ''));
+      navigator.clipboard.writeText(textToCopy);
+      copyResultBtn.textContent = '✓ Copied';
+      setTimeout(() => { copyResultBtn.textContent = '📋 Copy'; }, 1500);
+    });
+  }
+
+  if (testAllBtn) {
+    testAllBtn.addEventListener('click', runScoreboard);
+  }
+
+  if (closeScoreboardBtn && scoreboardCard) {
+    closeScoreboardBtn.addEventListener('click', () => {
+      scoreboardCard.classList.add('hidden');
+    });
+  }
+
+  // Keyboard Shortcuts
+  window.addEventListener('keydown', (e) => {
+    if (modal.classList.contains('hidden')) return;
+
+    if (e.key === 'Escape') {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+      return;
+    }
+
+    if (e.key === ' ' && document.activeElement !== promptEditor && document.activeElement !== searchInput && document.activeElement !== modelInput) {
+      e.preventDefault();
+      rollPrompt();
+      return;
+    }
+
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      fireTest();
+      return;
+    }
+  });
+
+  // Auto-open if URL has #keybait or path is /keybait
+  if (window.location.hash === '#keybait' || window.location.pathname.startsWith('/keybait')) {
+    modal.classList.remove('hidden');
+    loadPrompts();
+  }
+}
+
+// ========================================================
+// System Prompts & Configuration Studio (PIN: 1111)
+// ========================================================
+function initPromptsStudio() {
+  const openBtn = document.getElementById('openPromptsModalBtn');
+  const modal = document.getElementById('promptsModal');
+  const closeBtn = document.getElementById('closePromptsModalBtn');
+  const closeFooterBtn = document.getElementById('closePromptsModalFooterBtn');
+  const relockBtn = document.getElementById('promptsRelockBtn');
+  const lockBadge = document.getElementById('promptsStudioLockBadge');
+
+  const challengeView = document.getElementById('promptsPinChallengeView');
+  const editorView = document.getElementById('promptsEditorView');
+  const pinForm = document.getElementById('promptsPinForm');
+  const pinInput = document.getElementById('promptsPinInput');
+  const pinErrorMsg = document.getElementById('promptsPinErrorMsg');
+
+  // Tabs
+  const tabBtns = document.querySelectorAll('.prompts-tab-btn');
+  const tabPanels = document.querySelectorAll('.prompts-tab-panel');
+
+  // Field Inputs
+  const customSystemInput = document.getElementById('promptCustomSystemInput');
+  const defaultPersonaInput = document.getElementById('promptDefaultPersonaInput');
+  const roasterPersonaInput = document.getElementById('promptRoasterPersonaInput');
+  const operatingRulesInput = document.getElementById('promptOperatingRulesInput');
+  const noAutoLaunchToggle = document.getElementById('promptNoAutoLaunchToggle');
+  const maxTurnsInput = document.getElementById('promptMaxTurnsInput');
+  const cloudTimeoutInput = document.getElementById('promptCloudTimeoutInput');
+  const localTimeoutInput = document.getElementById('promptLocalTimeoutInput');
+  const requestTimeoutInput = document.getElementById('promptRequestTimeoutInput');
+  const openRouterModelInput = document.getElementById('promptOpenRouterModelInput');
+  const localDefaultModelInput = document.getElementById('promptLocalDefaultModelInput');
+  const newPinInput = document.getElementById('promptNewPinInput');
+  const confirmPinInput = document.getElementById('promptConfirmPinInput');
+  const pinMatchNotice = document.getElementById('promptPinMatchNotice');
+
+  // File System Access & Sandboxing Elements
+  const fsModeSandboxed = document.getElementById('promptFsModeSandboxed');
+  const fsModeTrusted = document.getElementById('promptFsModeTrusted');
+  const fsTrustBadge = document.getElementById('promptFsTrustBadge');
+  const workspaceDirInput = document.getElementById('promptWorkspaceDirInput');
+  const blockDesktopToggle = document.getElementById('promptBlockDesktopToggle');
+  const wsQuickBtns = document.querySelectorAll('.ws-quick-btn');
+
+  function updateFsTrustBadge() {
+    if (!fsTrustBadge) return;
+    const isTrusted = fsModeTrusted && fsModeTrusted.checked;
+    if (isTrusted) {
+      fsTrustBadge.textContent = '🔓 Trusted Full Access';
+      fsTrustBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+      fsTrustBadge.style.color = '#f59e0b';
+      fsTrustBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    } else {
+      fsTrustBadge.textContent = '🛡️ Sandboxed';
+      fsTrustBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+      fsTrustBadge.style.color = '#4ade80';
+      fsTrustBadge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+    }
+  }
+
+  if (fsModeSandboxed) fsModeSandboxed.addEventListener('change', updateFsTrustBadge);
+  if (fsModeTrusted) fsModeTrusted.addEventListener('change', updateFsTrustBadge);
+  if (wsQuickBtns) {
+    wsQuickBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const folder = btn.getAttribute('data-folder');
+        if (workspaceDirInput && folder) workspaceDirInput.value = folder;
+      });
+    });
+  }
+
+  // Cascade & Provider Controls Elements
+  const cascadeList = document.getElementById('promptsCascadeList');
+  const cascadeActiveCount = document.getElementById('promptsCascadeActiveCount');
+  const cascadeJsonInput = document.getElementById('promptCascadeJsonInput');
+  const cascadeJsonError = document.getElementById('promptCascadeJsonError');
+  const addConnForm = document.getElementById('promptsAddConnForm');
+  const newConnProvider = document.getElementById('promptsNewConnProvider');
+  const newConnKey = document.getElementById('promptsNewConnKey');
+  const newConnLabel = document.getElementById('promptsNewConnLabel');
+  const addConnBtn = document.getElementById('promptsAddConnBtn');
+  const connStatusMsg = document.getElementById('promptsConnStatusMsg');
+  const activeConnList = document.getElementById('promptsActiveConnectionsList');
+  const presetBtns = document.querySelectorAll('.cascade-preset-btn');
+
+  const PROVIDER_METADATA = {
+    deepseek: { name: 'DeepSeek', desc: '⚡ Super Cheap / Coder / R1 Reasoning', icon: '🐋' },
+    cerebras: { name: 'Cerebras', desc: '⚡ 1,800+ tok/s Llama 3.3 70B', icon: '⚡' },
+    groq: { name: 'Groq', desc: '🚀 LPU Ultra-Low Latency Inference', icon: '🚀' },
+    nvidia: { name: 'NVIDIA NIM', desc: '🟩 Free Cloud Inference Tier', icon: '🟩' },
+    qwen: { name: 'Qwen / DashScope', desc: '🌐 Alibaba Cloud Qwen 2.5', icon: '🌐' },
+    openrouter: { name: 'OpenRouter', desc: '🔀 Multi-Model Aggregator & Fallbacks', icon: '🔀' },
+    openai: { name: 'OpenAI', desc: '🟢 GPT-4o / o1 / o3-mini', icon: '🟢' },
+    anthropic: { name: 'Anthropic', desc: '🟣 Claude 3.5 / 3.7 Sonnet', icon: '🟣' },
+    gemini: { name: 'Google Gemini', desc: '🔷 Gemini 2.0 Flash / Pro', icon: '🔷' },
+    xai: { name: 'xAI / Grok', desc: '⚫ Grok 2 & Vision Models', icon: '⚫' },
+    aimlapi: { name: 'AIMLAPI', desc: '🤖 200+ Model Cloud Aggregator', icon: '🤖' },
+    gmicloud: { name: 'GMI Cloud', desc: '☁️ Enterprise Cloud GPUs', icon: '☁️' },
+    inception: { name: 'Inception Labs', desc: '⚡ High-Speed Diffusion LLMs', icon: '⚡' },
+    atria: { name: 'Atria ASI (Dawn)', desc: '🌅 744B MoE Agentic Foundation Model', icon: '🌅' },
+    cheaperinference: { name: 'CheaperInference', desc: '🏷️ Budget Cloud Inference', icon: '🏷️' },
+    local: { name: 'Local CUDA / Ollama', desc: '🖥️ Offline RTX 4060 GPU', icon: '🖥️' }
+  };
+
+  const CASCADE_PRESETS = {
+    coding: ['groq', 'cerebras', 'deepseek', 'nvidia', 'qwen', 'openrouter', 'local', 'openai', 'anthropic', 'gemini', 'xai', 'aimlapi', 'gmicloud', 'inception', 'atria', 'cheaperinference'],
+    quality: ['anthropic', 'openai', 'gemini', 'deepseek', 'cerebras', 'qwen', 'groq', 'nvidia', 'openrouter', 'xai', 'aimlapi', 'gmicloud', 'inception', 'atria', 'cheaperinference', 'local'],
+    free: ['openrouter', 'groq', 'cerebras', 'nvidia', 'local', 'deepseek', 'qwen', 'gemini', 'cheaperinference', 'aimlapi', 'gmicloud', 'inception', 'atria', 'openai', 'anthropic', 'xai'],
+    local: ['local', 'deepseek', 'cerebras', 'groq', 'nvidia', 'qwen', 'openrouter', 'gemini', 'openai', 'anthropic', 'xai', 'aimlapi', 'gmicloud', 'inception', 'atria', 'cheaperinference']
+  };
+
+  let currentCascadeOrder = Object.keys(PROVIDER_METADATA);
+  let currentDisabledProviders = [];
+  let currentProviderStatus = {};
+  let currentConnections = [];
+
+  function syncJsonEditor() {
+    if (cascadeJsonInput) {
+      cascadeJsonInput.value = JSON.stringify({
+        cascadeOrder: currentCascadeOrder,
+        disabledProviders: currentDisabledProviders
+      }, null, 2);
+    }
+    if (cascadeJsonError) {
+      cascadeJsonError.textContent = '';
+    }
+  }
+
+  function renderCascadeList() {
+    if (!cascadeList) return;
+    cascadeList.innerHTML = '';
+
+    const activeCount = currentCascadeOrder.filter(p => !currentDisabledProviders.includes(p)).length;
+    if (cascadeActiveCount) cascadeActiveCount.textContent = `${activeCount} of ${currentCascadeOrder.length}`;
+
+    currentCascadeOrder.forEach((provKey, index) => {
+      const meta = PROVIDER_METADATA[provKey] || { name: provKey, desc: 'External Provider', icon: '🔌' };
+      const isDisabled = currentDisabledProviders.includes(provKey);
+      const provStatus = currentProviderStatus[provKey] || {};
+      const isLocal = provKey === 'local';
+      const isConfigured = isLocal || provStatus.configured || (currentConnections && currentConnections.some(c => c.provider === provKey && c.status === 'active'));
+
+      const row = document.createElement('div');
+      row.className = `cascade-row ${isDisabled ? 'disabled' : ''}`;
+      row.setAttribute('data-provider', provKey);
+
+      let statusPillHtml = '';
+      if (isLocal) {
+        statusPillHtml = '<span class="cascade-status-pill cascade-status-local">🖥️ Local GPU</span>';
+      } else if (isConfigured) {
+        statusPillHtml = '<span class="cascade-status-pill cascade-status-ready">🟢 Ready</span>';
+      } else {
+        statusPillHtml = '<span class="cascade-status-pill cascade-status-missing">⚪ No Key Set</span>';
+      }
+
+      row.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <span class="cascade-rank-badge">#${index + 1}</span>
+          <div style="min-width: 0;">
+            <div style="font-size: 13px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span>${meta.icon}</span>
+              <span>${meta.name}</span>
+              ${statusPillHtml}
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${meta.desc}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <button type="button" class="cascade-order-btn cascade-up-btn" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Move Up in Cascade Priority">▲</button>
+          <button type="button" class="cascade-order-btn cascade-down-btn" data-index="${index}" ${index === currentCascadeOrder.length - 1 ? 'disabled' : ''} title="Move Down in Cascade Priority">▼</button>
+          <label class="switch" style="position: relative; display: inline-block; width: 38px; height: 20px; margin-left: 4px;" title="${isDisabled ? 'Enable' : 'Disable'} provider">
+            <input type="checkbox" class="cascade-toggle-input" data-provider="${provKey}" ${!isDisabled ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+            <span class="slider round" style="position: absolute; cursor: pointer; inset: 0; background-color: #334155; border-radius: 20px; transition: .3s;"></span>
+          </label>
+        </div>
+      `;
+
+      cascadeList.appendChild(row);
+    });
+
+    // Wire up event listeners
+    cascadeList.querySelectorAll('.cascade-up-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute('data-index'), 10);
+        if (idx > 0) {
+          const item = currentCascadeOrder.splice(idx, 1)[0];
+          currentCascadeOrder.splice(idx - 1, 0, item);
+          renderCascadeList();
+          syncJsonEditor();
+        }
+      });
+    });
+
+    cascadeList.querySelectorAll('.cascade-down-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute('data-index'), 10);
+        if (idx < currentCascadeOrder.length - 1) {
+          const item = currentCascadeOrder.splice(idx, 1)[0];
+          currentCascadeOrder.splice(idx + 1, 0, item);
+          renderCascadeList();
+          syncJsonEditor();
+        }
+      });
+    });
+
+    cascadeList.querySelectorAll('.cascade-toggle-input').forEach(input => {
+      input.addEventListener('change', () => {
+        const prov = input.getAttribute('data-provider');
+        if (input.checked) {
+          currentDisabledProviders = currentDisabledProviders.filter(p => p !== prov);
+        } else {
+          if (!currentDisabledProviders.includes(prov)) {
+            currentDisabledProviders.push(prov);
+          }
+        }
+        renderCascadeList();
+        syncJsonEditor();
+      });
+    });
+  }
+
+  function renderActiveConnectionsList() {
+    if (!activeConnList) return;
+    activeConnList.innerHTML = '';
+
+    if (!currentConnections || currentConnections.length === 0) {
+      activeConnList.innerHTML = `
+        <div style="font-size: 11.5px; color: var(--text-muted); font-style: italic; padding: 6px 0;">
+          No custom upstream keys saved yet. (Provider keys from environment variables or .env will still be used).
+        </div>
+      `;
+      return;
+    }
+
+    currentConnections.forEach(conn => {
+      const meta = PROVIDER_METADATA[conn.provider] || { name: conn.provider, icon: '🔑' };
+      const item = document.createElement('div');
+      item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: rgba(10, 15, 30, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 6px; padding: 6px 12px;';
+      item.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;">
+          <span>${meta.icon}</span>
+          <span style="font-weight: 700; color: #f8fafc;">${meta.name}</span>
+          <code style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: #94a3b8;">${conn.maskedKey}</code>
+          ${conn.label ? `<span style="font-size: 11px; color: #64748b;">(${conn.label})</span>` : ''}
+        </div>
+        <button type="button" class="action-tag-btn delete-conn-btn" data-id="${conn.id}" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3); font-size: 11px; padding: 3px 8px;" title="Remove this API Key">
+          🗑️ Remove
+        </button>
+      `;
+      activeConnList.appendChild(item);
+    });
+
+    activeConnList.querySelectorAll('.delete-conn-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        if (!confirm('Remove this upstream connection key?')) return;
+        try {
+          const res = await fetch(`/v1/provider-connections/${id}`, {
+            method: 'DELETE',
+            headers: adminHeaders(),
+          });
+          if (res.ok) {
+            currentConnections = currentConnections.filter(c => c.id !== id);
+            renderActiveConnectionsList();
+            renderCascadeList();
+          }
+        } catch (err) {
+          alert('Failed to delete connection: ' + err.message);
+        }
+      });
+    });
+  }
+
+  // Action Buttons
+  const saveBtn = document.getElementById('promptsSaveBtn');
+  const resetBtn = document.getElementById('promptsResetDefaultsBtn');
+  const saveStatusText = document.getElementById('promptsSaveStatusText');
+
+  let verifiedPin = sessionStorage.getItem('nexus_prompts_pin') || '';
+
+  function setUnlockedUi(unlocked) {
+    if (unlocked) {
+      if (challengeView) challengeView.classList.add('hidden');
+      if (editorView) editorView.classList.remove('hidden');
+      if (relockBtn) relockBtn.classList.remove('hidden');
+      if (lockBadge) {
+        lockBadge.textContent = '🔓 Unlocked';
+        lockBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+        lockBadge.style.color = '#22c55e';
+        lockBadge.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+      }
+    } else {
+      if (challengeView) challengeView.classList.remove('hidden');
+      if (editorView) editorView.classList.add('hidden');
+      if (relockBtn) relockBtn.classList.add('hidden');
+      if (lockBadge) {
+        lockBadge.textContent = 'PIN Protected';
+        lockBadge.style.background = 'rgba(234, 179, 8, 0.2)';
+        lockBadge.style.color = '#eab308';
+        lockBadge.style.borderColor = 'rgba(234, 179, 8, 0.4)';
+      }
+      if (pinInput) {
+        pinInput.value = '';
+        setTimeout(() => pinInput.focus(), 50);
+      }
+      if (pinErrorMsg) pinErrorMsg.textContent = '';
+    }
+  }
+
+  async function loadPromptsConfig() {
+    try {
+      const res = await fetch('/v1/prompts/config', { headers: adminHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const cfg = data.config || {};
+
+      if (customSystemInput) customSystemInput.value = cfg.customSystemPrompt || '';
+      if (defaultPersonaInput) defaultPersonaInput.value = cfg.defaultPersona || '';
+      if (roasterPersonaInput) roasterPersonaInput.value = cfg.roasterPersona || '';
+      if (operatingRulesInput) operatingRulesInput.value = cfg.autonomousOperatingRules || '';
+      if (noAutoLaunchToggle) noAutoLaunchToggle.checked = cfg.noAutoLaunch !== false;
+      const promptCavemanToggle = document.getElementById('promptCavemanToggle');
+      if (promptCavemanToggle) promptCavemanToggle.checked = cfg.cavemanMode === true;
+      if (maxTurnsInput) maxTurnsInput.value = cfg.maxAgentTurns || 25;
+      if (cloudTimeoutInput) cloudTimeoutInput.value = cfg.cloudTimeoutMs || 90000;
+      if (localTimeoutInput) localTimeoutInput.value = cfg.localTimeoutMs || 120000;
+      if (requestTimeoutInput) requestTimeoutInput.value = cfg.requestTimeoutMs || 900000;
+      if (openRouterModelInput) openRouterModelInput.value = cfg.openRouterModel || 'openrouter/free';
+      if (localDefaultModelInput) localDefaultModelInput.value = cfg.localDefaultModel || 'llama3.1:8b';
+
+      // File System Sandboxing
+      const isTrusted = cfg.fileSystemAccess === 'trusted_full';
+      if (fsModeSandboxed) fsModeSandboxed.checked = !isTrusted;
+      if (fsModeTrusted) fsModeTrusted.checked = isTrusted;
+      if (workspaceDirInput) workspaceDirInput.value = cfg.workspaceDirectory || 'workspace';
+      if (blockDesktopToggle) blockDesktopToggle.checked = cfg.blockDesktopAccess !== false;
+      updateFsTrustBadge();
+
+      if (Array.isArray(cfg.cascadeOrder) && cfg.cascadeOrder.length > 0) {
+        currentCascadeOrder = [...cfg.cascadeOrder];
+      } else {
+        currentCascadeOrder = Object.keys(PROVIDER_METADATA);
+      }
+      currentDisabledProviders = Array.isArray(cfg.disabledProviders) ? [...cfg.disabledProviders] : [];
+      currentProviderStatus = data.providers || {};
+      currentConnections = data.connections || [];
+
+      renderCascadeList();
+      renderActiveConnectionsList();
+      syncJsonEditor();
+
+      if (newPinInput) newPinInput.value = '';
+      if (confirmPinInput) confirmPinInput.value = '';
+      if (pinMatchNotice) pinMatchNotice.textContent = '';
+    } catch (err) {
+      console.warn('[PromptsStudio] Failed to load config:', err);
+    }
+  }
+
+  async function checkAndOpen() {
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    // If we have a cached PIN, verify it with the server
+    if (verifiedPin) {
+      try {
+        const res = await fetch('/v1/prompts/verify-pin', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ pin: verifiedPin }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          if (data.token) {
+            adminSessionToken = data.token;
+            sessionStorage.setItem('nexus_admin_token', data.token);
+          }
+          setUnlockedUi(true);
+          await loadPromptsConfig();
+          return;
+        }
+      } catch {}
+      verifiedPin = '';
+      sessionStorage.removeItem('nexus_prompts_pin');
+    }
+
+    setUnlockedUi(false);
+  }
+
+  function closeModal() {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  if (openBtn) {
+    openBtn.addEventListener('click', checkAndOpen);
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeModal);
+  }
+  if (closeFooterBtn) {
+    closeFooterBtn.addEventListener('click', closeModal);
+  }
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  if (relockBtn) {
+    relockBtn.addEventListener('click', () => {
+      verifiedPin = '';
+      sessionStorage.removeItem('nexus_prompts_pin');
+      setUnlockedUi(false);
+    });
+  }
+
+  // PIN Form submission
+  let isVerifyingPin = false;
+  if (pinForm) {
+    pinForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isVerifyingPin) return;
+      const enteredPin = (pinInput ? pinInput.value : '').trim();
+      if (!enteredPin) {
+        if (pinErrorMsg) pinErrorMsg.textContent = 'Please enter PIN (default 1111)';
+        return;
+      }
+
+      isVerifyingPin = true;
+      try {
+        const res = await fetch('/v1/prompts/verify-pin', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ pin: enteredPin }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          verifiedPin = enteredPin;
+          sessionStorage.setItem('nexus_prompts_pin', enteredPin);
+          if (data.token) {
+            adminSessionToken = data.token;
+            sessionStorage.setItem('nexus_admin_token', data.token);
+          }
+          if (pinErrorMsg) pinErrorMsg.textContent = '';
+          setUnlockedUi(true);
+          await loadPromptsConfig();
+        } else {
+          if (pinErrorMsg) pinErrorMsg.textContent = '❌ Incorrect PIN. Try 1111.';
+          if (pinInput) {
+            pinInput.select();
+            pinInput.focus();
+          }
+        }
+      } catch (err) {
+        if (pinErrorMsg) pinErrorMsg.textContent = 'Error connecting to gateway: ' + err.message;
+      } finally {
+        isVerifyingPin = false;
+      }
+    });
+  }
+
+  // Auto-submit when entering 4-digit PIN (e.g. 1111) without pressing Enter
+  if (pinInput) {
+    pinInput.addEventListener('input', () => {
+      const val = pinInput.value.trim();
+      if (val.length >= 4 && pinForm) {
+        pinForm.requestSubmit ? pinForm.requestSubmit() : pinForm.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    });
+  }
+
+  // Tab switching
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabName = btn.getAttribute('data-tab');
+      tabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      tabPanels.forEach(panel => {
+        panel.classList.add('hidden');
+      });
+
+      const targetId = 'promptsTabContent' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
+      const targetPanel = document.getElementById(targetId);
+      if (targetPanel) {
+        targetPanel.classList.remove('hidden');
+      }
+    });
+  });
+
+  // Save Configuration
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      if (!verifiedPin) {
+        setUnlockedUi(false);
+        return;
+      }
+
+      // Validate new PIN if filled
+      let nextPin = undefined;
+      const nPin = newPinInput ? newPinInput.value.trim() : '';
+      const cPin = confirmPinInput ? confirmPinInput.value.trim() : '';
+      if (nPin || cPin) {
+        if (nPin !== cPin) {
+          if (pinMatchNotice) {
+            pinMatchNotice.textContent = '❌ New PINs do not match!';
+            pinMatchNotice.style.color = '#ef4444';
+          }
+          const secBtn = document.getElementById('promptsTabSecurityBtn');
+          if (secBtn) secBtn.click();
+          return;
+        }
+        nextPin = nPin;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span>⏳ Saving...</span>';
+      if (saveStatusText) saveStatusText.textContent = '';
+
+      const updates = {
+        customSystemPrompt: customSystemInput ? customSystemInput.value : '',
+        defaultPersona: defaultPersonaInput ? defaultPersonaInput.value : '',
+        roasterPersona: roasterPersonaInput ? roasterPersonaInput.value : '',
+        autonomousOperatingRules: operatingRulesInput ? operatingRulesInput.value : '',
+        noAutoLaunch: noAutoLaunchToggle ? noAutoLaunchToggle.checked : true,
+        cavemanMode: document.getElementById('promptCavemanToggle') ? document.getElementById('promptCavemanToggle').checked : false,
+        maxAgentTurns: maxTurnsInput ? parseInt(maxTurnsInput.value, 10) || 25 : 25,
+        cloudTimeoutMs: cloudTimeoutInput ? parseInt(cloudTimeoutInput.value, 10) || 90000 : 90000,
+        localTimeoutMs: localTimeoutInput ? parseInt(localTimeoutInput.value, 10) || 120000 : 120000,
+        requestTimeoutMs: requestTimeoutInput ? parseInt(requestTimeoutInput.value, 10) || 900000 : 900000,
+        openRouterModel: openRouterModelInput ? openRouterModelInput.value.trim() || 'openrouter/free' : 'openrouter/free',
+        localDefaultModel: localDefaultModelInput ? localDefaultModelInput.value.trim() || 'llama3.1:8b' : 'llama3.1:8b',
+        cascadeOrder: currentCascadeOrder,
+        disabledProviders: currentDisabledProviders,
+        fileSystemAccess: fsModeTrusted && fsModeTrusted.checked ? 'trusted_full' : 'sandboxed',
+        workspaceDirectory: workspaceDirInput ? workspaceDirInput.value.trim() || 'workspace' : 'workspace',
+        blockDesktopAccess: blockDesktopToggle ? blockDesktopToggle.checked : true,
+      };
+
+      if (nextPin) {
+        updates.pin = nextPin;
+      }
+
+      try {
+        const res = await fetch('/v1/prompts/config', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ pin: verifiedPin, updates }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const promptCavemanToggle = document.getElementById('promptCavemanToggle');
+          if (promptCavemanToggle) setCavemanMode(promptCavemanToggle.checked);
+          if (nextPin) {
+            verifiedPin = nextPin;
+            sessionStorage.setItem('nexus_prompts_pin', nextPin);
+            if (newPinInput) newPinInput.value = '';
+            if (confirmPinInput) confirmPinInput.value = '';
+            if (pinMatchNotice) {
+              pinMatchNotice.textContent = '✓ PIN successfully changed!';
+              pinMatchNotice.style.color = '#22c55e';
+            }
+          }
+          if (data.config) {
+            if (Array.isArray(data.config.cascadeOrder)) currentCascadeOrder = [...data.config.cascadeOrder];
+            if (Array.isArray(data.config.disabledProviders)) currentDisabledProviders = [...data.config.disabledProviders];
+            if (data.config.fileSystemAccess) {
+              const isTr = data.config.fileSystemAccess === 'trusted_full';
+              if (fsModeSandboxed) fsModeSandboxed.checked = !isTr;
+              if (fsModeTrusted) fsModeTrusted.checked = isTr;
+            }
+            if (data.config.workspaceDirectory && workspaceDirInput) {
+              workspaceDirInput.value = data.config.workspaceDirectory;
+            }
+            if (data.config.blockDesktopAccess !== undefined && blockDesktopToggle) {
+              blockDesktopToggle.checked = data.config.blockDesktopAccess !== false;
+            }
+            updateFsTrustBadge();
+          }
+          if (data.providers) currentProviderStatus = data.providers;
+          if (data.connections) currentConnections = data.connections;
+          renderCascadeList();
+          renderActiveConnectionsList();
+          syncJsonEditor();
+
+          if (saveStatusText) {
+            saveStatusText.textContent = '✓ Saved & applied live in-memory!';
+            saveStatusText.style.color = '#22c55e';
+            setTimeout(() => { if (saveStatusText) saveStatusText.textContent = ''; }, 3000);
+          }
+        } else {
+          if (saveStatusText) {
+            saveStatusText.textContent = '❌ ' + (data.error || 'Failed to save');
+            saveStatusText.style.color = '#ef4444';
+          }
+        }
+      } catch (err) {
+        if (saveStatusText) {
+          saveStatusText.textContent = '❌ Network error: ' + err.message;
+          saveStatusText.style.color = '#ef4444';
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span>💾 Save &amp; Apply Immediately</span>';
+      }
+    });
+  }
+
+  // Reset to Defaults
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      if (!verifiedPin) {
+        setUnlockedUi(false);
+        return;
+      }
+
+      const confirmed = window.confirm('Reset all system prompts, personas, operating rules, cascade order, and timeout limits to factory defaults?');
+      if (!confirmed) return;
+
+      resetBtn.disabled = true;
+      resetBtn.textContent = '⏳ Resetting...';
+
+      try {
+        const res = await fetch('/v1/prompts/reset', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ pin: verifiedPin }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const cfg = data.config || {};
+          currentCascadeOrder = Array.isArray(cfg.cascadeOrder) ? [...cfg.cascadeOrder] : Object.keys(PROVIDER_METADATA);
+          currentDisabledProviders = Array.isArray(cfg.disabledProviders) ? [...cfg.disabledProviders] : [];
+          currentProviderStatus = data.providers || {};
+          currentConnections = data.connections || [];
+
+          if (fsModeSandboxed) fsModeSandboxed.checked = true;
+          if (fsModeTrusted) fsModeTrusted.checked = false;
+          if (workspaceDirInput) workspaceDirInput.value = 'workspace';
+          if (blockDesktopToggle) blockDesktopToggle.checked = true;
+          updateFsTrustBadge();
+
+          renderCascadeList();
+          renderActiveConnectionsList();
+          syncJsonEditor();
+          await loadPromptsConfig();
+
+          if (saveStatusText) {
+            saveStatusText.textContent = '✓ Reverted all settings to factory defaults!';
+            saveStatusText.style.color = '#22c55e';
+            setTimeout(() => { if (saveStatusText) saveStatusText.textContent = ''; }, 3000);
+          }
+        } else {
+          alert('Failed to reset: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Reset network error: ' + err.message);
+      } finally {
+        resetBtn.disabled = false;
+        resetBtn.textContent = '🔄 Reset to Factory Defaults';
+      }
+    });
+  }
+
+  // Presets Buttons
+  if (presetBtns) {
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const presetKey = btn.getAttribute('data-preset');
+        const order = CASCADE_PRESETS[presetKey];
+        if (order) {
+          const newOrder = [...order];
+          currentCascadeOrder.forEach(p => {
+            if (!newOrder.includes(p)) newOrder.push(p);
+          });
+          currentCascadeOrder = newOrder;
+          renderCascadeList();
+          syncJsonEditor();
+        }
+      });
+    });
+  }
+
+  // Direct JSON Syntax Editor Live Sync
+  if (cascadeJsonInput) {
+    cascadeJsonInput.addEventListener('input', () => {
+      try {
+        const parsed = JSON.parse(cascadeJsonInput.value);
+        if (Array.isArray(parsed.cascadeOrder)) {
+          currentCascadeOrder = parsed.cascadeOrder.map(String);
+        }
+        if (Array.isArray(parsed.disabledProviders)) {
+          currentDisabledProviders = parsed.disabledProviders.map(String);
+        }
+        if (cascadeJsonError) cascadeJsonError.textContent = '';
+        renderCascadeList();
+      } catch (err) {
+        if (cascadeJsonError) cascadeJsonError.textContent = 'JSON Syntax Error: ' + err.message;
+      }
+    });
+  }
+
+  // Add Provider Key Form
+  if (addConnForm) {
+    addConnForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const provider = newConnProvider ? newConnProvider.value : '';
+      const apiKey = newConnKey ? newConnKey.value.trim() : '';
+      const label = newConnLabel ? newConnLabel.value.trim() : '';
+
+      if (!apiKey) {
+        if (connStatusMsg) {
+          connStatusMsg.textContent = '⚠️ Please enter an API key.';
+          connStatusMsg.style.color = '#ef4444';
+        }
+        return;
+      }
+
+      if (addConnBtn) {
+        addConnBtn.disabled = true;
+        addConnBtn.textContent = '⏳ Adding...';
+      }
+
+      try {
+        const res = await fetch('/v1/provider-connections', {
+          method: 'POST',
+          headers: adminHeaders(),
+          body: JSON.stringify({ provider, apiKey, label: label || undefined }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          currentConnections = data.connections || [];
+          if (newConnKey) newConnKey.value = '';
+          if (newConnLabel) newConnLabel.value = '';
+          if (connStatusMsg) {
+            connStatusMsg.textContent = '✓ Connection added successfully!';
+            connStatusMsg.style.color = '#22c55e';
+            setTimeout(() => { if (connStatusMsg) connStatusMsg.textContent = ''; }, 3000);
+          }
+          renderActiveConnectionsList();
+          renderCascadeList();
+        } else {
+          if (connStatusMsg) {
+            connStatusMsg.textContent = '❌ ' + (data.error || 'Failed to add connection');
+            connStatusMsg.style.color = '#ef4444';
+          }
+        }
+      } catch (err) {
+        if (connStatusMsg) {
+          connStatusMsg.textContent = '❌ Network error: ' + err.message;
+          connStatusMsg.style.color = '#ef4444';
+        }
+      } finally {
+        if (addConnBtn) {
+          addConnBtn.disabled = false;
+          addConnBtn.textContent = '➕ Add Key';
+        }
+      }
+    });
+  }
+
+  // Keyboard shortcut: Escape closes modal
+  window.addEventListener('keydown', (e) => {
+    if (modal && !modal.classList.contains('hidden') && e.key === 'Escape') {
+      closeModal();
+    }
+  });
+
+  // Auto-open if URL has #prompts
+  if (window.location.hash === '#prompts' || window.location.hash === '#prompts-studio') {
+    checkAndOpen();
+  }
+}
+
+// Initialize Subsystems
+initKeyBait();
+initPromptsStudio();
+loadStudioGallery().catch(() => {});
+initNexusMesh();
+
+// ============================================================================
+// Nexus Mesh: Human Chat Lobbies & Soulseek/DC++ File Sharing
+// ============================================================================
+function initNexusMesh() {
+  const meshModal = document.getElementById('meshModal');
+  const openMeshModalBtn = document.getElementById('openMeshModalBtn');
+  const closeMeshModalBtn = document.getElementById('closeMeshModalBtn');
+
+  if (!meshModal || !openMeshModalBtn) return;
+
+  // State & Guest Mode Detection
+  const urlParams = new URLSearchParams(window.location.search);
+  const isGuestMode = urlParams.get('guest') === '1';
+
+  let localPeerId = isGuestMode 
+    ? ('guest_' + Math.random().toString(36).substring(2, 7)) 
+    : (localStorage.getItem('nexus_mesh_peer_id') || ('peer_' + Math.random().toString(36).substring(2, 9)));
+  if (!isGuestMode && !localStorage.getItem('nexus_mesh_peer_id')) {
+    localStorage.setItem('nexus_mesh_peer_id', localPeerId);
+  }
+
+  const guestAvatars = ['🎧', '🕹️', '⚡', '🚀', '👽', '👾', '🐱', '🕶️', '🤖', '📼', '🐉', '🦊', '🎸', '🎹', '🍕', '💎', '🎩', '🎨', '🔮', '🪐'];
+  let localHandle = localStorage.getItem('nexus_mesh_handle') || (isGuestMode ? ('Guest_' + Math.floor(Math.random() * 899 + 100)) : 'NexusHost');
+  let localAvatar = localStorage.getItem('nexus_mesh_avatar') || (isGuestMode ? guestAvatars[Math.floor(Math.random() * guestAvatars.length)] : '⚡');
+  let hasCustomizedProfile = !!localStorage.getItem('nexus_mesh_handle_customized');
+
+  // Header Profile & Identity Setup
+  const userAvatarDisplay = document.getElementById('meshUserAvatarDisplay');
+  const userHandleDisplay = document.getElementById('meshUserHandleDisplay');
+  const openProfileBtn = document.getElementById('meshOpenProfileBtn');
+  const profileModal = document.getElementById('meshProfileModal');
+  const profileHandleInput = document.getElementById('meshProfileHandleInput');
+  const avatarGrid = document.getElementById('meshAvatarGrid');
+  const selectedAvatarPreview = document.getElementById('meshSelectedAvatarPreview');
+  const profileStatusInput = document.getElementById('meshProfileStatusInput');
+  const submitProfileBtn = document.getElementById('submitMeshProfileBtn');
+  const cancelProfileBtn = document.getElementById('cancelMeshProfileBtn');
+  const closeProfileBtn = document.getElementById('closeMeshProfileBtn');
+
+  let pendingAvatar = localAvatar;
+
+  function updateUserProfileDisplay() {
+    if (userAvatarDisplay) userAvatarDisplay.textContent = localAvatar;
+    if (userHandleDisplay) userHandleDisplay.textContent = localHandle;
+    const settingAvatar = document.getElementById('meshSettingAvatar');
+    const settingHandle = document.getElementById('meshSettingHandle');
+    if (settingAvatar) settingAvatar.value = localAvatar;
+    if (settingHandle) settingHandle.value = localHandle;
+  }
+
+  function renderAvatarGrid() {
+    if (!avatarGrid) return;
+    avatarGrid.innerHTML = '';
+    guestAvatars.forEach(av => {
+      const chip = document.createElement('div');
+      chip.className = `mesh-avatar-chip ${av === pendingAvatar ? 'selected' : ''}`;
+      chip.textContent = av;
+      chip.title = `Select ${av}`;
+      chip.addEventListener('click', () => {
+        pendingAvatar = av;
+        if (selectedAvatarPreview) selectedAvatarPreview.textContent = av;
+        avatarGrid.querySelectorAll('.mesh-avatar-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      });
+      avatarGrid.appendChild(chip);
+    });
+  }
+
+  function openProfileModal() {
+    if (!profileModal) return;
+    pendingAvatar = localAvatar;
+    if (selectedAvatarPreview) selectedAvatarPreview.textContent = localAvatar;
+    if (profileHandleInput) {
+      profileHandleInput.value = (localHandle && !localHandle.startsWith('Guest_') && localHandle !== 'NexusHost') 
+        ? localHandle 
+        : '';
+      profileHandleInput.placeholder = isGuestMode ? 'Choose a nickname...' : 'NexusHost';
+    }
+    renderAvatarGrid();
+    profileModal.classList.remove('hidden');
+    setTimeout(() => {
+      if (profileHandleInput) {
+        profileHandleInput.focus();
+        if (profileHandleInput.value) profileHandleInput.select();
+      }
+    }, 120);
+  }
+
+  function closeProfileModal() {
+    if (profileModal) profileModal.classList.add('hidden');
+  }
+
+  async function saveProfile() {
+    let chosenHandle = (profileHandleInput?.value || '').trim();
+    if (!chosenHandle) {
+      chosenHandle = localHandle || (isGuestMode ? ('Guest_' + Math.floor(Math.random() * 899 + 100)) : 'NexusHost');
+    }
+    localHandle = chosenHandle;
+    localAvatar = pendingAvatar || localAvatar || '⚡';
+    const statusMsg = (profileStatusInput?.value || '').trim();
+
+    localStorage.setItem('nexus_mesh_handle', localHandle);
+    localStorage.setItem('nexus_mesh_avatar', localAvatar);
+    localStorage.setItem('nexus_mesh_handle_customized', '1');
+    hasCustomizedProfile = true;
+
+    updateUserProfileDisplay();
+    renderPeersList();
+    closeProfileModal();
+
+    try {
+      await fetch('/v1/mesh/peers/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peerId: localPeerId,
+          handle: localHandle,
+          avatar: localAvatar,
+          statusMessage: statusMsg,
+        }),
+      });
+    } catch (e) {
+      console.warn('[Mesh] Error updating peer profile:', e);
+    }
+  }
+
+  if (openProfileBtn) openProfileBtn.addEventListener('click', openProfileModal);
+  if (closeProfileBtn) closeProfileBtn.addEventListener('click', closeProfileModal);
+  if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', closeProfileModal);
+  if (submitProfileBtn) submitProfileBtn.addEventListener('click', saveProfile);
+  if (profileHandleInput) {
+    profileHandleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveProfile();
+      }
+    });
+  }
+
+  updateUserProfileDisplay();
+
+  let currentTab = 'lobby';
+  let sseSource = null;
+  let heartbeatInterval = null;
+  let peersMap = new Map();
+  let currentRoomId = 'lounge';
+  let roomsMap = new Map();
+  let roomUnreadMap = new Map();
+  const renderedMessageIds = new Set();
+
+  const defaultRoomsList = [
+    { id: 'lounge', name: 'lounge', avatar: '🌐', topic: 'The Creative Syndicate · General Lounge' },
+    { id: 'acid-lab', name: 'acid-lab', avatar: '📼', topic: '303 Acid & Stems Lab' },
+    { id: 'retro-vault', name: 'retro-vault', avatar: '🕹️', topic: 'ZX Spectrum +3 & Amiga Vault' },
+    { id: 'ai-forge', name: 'ai-forge', avatar: '🧠', topic: 'AI Model & LoRA Exchange' },
+    { id: 'p2p-trading', name: 'p2p-trading', avatar: '📦', topic: 'P2P File Swap & Requests' }
+  ];
+  defaultRoomsList.forEach(r => roomsMap.set(r.id, r));
+
+  let currentBrowsePeerId = 'local';
+  let currentBrowseTree = null;
+  let selectedBrowseFolder = null;
+  let activeDownloads = new Map(); // id -> download item
+  let completedCount = 0;
+  let contextTargetPeer = null;
+  let isMeshFullscreen = false;
+
+  // Mobile Drawer State & Handlers
+  const mobileChannelsBtn = document.getElementById('meshMobileChannelsToggle');
+  const mobilePeersBtn = document.getElementById('meshMobilePeersToggle');
+  const mobileBackdrop = document.getElementById('meshMobileBackdrop');
+  const lobbyView = document.getElementById('meshViewLobby');
+
+  function closeMobileDrawers() {
+    if (lobbyView) {
+      lobbyView.classList.remove('channels-open', 'peers-open');
+    }
+  }
+
+  if (mobileChannelsBtn && lobbyView) {
+    mobileChannelsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lobbyView.classList.toggle('channels-open');
+      lobbyView.classList.remove('peers-open');
+    });
+  }
+  if (mobilePeersBtn && lobbyView) {
+    mobilePeersBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      lobbyView.classList.toggle('peers-open');
+      lobbyView.classList.remove('channels-open');
+    });
+  }
+  if (mobileBackdrop) {
+    mobileBackdrop.addEventListener('click', closeMobileDrawers);
+  }
+
+  function renderRoomsList() {
+    const listEl = document.getElementById('meshRoomsList');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    roomsMap.forEach((room) => {
+      const item = document.createElement('div');
+      const isActive = room.id === currentRoomId;
+      const unread = roomUnreadMap.get(room.id) || 0;
+
+      item.className = `mesh-channel-btn ${isActive ? 'active' : ''}`;
+      item.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: ${isActive ? '700' : '500'};
+        color: ${isActive ? '#f8fafc' : '#94a3b8'};
+        background: ${isActive ? 'rgba(168, 85, 247, 0.22)' : 'transparent'};
+        border: 1px solid ${isActive ? 'rgba(168, 85, 247, 0.45)' : 'transparent'};
+        transition: all 0.15s ease;
+      `;
+
+      item.onmouseenter = () => {
+        if (room.id !== currentRoomId) {
+          item.style.background = 'rgba(255, 255, 255, 0.04)';
+          item.style.color = '#cbd5e1';
+        }
+      };
+      item.onmouseleave = () => {
+        if (room.id !== currentRoomId) {
+          item.style.background = 'transparent';
+          item.style.color = '#94a3b8';
+        }
+      };
+
+      const cleanName = room.name.replace(/^#/, '');
+
+      item.innerHTML = `
+        <span style="font-size: 14px; flex-shrink: 0;">${room.avatar || '💬'}</span>
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">#${escapeHtml(cleanName)}</span>
+        ${unread > 0 ? `<span style="background: #a855f7; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px;">${unread}</span>` : ''}
+      `;
+
+      item.addEventListener('click', () => {
+        switchRoom(room.id);
+      });
+
+      listEl.appendChild(item);
+    });
+  }
+
+  async function switchRoom(roomId) {
+    closeMobileDrawers();
+    if (!roomsMap.has(roomId) && roomId !== 'lounge') return;
+    currentRoomId = roomId;
+    roomUnreadMap.set(roomId, 0);
+
+    const room = roomsMap.get(roomId) || { id: 'lounge', name: 'lounge', avatar: '🌐', topic: 'The Creative Syndicate' };
+
+    const avatarEl = document.getElementById('meshActiveRoomAvatar');
+    const nameEl = document.getElementById('meshActiveRoomName');
+    const topicEl = document.getElementById('meshActiveRoomTopic');
+    if (avatarEl) avatarEl.textContent = room.avatar || '💬';
+    if (nameEl) nameEl.textContent = '#' + room.name.replace(/^#/, '');
+    if (topicEl) topicEl.textContent = room.topic || '';
+
+    renderRoomsList();
+
+    fetch(`/v1/mesh/voice/peers?roomId=${encodeURIComponent(roomId)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.peers && typeof updateRoomVoiceBadge === 'function') {
+          updateRoomVoiceBadge(d.peers.length);
+        }
+      })
+      .catch(() => {});
+
+    const chatContainer = document.getElementById('meshChatMessages');
+    if (chatContainer) {
+      chatContainer.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px; font-size: 12px;">Loading channel messages...</div>';
+    }
+
+    try {
+      const res = await fetch(`/v1/mesh/messages?roomId=${encodeURIComponent(roomId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (chatContainer) {
+          chatContainer.innerHTML = '';
+          renderedMessageIds.clear();
+          if (data.messages && Array.isArray(data.messages)) {
+            data.messages.forEach(msg => appendMeshChatMessage(msg));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Mesh] Error loading room messages:', err);
+    }
+  }
+
+  // Web Audio FM Synth Chime for human peer arrivals & messages
+  function playJoinChime() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {}
+  }
+
+  // Format bytes helper
+  function formatMeshBytes(bytes) {
+    if (!bytes || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+  }
+
+  // Format timestamp helper
+  function formatMeshTime(isoOrTimestamp) {
+    try {
+      const d = new Date(isoOrTimestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }
+
+  // Format file category icon & badge class
+  function getCategoryInfo(category) {
+    const map = {
+      models: { icon: '🧠', label: 'Model', class: 'mesh-category-models' },
+      loras: { icon: '✨', label: 'LoRA', class: 'mesh-category-loras' },
+      retro: { icon: '👾', label: 'Retro ROM', class: 'mesh-category-retro' },
+      audio: { icon: '🎵', label: 'Audio', class: 'mesh-category-audio' },
+      image: { icon: '🖼️', label: 'Image', class: 'mesh-category-loras' },
+      video: { icon: '🎬', label: 'Video', class: 'mesh-category-models' },
+      code: { icon: '💻', label: 'Code', class: 'mesh-category-code' },
+      docs: { icon: '📄', label: 'Document', class: 'mesh-category-docs' },
+      other: { icon: '📦', label: 'File', class: 'mesh-category-other' },
+    };
+    return map[category] || map.other;
+  }
+
+  // Open & Close Modal
+  function openMeshLounge() {
+    meshModal.classList.remove('hidden');
+    updateUserProfileDisplay();
+    renderRoomsList();
+    connectSSE();
+    loadStatus();
+    switchTab(currentTab);
+    switchRoom(currentRoomId || 'lounge');
+
+    // Prompt guest / new user to choose their nickname and avatar if not customized yet
+    if (!localStorage.getItem('nexus_mesh_handle_customized')) {
+      setTimeout(() => {
+        openProfileModal();
+      }, 350);
+    }
+  }
+
+  openMeshModalBtn.addEventListener('click', openMeshLounge);
+
+  const heroOpenMeshBtn = document.getElementById('heroOpenMeshBtn');
+  if (heroOpenMeshBtn) heroOpenMeshBtn.addEventListener('click', openMeshLounge);
+
+  if (closeMeshModalBtn) {
+    closeMeshModalBtn.addEventListener('click', () => {
+      meshModal.classList.add('hidden');
+      hideContextMenu();
+    });
+  }
+
+  // True Zen Mode Fullscreen
+  const toggleFullscreenBtn = document.getElementById('meshToggleFullscreenBtn');
+  function updateMeshFullscreenUI() {
+    const isFull = !!document.fullscreenElement || meshModal.classList.contains('modal-maximized') || meshModal.classList.contains('zen-mode');
+    if (toggleFullscreenBtn) {
+      toggleFullscreenBtn.textContent = isFull ? '🗗' : '⛶';
+      toggleFullscreenBtn.title = isFull ? 'Exit Zen Mode Fullscreen' : 'Toggle Zen Mode Fullscreen';
+      toggleFullscreenBtn.classList.toggle('active', isFull);
+    }
+    const container = meshModal.querySelector('.modal-container');
+    if (isFull || isMeshFullscreen) {
+      meshModal.classList.add('zen-mode', 'modal-maximized');
+      if (container) {
+        container.style.maxWidth = '100vw';
+        container.style.width = '100vw';
+        container.style.height = '100vh';
+        container.style.borderRadius = '0';
+      }
+    } else {
+      meshModal.classList.remove('zen-mode', 'modal-maximized');
+      if (container) {
+        container.style.maxWidth = '1140px';
+        container.style.width = '96%';
+        container.style.height = 'min(780px, 92vh)';
+        container.style.borderRadius = '14px';
+      }
+    }
+  }
+
+  // Note: toggleFullscreenBtn is handled universally by .modal-maximize-btn
+
+
+  document.addEventListener('fullscreenchange', updateMeshFullscreenUI);
+
+  // Tab switching elements
+  const tabs = {
+    lobby: {
+      btn: document.getElementById('meshNavBtnLobby'),
+      view: document.getElementById('meshViewLobby'),
+    },
+    browse: {
+      btn: document.getElementById('meshNavBtnBrowse'),
+      view: document.getElementById('meshViewBrowse'),
+    },
+    search: {
+      btn: document.getElementById('meshNavBtnSearch'),
+      view: document.getElementById('meshViewSearch'),
+    },
+    transfers: {
+      btn: document.getElementById('meshNavBtnTransfers'),
+      view: document.getElementById('meshViewTransfers'),
+    },
+    settings: {
+      btn: document.getElementById('meshNavBtnSettings'),
+      view: document.getElementById('meshViewSettings'),
+    },
+  };
+
+  function switchTab(tabKey) {
+    currentTab = tabKey;
+    hideContextMenu();
+    Object.entries(tabs).forEach(([k, t]) => {
+      if (!t.btn || !t.view) return;
+      if (k === tabKey) {
+        t.btn.classList.add('active');
+        t.btn.style.background = 'rgba(168, 85, 247, 0.25)';
+        t.btn.style.color = '#e9d5ff';
+        t.btn.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+        t.view.style.display = k === 'lobby' ? 'flex' : (k === 'settings' ? 'block' : 'flex');
+      } else {
+        t.btn.classList.remove('active');
+        t.btn.style.background = 'transparent';
+        t.btn.style.color = '#94a3b8';
+        t.btn.style.borderColor = 'transparent';
+        t.view.style.display = 'none';
+      }
+    });
+
+    if (tabKey === 'browse') {
+      loadBrowseTree();
+    } else if (tabKey === 'search') {
+      performGlobalSearch();
+    } else if (tabKey === 'transfers') {
+      renderTransfersList();
+    } else if (tabKey === 'settings') {
+      loadSettingsView();
+    }
+  }
+
+  Object.entries(tabs).forEach(([k, t]) => {
+    if (t.btn) {
+      t.btn.addEventListener('click', () => switchTab(k));
+    }
+  });
+
+  // Load Status / Initial Overview
+  async function loadStatus() {
+    try {
+      const [statusRes, peersRes, msgsRes, roomsRes] = await Promise.all([
+        fetch('/v1/mesh/status').catch(() => null),
+        fetch('/v1/mesh/peers').catch(() => null),
+        fetch(`/v1/mesh/messages?roomId=${encodeURIComponent(currentRoomId)}`).catch(() => null),
+        fetch('/v1/mesh/rooms').catch(() => null),
+      ]);
+
+      if (roomsRes && roomsRes.ok) {
+        const rData = await roomsRes.json();
+        if (rData.rooms && Array.isArray(rData.rooms)) {
+          roomsMap.clear();
+          rData.rooms.forEach(r => roomsMap.set(r.id, r));
+          renderRoomsList();
+        }
+      }
+
+      if (statusRes && statusRes.ok) {
+        const data = await statusRes.json();
+        updateHeaderStats(data.peersCount || 1, data.totalSharedBytes || 0);
+        if (data.config) {
+          const motdEl = document.getElementById('meshMotdText');
+          if (motdEl && data.config.motd) motdEl.textContent = data.config.motd;
+        }
+      }
+
+      if (peersRes && peersRes.ok) {
+        const pData = await peersRes.json();
+        if (pData.peers && Array.isArray(pData.peers)) {
+          peersMap.clear();
+          pData.peers.forEach(p => peersMap.set(p.id, p));
+          renderPeersList();
+          updateBrowsePeerSelect();
+        }
+      }
+
+      if (msgsRes && msgsRes.ok) {
+        const mData = await msgsRes.json();
+        if (mData.messages && Array.isArray(mData.messages)) {
+          const chatContainer = document.getElementById('meshChatMessages');
+          if (chatContainer) {
+            renderedMessageIds.clear();
+            chatContainer.innerHTML = '';
+            mData.messages.forEach(msg => appendMeshChatMessage(msg));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Mesh] Error fetching status:', e);
+    }
+  }
+
+  function updateHeaderStats(peerCount, totalBytes) {
+    const statsEl = document.getElementById('meshHeaderStats');
+    if (statsEl) {
+      statsEl.innerHTML = `<span class="status-dot active" style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; margin-right: 4px;"></span> Connected · ${peerCount} ${peerCount === 1 ? 'Peer' : 'Peers'} · ${formatMeshBytes(totalBytes)} Shared`;
+    }
+    const navBadge = document.getElementById('navMeshCountBadge');
+    if (navBadge) {
+      navBadge.textContent = `${peerCount}`;
+    }
+    const peerBadge = document.getElementById('meshPeerCountBadge');
+    if (peerBadge) {
+      peerBadge.textContent = `${peerCount}`;
+    }
+  }
+
+  // ============================================================================
+  // WebRTC P2P Voice Lounge Implementation
+  // ============================================================================
+  function normRoom(r) {
+    return (r || 'lounge').toLowerCase().replace(/^#/, '').trim();
+  }
+
+  const voiceState = {
+    isInCall: false,
+    roomId: 'lounge',
+    isMuted: false,
+    isDeafened: false,
+    isSpeaking: false,
+    isListenOnly: false,
+    isToneActive: false,
+    syntheticStream: null,
+    localStream: null,
+    audioContext: null,
+    analyser: null,
+    voicePeers: new Map(), // peerId -> VoicePeerState
+    peerConnections: new Map(), // peerId -> RTCPeerConnection
+    remoteAudios: new Map(), // peerId -> HTMLAudioElement
+    remoteGainNodes: new Map(), // peerId -> GainNode
+    remoteAnalysers: new Map(), // peerId -> AnalyserNode
+    pendingCandidates: new Map(), // peerId -> candidate[]
+    animFrameId: null,
+    heartbeatInterval: null,
+  };
+
+  const RTC_CONFIG = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      {
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp'
+        ],
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    ],
+    iceCandidatePoolSize: 4
+  };
+
+  async function refreshIceServers() {
+    try {
+      const res = await fetch('/v1/mesh/voice/ice-servers');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+          RTC_CONFIG.iceServers = data.iceServers;
+        }
+      }
+    } catch {}
+  }
+  refreshIceServers();
+
+  const joinVoiceBtn = document.getElementById('meshJoinVoiceBtn');
+  const joinVoiceLabel = document.getElementById('meshJoinVoiceLabel');
+  const voicePeerCountBadge = document.getElementById('meshVoicePeerCountBadge');
+  const voiceDock = document.getElementById('meshVoiceDock');
+  const voiceDockRoom = document.getElementById('meshVoiceDockRoom');
+  const voiceToggleGridBtn = document.getElementById('meshVoiceToggleGridBtn');
+  const voiceMuteBtn = document.getElementById('meshVoiceMuteBtn');
+  const voiceMuteIcon = document.getElementById('meshVoiceMuteIcon');
+  const voiceMuteLabel = document.getElementById('meshVoiceMuteLabel');
+  const voiceDeafenBtn = document.getElementById('meshVoiceDeafenBtn');
+  const voiceDeafenIcon = document.getElementById('meshVoiceDeafenIcon');
+  const voiceDeafenLabel = document.getElementById('meshVoiceDeafenLabel');
+  const voiceDisconnectBtn = document.getElementById('meshVoiceDisconnectBtn');
+  const voiceStage = document.getElementById('meshVoiceStage');
+  const voiceStageCount = document.getElementById('meshVoiceStageCount');
+  const voiceParticipantsGrid = document.getElementById('meshVoiceParticipantsGrid');
+  const voiceMinimizeStageBtn = document.getElementById('meshVoiceMinimizeStageBtn');
+  const voiceTestToneBtn = document.getElementById('meshVoiceTestToneBtn');
+  const voiceTestSpeakerBtn = document.getElementById('meshVoiceTestSpeakerBtn');
+  const voiceNoticeBanner = document.getElementById('meshVoiceNoticeBanner');
+  const voiceNoticeText = document.getElementById('meshVoiceNoticeText');
+  const voiceNoticeActionBtn = document.getElementById('meshVoiceNoticeActionBtn');
+  const httpsSwitchBtn = document.getElementById('meshHttpsSwitchBtn');
+
+  // Check if current session is insecure HTTP on LAN/mobile
+  const isLocalHostOrigin = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const isSecureOrigin = window.isSecureContext || location.protocol === 'https:' || isLocalHostOrigin;
+  if (httpsSwitchBtn) {
+    if (!isSecureOrigin && location.protocol === 'http:') {
+      httpsSwitchBtn.style.display = 'inline-flex';
+      httpsSwitchBtn.onclick = () => {
+        location.href = `https://${location.hostname}:3001/#mesh`;
+      };
+    } else {
+      httpsSwitchBtn.style.display = 'none';
+    }
+  }
+
+  let testToneTimer = null;
+  let testToneNextNoteTime = 0;
+  let testToneStep = 0;
+  const TONE_MELODY = [330, 392, 440, 523.25, 659.25, 523.25, 440, 392]; // E4, G4, A4, C5, E5, C5, A4, G4
+  const TONE_STEP_DURATION = 0.20; // 200ms per note (150 BPM 8th notes)
+  const TONE_NOTE_LENGTH = 0.17; // snappy note gate
+  const TONE_LOOKAHEAD_WINDOW = 1.5; // schedule 1.5s ahead so browser backgrounding/throttling never slows it down
+
+  function scheduleSynthToneNotes(ctx, masterGain) {
+    if (!voiceState.isToneActive || !voiceState.isInCall) return;
+    if (testToneNextNoteTime < ctx.currentTime) {
+      testToneNextNoteTime = ctx.currentTime + 0.05;
+    }
+    while (testToneNextNoteTime < ctx.currentTime + TONE_LOOKAHEAD_WINDOW) {
+      const noteStart = Math.max(testToneNextNoteTime, ctx.currentTime);
+      const freq = TONE_MELODY[testToneStep % TONE_MELODY.length];
+
+      try {
+        const osc = ctx.createOscillator();
+        const noteGain = ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, noteStart);
+
+        noteGain.gain.setValueAtTime(0.0001, noteStart);
+        noteGain.gain.exponentialRampToValueAtTime(0.18, noteStart + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, noteStart + TONE_NOTE_LENGTH);
+
+        osc.connect(noteGain);
+        noteGain.connect(masterGain);
+
+        osc.start(noteStart);
+        osc.stop(noteStart + TONE_NOTE_LENGTH + 0.02);
+      } catch (e) {
+        console.warn('[WebRTC] Note schedule error:', e);
+      }
+
+      testToneNextNoteTime += TONE_STEP_DURATION;
+      testToneStep++;
+    }
+  }
+
+  function playLocalSpeakerTest() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) {
+        alert('Web Audio API not supported in this browser.');
+        return;
+      }
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const notes = [440, 554.37, 659.25, 880]; // Retro A-Major synth chime
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + idx * 0.12 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.12 + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + idx * 0.12 + 0.3);
+      });
+      setTimeout(() => { try { ctx.close(); } catch {} }, 1200);
+      showNotification('🔊 Speaker test chime played! If you heard 4 retro notes, your sound is working.');
+    } catch (e) {
+      console.warn('[WebRTC] Speaker test error:', e);
+    }
+  }
+
+  function startTestTone() {
+    if (!voiceState.isInCall) {
+      showNotification('⚠️ Join the voice call first to broadcast a test melody!');
+      return;
+    }
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!voiceState.audioContext) {
+        voiceState.audioContext = new AudioCtx();
+      }
+      const ctx = voiceState.audioContext;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const dest = ctx.createMediaStreamDestination();
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.25, ctx.currentTime);
+      masterGain.connect(dest);
+
+      if (!voiceState.analyser) {
+        voiceState.analyser = ctx.createAnalyser();
+        voiceState.analyser.fftSize = 64;
+      }
+      masterGain.connect(voiceState.analyser);
+
+      const toneTrack = dest.stream.getAudioTracks()[0];
+      voiceState.syntheticStream = dest.stream;
+      voiceState.isToneActive = true;
+      voiceState.isMuted = false;
+
+      // Swap track into all existing peer connections
+      voiceState.peerConnections.forEach((pc) => {
+        const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+        const audioTransceiver = transceivers.find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'audio') || transceivers[0];
+        if (audioTransceiver) {
+          audioTransceiver.direction = 'sendrecv';
+          if (audioTransceiver.sender) {
+            audioTransceiver.sender.replaceTrack(toneTrack).catch(() => {});
+          }
+        } else {
+          const senders = pc.getSenders();
+          const audioSender = senders.find(s => s.track && s.track.kind === 'audio') || senders.find(s => !s.track);
+          if (audioSender) {
+            audioSender.replaceTrack(toneTrack).catch(() => {});
+          } else {
+            try { pc.addTrack(toneTrack, dest.stream); } catch {}
+          }
+        }
+      });
+
+      // Transmit 80s synthesizer melody using lookahead hardware scheduling (immune to browser throttling)
+      testToneStep = 0;
+      testToneNextNoteTime = ctx.currentTime + 0.05;
+      scheduleSynthToneNotes(ctx, masterGain);
+      testToneTimer = setInterval(() => {
+        scheduleSynthToneNotes(ctx, masterGain);
+      }, 100);
+
+      if (voiceTestToneBtn) {
+        voiceTestToneBtn.textContent = '⏹️ Stop Tone';
+        voiceTestToneBtn.style.color = '#ef4444';
+        voiceTestToneBtn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+      }
+      showNotification('🎵 Broadcasting synth melody! Check your phone/connected callers to hear it.');
+      renderVoiceParticipants();
+    } catch (e) {
+      console.warn('[WebRTC] Error starting test tone:', e);
+    }
+  }
+
+  function stopTestTone() {
+    voiceState.isToneActive = false;
+    if (testToneTimer) {
+      clearInterval(testToneTimer);
+      testToneTimer = null;
+    }
+    if (voiceState.syntheticStream) {
+      voiceState.syntheticStream.getTracks().forEach(t => t.stop());
+      voiceState.syntheticStream = null;
+    }
+    const trackToRestore = voiceState.localStream ? voiceState.localStream.getAudioTracks()[0] : null;
+    voiceState.peerConnections.forEach(pc => {
+      const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+      const audioTransceiver = transceivers.find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'audio') || transceivers[0];
+      if (audioTransceiver && audioTransceiver.sender) {
+        audioTransceiver.sender.replaceTrack(trackToRestore).catch(() => {});
+        if (!trackToRestore) {
+          audioTransceiver.direction = 'recvonly';
+        }
+      } else {
+        const senders = pc.getSenders();
+        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+        if (audioSender) {
+          audioSender.replaceTrack(trackToRestore).catch(() => {});
+        }
+      }
+    });
+
+    if (voiceTestToneBtn) {
+      voiceTestToneBtn.textContent = '🎵 Send Test Tone';
+      voiceTestToneBtn.style.color = '#38bdf8';
+      voiceTestToneBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+    }
+    renderVoiceParticipants();
+  }
+
+  function toggleTestTone() {
+    if (voiceState.isToneActive) {
+      stopTestTone();
+    } else {
+      startTestTone();
+    }
+  }
+
+  function updateRoomVoiceBadge(count) {
+    if (voicePeerCountBadge) {
+      if (count > 0) {
+        voicePeerCountBadge.textContent = count;
+        voicePeerCountBadge.style.display = 'inline-block';
+      } else if (!voiceState.isInCall) {
+        voicePeerCountBadge.style.display = 'none';
+      }
+    }
+    if (joinVoiceLabel && !voiceState.isInCall) {
+      joinVoiceLabel.textContent = count > 0 ? `Join Voice (${count} Live)` : 'Join Voice';
+    }
+  }
+
+  async function joinVoiceCall(targetRoomId = currentRoomId) {
+    const normTarget = normRoom(targetRoomId);
+    if (voiceState.isInCall) {
+      if (normRoom(voiceState.roomId) === normTarget) {
+        leaveVoiceCall();
+        return;
+      } else {
+        leaveVoiceCall();
+      }
+    }
+
+    try {
+      // Refresh ICE / TURN servers before connecting
+      refreshIceServers().catch(() => {});
+
+      // Unlock mobile audio playback pipeline during user gesture
+      try {
+        if (!voiceState.audioContext) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) voiceState.audioContext = new AudioCtx();
+        }
+        if (voiceState.audioContext && voiceState.audioContext.state === 'suspended') {
+          voiceState.audioContext.resume().catch(() => {});
+        }
+        const unlockAudio = new Audio();
+        unlockAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+        unlockAudio.play().catch(() => {});
+      } catch {}
+
+      if (joinVoiceLabel) joinVoiceLabel.textContent = 'Connecting...';
+
+      let stream = null;
+      let isListenOnly = false;
+      let micErrorReason = null;
+
+      const isSecure = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+      if (!isSecure && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
+        isListenOnly = true;
+        micErrorReason = 'insecure_http';
+        if (typeof showToast === 'function') {
+          showToast('⚠️ Mobile mic blocked on HTTP! Switch to HTTPS (:3001) to speak.', 'warning');
+        }
+      } else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+        } catch (err) {
+          console.warn('[WebRTC] Constrained microphone access failed, trying unconstrained fallback:', err);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch (fallbackErr) {
+            console.warn('[WebRTC] Microphone access completely failed:', fallbackErr);
+            isListenOnly = true;
+            micErrorReason = (fallbackErr.name === 'NotFoundError' || fallbackErr.name === 'DevicesNotFoundError') ? 'no_hardware' : 'denied';
+          }
+        }
+      } else {
+        isListenOnly = true;
+        micErrorReason = 'no_devices_api';
+      }
+
+      voiceState.localStream = stream;
+      voiceState.isListenOnly = isListenOnly;
+      voiceState.isInCall = true;
+      voiceState.roomId = normTarget;
+      voiceState.isMuted = isListenOnly;
+      voiceState.isDeafened = false;
+
+      // Web Audio API volume analyser & direct speaker playback engine
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          if (!voiceState.audioContext) {
+            voiceState.audioContext = new AudioCtx();
+          }
+          if (voiceState.audioContext.state === 'suspended') {
+            await voiceState.audioContext.resume();
+          }
+          if (stream) {
+            const source = voiceState.audioContext.createMediaStreamSource(stream);
+            voiceState.analyser = voiceState.audioContext.createAnalyser();
+            voiceState.analyser.fftSize = 64;
+            source.connect(voiceState.analyser);
+          }
+        }
+      } catch (e) {
+        console.warn('[WebRTC] AudioContext warning:', e);
+      }
+
+      // Register with backend hub
+      const res = await fetch('/v1/mesh/voice/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: normTarget,
+          peerId: localPeerId,
+          handle: localHandle,
+          avatar: localAvatar,
+          isListenOnly: isListenOnly,
+        })
+      });
+      const data = await res.json();
+
+      voiceState.voicePeers.clear();
+      if (data.peers && Array.isArray(data.peers)) {
+        data.peers.forEach(p => voiceState.voicePeers.set(p.peerId, p));
+      }
+
+      updateVoiceUI();
+
+      // Show informative banner based on mic state
+      if (voiceNoticeBanner && voiceNoticeText && voiceNoticeActionBtn) {
+        if (micErrorReason === 'insecure_http') {
+          voiceNoticeText.innerHTML = '📱 <strong>Microphone blocked by mobile browser on HTTP:</strong> Joined in <strong>Listen-Only</strong> mode. Switch to secure HTTPS to speak:';
+          voiceNoticeActionBtn.style.display = 'inline-block';
+          voiceNoticeActionBtn.textContent = '🔒 Switch to HTTPS (:3001)';
+          voiceNoticeActionBtn.onclick = () => {
+            location.href = `https://${location.hostname}:3001/#mesh`;
+          };
+          voiceNoticeBanner.style.display = 'flex';
+        } else if (micErrorReason === 'no_hardware') {
+          voiceNoticeText.innerHTML = '🎧 <strong>No PC microphone detected:</strong> Connected in <strong>Listen-Only</strong> mode (you can hear other callers through your speakers). Click <strong>🎵 Send Test Tone</strong> above to test audio pipeline!';
+          voiceNoticeActionBtn.style.display = 'none';
+          voiceNoticeBanner.style.display = 'flex';
+        } else if (micErrorReason === 'denied') {
+          voiceNoticeText.innerHTML = '🔇 <strong>Microphone permission blocked:</strong> Connected in <strong>Listen-Only</strong> mode (you can still hear other callers).';
+          voiceNoticeActionBtn.style.display = 'none';
+          voiceNoticeBanner.style.display = 'flex';
+        } else {
+          voiceNoticeBanner.style.display = 'none';
+        }
+      }
+
+      // Initiate peer connection for each existing remote peer
+      if (data.peers && Array.isArray(data.peers)) {
+        for (const remotePeer of data.peers) {
+          if (remotePeer.peerId !== localPeerId) {
+            setupPeerConnection(remotePeer.peerId, true);
+          }
+        }
+      }
+
+      startAudioVolumeMonitor();
+
+      // Periodic voice heartbeat to prevent dropped presence over tunnel or mobile backgrounding
+      if (voiceState.heartbeatInterval) clearInterval(voiceState.heartbeatInterval);
+      voiceState.heartbeatInterval = setInterval(async () => {
+        if (!voiceState.isInCall) return;
+        try {
+          const hbRes = await fetch('/v1/mesh/voice/heartbeat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomId: voiceState.roomId, peerId: localPeerId })
+          });
+          const hbData = await hbRes.json();
+          if (hbData && hbData.success && !hbData.isInRoom) {
+            fetch('/v1/mesh/voice/join', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomId: voiceState.roomId,
+                peerId: localPeerId,
+                handle: localHandle,
+                avatar: localAvatar,
+                isListenOnly: voiceState.isListenOnly,
+              })
+            }).catch(() => {});
+          }
+        } catch {}
+      }, 15000);
+
+    } catch (err) {
+      console.error('[WebRTC] Join error:', err);
+      leaveVoiceCall();
+    }
+  }
+
+  function setupPeerConnection(remotePeerId, isInitiator) {
+    if (voiceState.peerConnections.has(remotePeerId)) {
+      try { voiceState.peerConnections.get(remotePeerId).close(); } catch {}
+    }
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    voiceState.peerConnections.set(remotePeerId, pc);
+
+    if (voiceState.localStream) {
+      voiceState.localStream.getTracks().forEach(track => {
+        pc.addTrack(track, voiceState.localStream);
+      });
+    } else if (voiceState.syntheticStream) {
+      voiceState.syntheticStream.getTracks().forEach(track => {
+        pc.addTrack(track, voiceState.syntheticStream);
+      });
+    } else {
+      try {
+        if (pc.addTransceiver) {
+          pc.addTransceiver('audio', { direction: 'sendrecv' });
+        }
+      } catch (e) {}
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        fetch('/v1/mesh/voice/signal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromPeerId: localPeerId,
+            toPeerId: remotePeerId,
+            roomId: voiceState.roomId,
+            signalType: 'candidate',
+            data: event.candidate,
+          })
+        }).catch(() => {});
+      }
+    };
+
+    pc.ontrack = (event) => {
+      const remoteStream = (event.streams && event.streams[0])
+        ? event.streams[0]
+        : new MediaStream([event.track]);
+
+      // 1. Hardware HTML5 audio element for crystal-clear unmuted speaker playback
+      let audioEl = voiceState.remoteAudios.get(remotePeerId);
+      if (!audioEl) {
+        audioEl = new Audio();
+        audioEl.autoplay = true;
+        audioEl.playsInline = true;
+        audioEl.style.display = 'none';
+        document.body.appendChild(audioEl);
+        voiceState.remoteAudios.set(remotePeerId, audioEl);
+      }
+      audioEl.muted = !!voiceState.isDeafened;
+      audioEl.volume = voiceState.isDeafened ? 0 : 1;
+      try {
+        audioEl.srcObject = remoteStream;
+        audioEl.play().catch(() => {});
+      } catch (e) {}
+
+      // 2. Web Audio analyser for real-time VU meter on the caller's avatar card
+      try {
+        if (!voiceState.audioContext) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) voiceState.audioContext = new AudioCtx();
+        }
+        if (voiceState.audioContext) {
+          if (voiceState.audioContext.state === 'suspended') {
+            voiceState.audioContext.resume().catch(() => {});
+          }
+
+          if (voiceState.remoteGainNodes.has(remotePeerId)) {
+            try { voiceState.remoteGainNodes.get(remotePeerId).disconnect(); } catch {}
+          }
+
+          const source = voiceState.audioContext.createMediaStreamSource(remoteStream);
+
+          // Direct Web Audio routing to hardware destination for mobile phones
+          const gainNode = voiceState.audioContext.createGain();
+          gainNode.gain.setValueAtTime(voiceState.isDeafened ? 0 : 1, voiceState.audioContext.currentTime);
+          source.connect(gainNode);
+          gainNode.connect(voiceState.audioContext.destination);
+          voiceState.remoteGainNodes.set(remotePeerId, gainNode);
+
+          const analyser = voiceState.audioContext.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.5;
+
+          source.connect(analyser);
+          voiceState.remoteAnalysers.set(remotePeerId, analyser);
+        }
+      } catch (e) {
+        console.warn('[WebRTC] Web Audio analyser error:', e);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        cleanupPeerConnection(remotePeerId);
+      }
+    };
+
+    if (isInitiator) {
+      pc.createOffer({ offerToReceiveAudio: true })
+        .then(offer => pc.setLocalDescription(offer))
+        .then(() => {
+          return fetch('/v1/mesh/voice/signal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fromPeerId: localPeerId,
+              toPeerId: remotePeerId,
+              roomId: voiceState.roomId,
+              signalType: 'offer',
+              data: pc.localDescription,
+            })
+          });
+        })
+        .catch(err => console.error('[WebRTC] Offer error to', remotePeerId, err));
+    }
+
+    return pc;
+  }
+
+  function getOrCreatePeerConnection(remotePeerId, isInitiator) {
+    let pc = voiceState.peerConnections.get(remotePeerId);
+    if (pc && pc.connectionState !== 'closed' && pc.connectionState !== 'failed') {
+      return pc;
+    }
+    return setupPeerConnection(remotePeerId, isInitiator);
+  }
+
+  async function handleVoiceSignal(signal) {
+    if (!voiceState.isInCall) return;
+    if (signal.toPeerId !== localPeerId || normRoom(signal.roomId) !== normRoom(voiceState.roomId)) return;
+
+    const { fromPeerId, signalType, data } = signal;
+
+    if (signalType === 'offer') {
+      const pc = getOrCreatePeerConnection(fromPeerId, false);
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+        if (voiceState.pendingCandidates.has(fromPeerId)) {
+          const queue = voiceState.pendingCandidates.get(fromPeerId) || [];
+          for (const cand of queue) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
+          }
+          voiceState.pendingCandidates.delete(fromPeerId);
+        }
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        await fetch('/v1/mesh/voice/signal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromPeerId: localPeerId,
+            toPeerId: fromPeerId,
+            roomId: normRoom(voiceState.roomId),
+            signalType: 'answer',
+            data: pc.localDescription,
+          })
+        });
+      } catch (err) {
+        console.error('[WebRTC] Error handling offer:', err);
+      }
+    } else if (signalType === 'answer') {
+      const pc = voiceState.peerConnections.get(fromPeerId);
+      if (pc && pc.signalingState !== 'stable') {
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(data));
+          if (voiceState.pendingCandidates.has(fromPeerId)) {
+            const queue = voiceState.pendingCandidates.get(fromPeerId) || [];
+            for (const cand of queue) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
+            }
+            voiceState.pendingCandidates.delete(fromPeerId);
+          }
+        } catch (err) {
+          console.error('[WebRTC] Error handling answer:', err);
+        }
+      }
+    } else if (signalType === 'candidate') {
+      const pc = voiceState.peerConnections.get(fromPeerId);
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(data));
+        } catch (err) {
+          console.warn('[WebRTC] Error adding ICE candidate:', err);
+        }
+      } else {
+        if (!voiceState.pendingCandidates.has(fromPeerId)) {
+          voiceState.pendingCandidates.set(fromPeerId, []);
+        }
+        voiceState.pendingCandidates.get(fromPeerId).push(data);
+      }
+    }
+  }
+
+  function cleanupPeerConnection(peerId) {
+    if (voiceState.peerConnections.has(peerId)) {
+      try { voiceState.peerConnections.get(peerId).close(); } catch {}
+      voiceState.peerConnections.delete(peerId);
+    }
+    if (voiceState.remoteGainNodes.has(peerId)) {
+      try { voiceState.remoteGainNodes.get(peerId).disconnect(); } catch {}
+      voiceState.remoteGainNodes.delete(peerId);
+    }
+    if (voiceState.remoteAudios.has(peerId)) {
+      const el = voiceState.remoteAudios.get(peerId);
+      try { el.srcObject = null; el.remove(); } catch {}
+      voiceState.remoteAudios.delete(peerId);
+    }
+    voiceState.remoteAnalysers.delete(peerId);
+    voiceState.pendingCandidates.delete(peerId);
+  }
+
+  function leaveVoiceCall() {
+    if (!voiceState.isInCall) return;
+
+    if (voiceState.heartbeatInterval) {
+      clearInterval(voiceState.heartbeatInterval);
+      voiceState.heartbeatInterval = null;
+    }
+
+    fetch('/v1/mesh/voice/leave', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: normRoom(voiceState.roomId), peerId: localPeerId })
+    }).catch(() => {});
+
+    stopTestTone();
+
+    if (voiceState.localStream) {
+      voiceState.localStream.getTracks().forEach(t => t.stop());
+      voiceState.localStream = null;
+    }
+
+    if (voiceState.remoteGainNodes) {
+      voiceState.remoteGainNodes.forEach(g => { try { g.disconnect(); } catch {} });
+      voiceState.remoteGainNodes.clear();
+    }
+
+    if (voiceState.audioContext) {
+      try { voiceState.audioContext.close(); } catch {}
+      voiceState.audioContext = null;
+    }
+
+    if (voiceState.animFrameId) {
+      cancelAnimationFrame(voiceState.animFrameId);
+      voiceState.animFrameId = null;
+    }
+
+    for (const peerId of voiceState.peerConnections.keys()) {
+      cleanupPeerConnection(peerId);
+    }
+    voiceState.voicePeers.clear();
+
+    voiceState.isInCall = false;
+    voiceState.isMuted = false;
+    voiceState.isDeafened = false;
+    voiceState.isSpeaking = false;
+    voiceState.isListenOnly = false;
+
+    if (voiceNoticeBanner) voiceNoticeBanner.style.display = 'none';
+
+    updateVoiceUI();
+  }
+
+  function toggleMute() {
+    if (!voiceState.isInCall) return;
+    if (voiceState.isListenOnly && !voiceState.isToneActive) {
+      showNotification('🎧 Listen-Only mode: No local microphone active to mute.');
+      return;
+    }
+    voiceState.isMuted = !voiceState.isMuted;
+    if (voiceState.localStream) {
+      voiceState.localStream.getAudioTracks().forEach(t => {
+        t.enabled = !voiceState.isMuted;
+      });
+    }
+
+    if (voiceMuteBtn) {
+      voiceMuteBtn.classList.toggle('is-muted', voiceState.isMuted);
+      if (voiceMuteIcon) voiceMuteIcon.textContent = voiceState.isMuted ? '🔇' : '🎤';
+      if (voiceMuteLabel) voiceMuteLabel.textContent = voiceState.isMuted ? 'Unmute' : 'Mute';
+    }
+
+    const localVoice = voiceState.voicePeers.get(localPeerId);
+    if (localVoice) {
+      localVoice.isMuted = voiceState.isMuted;
+      renderVoiceParticipants();
+    }
+
+    fetch('/v1/mesh/voice/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId: normRoom(voiceState.roomId),
+        peerId: localPeerId,
+        isMuted: voiceState.isMuted
+      })
+    }).catch(() => {});
+  }
+
+  function toggleDeafen() {
+    if (!voiceState.isInCall) return;
+    voiceState.isDeafened = !voiceState.isDeafened;
+
+    voiceState.remoteGainNodes.forEach(gainNode => {
+      try {
+        if (voiceState.audioContext) {
+          gainNode.gain.setValueAtTime(voiceState.isDeafened ? 0 : 1, voiceState.audioContext.currentTime);
+        }
+      } catch {}
+    });
+
+    voiceState.remoteAudios.forEach(audioEl => {
+      audioEl.muted = !!voiceState.isDeafened;
+      audioEl.volume = voiceState.isDeafened ? 0 : 1;
+    });
+
+    if (voiceState.isDeafened && !voiceState.isMuted) {
+      toggleMute();
+    }
+
+    if (voiceDeafenBtn) {
+      voiceDeafenBtn.classList.toggle('is-deafened', voiceState.isDeafened);
+      if (voiceDeafenIcon) voiceDeafenIcon.textContent = voiceState.isDeafened ? '🔕' : '🎧';
+      if (voiceDeafenLabel) voiceDeafenLabel.textContent = voiceState.isDeafened ? 'Undeafen' : 'Deafen';
+    }
+
+    const localVoice = voiceState.voicePeers.get(localPeerId);
+    if (localVoice) {
+      localVoice.isDeafened = voiceState.isDeafened;
+      renderVoiceParticipants();
+    }
+
+    fetch('/v1/mesh/voice/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomId: normRoom(voiceState.roomId),
+        peerId: localPeerId,
+        isDeafened: voiceState.isDeafened
+      })
+    }).catch(() => {});
+  }
+
+  function startAudioVolumeMonitor() {
+    let lastSpeakingState = false;
+
+    function monitor() {
+      if (!voiceState.isInCall) return;
+
+      if (voiceState.analyser && !voiceState.isMuted && !voiceState.isDeafened) {
+        const data = new Uint8Array(voiceState.analyser.frequencyBinCount);
+        voiceState.analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        const speaking = avg > 8 || voiceState.isToneActive;
+
+        if (speaking !== lastSpeakingState) {
+          lastSpeakingState = speaking;
+          voiceState.isSpeaking = speaking;
+          updateVoiceCardSpeaking(localPeerId, speaking, avg);
+          fetch('/v1/mesh/voice/state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roomId: voiceState.roomId,
+              peerId: localPeerId,
+              isSpeaking: speaking,
+              isToneActive: voiceState.isToneActive,
+            })
+          }).catch(() => {});
+        } else if (speaking) {
+          updateVoiceCardSpeaking(localPeerId, true, avg);
+        }
+      }
+
+      voiceState.remoteAnalysers.forEach((analyser, pId) => {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        const speaking = avg > 8;
+        updateVoiceCardSpeaking(pId, speaking, avg);
+      });
+
+      voiceState.animFrameId = requestAnimationFrame(monitor);
+    }
+
+    voiceState.animFrameId = requestAnimationFrame(monitor);
+  }
+
+  function updateVoiceCardSpeaking(peerId, isSpeaking, level = 0) {
+    const card = document.getElementById(`voiceCard_${peerId}`);
+    if (!card) return;
+    const avatarWrap = card.querySelector('.mesh-voice-avatar-wrap');
+    const vumeterFill = card.querySelector('.mesh-voice-vumeter-fill');
+    const isLocal = peerId === localPeerId;
+    const remotePeer = voiceState.voicePeers.get(peerId);
+    const isTone = isLocal ? voiceState.isToneActive : (remotePeer && remotePeer.isToneActive);
+
+    if (avatarWrap) {
+      if (isTone) {
+        avatarWrap.classList.add('is-tone');
+        avatarWrap.classList.remove('is-speaking');
+      } else {
+        avatarWrap.classList.remove('is-tone');
+        avatarWrap.classList.toggle('is-speaking', isSpeaking);
+      }
+    }
+    if (vumeterFill) {
+      const active = isSpeaking || isTone;
+      const percent = active ? Math.min(100, Math.max(18, Math.round(level * 2.5))) : 0;
+      vumeterFill.style.width = percent + '%';
+      if (isTone) vumeterFill.classList.add('tone');
+      else vumeterFill.classList.remove('tone');
+    }
+  }
+
+  function updateVoiceUI() {
+    const count = voiceState.voicePeers.size;
+
+    if (voiceState.isInCall) {
+      if (joinVoiceBtn) {
+        joinVoiceBtn.classList.add('in-call');
+        if (joinVoiceLabel) joinVoiceLabel.textContent = 'Leave Voice';
+      }
+      if (voiceDock) voiceDock.style.display = 'block';
+      if (voiceStage) voiceStage.style.display = 'block';
+      if (voiceDockRoom) {
+        const roomName = '#' + (roomsMap.get(voiceState.roomId)?.name || voiceState.roomId).replace(/^#/, '');
+        voiceDockRoom.textContent = `${roomName} (${count} Caller${count === 1 ? '' : 's'})`;
+      }
+      if (voiceStageCount) {
+        voiceStageCount.textContent = `${count} Connected`;
+      }
+      if (voicePeerCountBadge) {
+        voicePeerCountBadge.style.display = 'inline-block';
+        voicePeerCountBadge.textContent = count;
+      }
+      renderVoiceParticipants();
+    } else {
+      if (joinVoiceBtn) {
+        joinVoiceBtn.classList.remove('in-call');
+        if (joinVoiceLabel) {
+          joinVoiceLabel.textContent = count > 0 ? `Join Voice (${count} Live)` : 'Join Voice';
+        }
+      }
+      if (voiceDock) voiceDock.style.display = 'none';
+      if (voiceStage) voiceStage.style.display = 'none';
+      if (voicePeerCountBadge) {
+        if (count > 0) {
+          voicePeerCountBadge.style.display = 'inline-block';
+          voicePeerCountBadge.textContent = count;
+        } else {
+          voicePeerCountBadge.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  function renderVoiceParticipants() {
+    if (!voiceParticipantsGrid) return;
+    voiceParticipantsGrid.innerHTML = '';
+
+    voiceState.voicePeers.forEach(peer => {
+      const isLocal = peer.peerId === localPeerId;
+      const card = document.createElement('div');
+      card.className = 'mesh-voice-card';
+      card.id = `voiceCard_${peer.peerId}`;
+
+      let statusBadge = '';
+      if (peer.isDeafened) {
+        statusBadge = '<span class="mesh-voice-status-badge" title="Deafened">🔕</span>';
+      } else if (peer.isMuted) {
+        statusBadge = '<span class="mesh-voice-status-badge" title="Muted">🔇</span>';
+      }
+
+      let roleText = 'WebRTC P2P';
+      let dotClass = 'active';
+      const isTone = peer.isToneActive || (isLocal && voiceState.isToneActive);
+      if (peer.isListenOnly || (isLocal && voiceState.isListenOnly && !isTone)) {
+        roleText = '🎧 Listen Only';
+        dotClass = 'listen-only';
+      } else if (isTone) {
+        roleText = '🎵 Synth Melody';
+        dotClass = 'tone';
+      } else if (peer.isMuted) {
+        roleText = 'Muted';
+        dotClass = '';
+      }
+
+      card.innerHTML = `
+        <div class="mesh-voice-avatar-wrap ${isTone ? 'is-tone' : (peer.isSpeaking ? 'is-speaking' : '')}">
+          <span>${peer.avatar || '👤'}</span>
+          ${statusBadge}
+        </div>
+        <div class="mesh-voice-card-handle" title="${escapeHtml(peer.handle)}">
+          ${escapeHtml(peer.handle)} ${isLocal ? '<span style="color: #4ade80; font-size: 10px;">(You)</span>' : ''}
+        </div>
+        <div class="mesh-voice-card-role">
+          <span class="status-dot ${dotClass}" style="width: 5px; height: 5px; border-radius: 50%;"></span>
+          <span>${roleText}</span>
+        </div>
+        <div class="mesh-voice-vumeter">
+          <div class="mesh-voice-vumeter-fill ${isTone ? 'tone' : ''}"></div>
+        </div>
+      `;
+
+      voiceParticipantsGrid.appendChild(card);
+    });
+  }
+
+  function handleVoicePeerJoined(data) {
+    if (voiceState.isInCall && normRoom(data.roomId) === normRoom(voiceState.roomId)) {
+      voiceState.voicePeers.set(data.peer.peerId, data.peer);
+      updateVoiceUI();
+      if (data.peer.peerId !== localPeerId) {
+        getOrCreatePeerConnection(data.peer.peerId, false);
+      }
+    } else if (normRoom(data.roomId) === normRoom(currentRoomId)) {
+      updateRoomVoiceBadge(data.peers ? data.peers.length : 1);
+    }
+  }
+
+  function handleVoicePeerLeft(data) {
+    if (voiceState.isInCall && normRoom(data.roomId) === normRoom(voiceState.roomId)) {
+      voiceState.voicePeers.delete(data.peerId);
+      cleanupPeerConnection(data.peerId);
+      updateVoiceUI();
+    } else if (normRoom(data.roomId) === normRoom(currentRoomId)) {
+      updateRoomVoiceBadge(data.peers ? data.peers.length : 0);
+    }
+  }
+
+  function handleVoiceStateChanged(data) {
+    if (voiceState.isInCall && normRoom(data.roomId) === normRoom(voiceState.roomId)) {
+      const peer = voiceState.voicePeers.get(data.peerId);
+      if (peer && data.state) {
+        Object.assign(peer, data.state);
+        renderVoiceParticipants();
+      }
+    }
+  }
+
+  // Voice Event Listeners
+  if (joinVoiceBtn) {
+    joinVoiceBtn.addEventListener('click', () => {
+      if (voiceState.isInCall) {
+        leaveVoiceCall();
+      } else {
+        joinVoiceCall(currentRoomId);
+      }
+    });
+  }
+  if (voiceMuteBtn) voiceMuteBtn.addEventListener('click', toggleMute);
+  if (voiceDeafenBtn) voiceDeafenBtn.addEventListener('click', toggleDeafen);
+  if (voiceDisconnectBtn) voiceDisconnectBtn.addEventListener('click', leaveVoiceCall);
+  if (voiceTestToneBtn) voiceTestToneBtn.addEventListener('click', toggleTestTone);
+  if (voiceTestSpeakerBtn) voiceTestSpeakerBtn.addEventListener('click', playLocalSpeakerTest);
+
+  if (voiceMinimizeStageBtn && voiceStage) {
+    voiceMinimizeStageBtn.addEventListener('click', () => {
+      const isCollapsed = voiceParticipantsGrid.style.display === 'none';
+      voiceParticipantsGrid.style.display = isCollapsed ? 'flex' : 'none';
+      voiceMinimizeStageBtn.textContent = isCollapsed ? 'Collapse' : 'Expand';
+    });
+  }
+  if (voiceToggleGridBtn && voiceStage) {
+    voiceToggleGridBtn.addEventListener('click', () => {
+      voiceStage.style.display = voiceStage.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+  window.addEventListener('beforeunload', () => {
+    if (voiceState.isInCall) leaveVoiceCall();
+  });
+
+  // SSE Stream
+  function connectSSE() {
+    if (sseSource && sseSource.readyState !== EventSource.CLOSED) return;
+
+    const url = `/v1/mesh/events?peerId=${encodeURIComponent(localPeerId)}&handle=${encodeURIComponent(localHandle)}&avatar=${encodeURIComponent(localAvatar)}`;
+    sseSource = new EventSource(url);
+
+    sseSource.onopen = () => {
+      loadStatus();
+    };
+
+    sseSource.addEventListener('init', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.peers) {
+          peersMap.clear();
+          data.peers.forEach(p => peersMap.set(p.id, p));
+          renderPeersList();
+          updateBrowsePeerSelect();
+        }
+        if (data.rooms && Array.isArray(data.rooms)) {
+          roomsMap.clear();
+          data.rooms.forEach(r => roomsMap.set(r.id, r));
+          renderRoomsList();
+        }
+        if (data.messages && Array.isArray(data.messages)) {
+          const chatContainer = document.getElementById('meshChatMessages');
+          if (chatContainer) {
+            chatContainer.innerHTML = '';
+            data.messages.forEach(msg => appendMeshChatMessage(msg));
+          }
+        }
+        if (data.config && data.config.motd) {
+          const motdEl = document.getElementById('meshMotdText');
+          if (motdEl) motdEl.textContent = data.config.motd;
+        }
+        if (data.stats) {
+          updateHeaderStats(data.stats.peersCount || 1, data.stats.totalSharedBytes || 0);
+        }
+        if (data.voicePeers && Array.isArray(data.voicePeers)) {
+          updateRoomVoiceBadge(data.voicePeers.length);
+          if (voiceState.isInCall) {
+            const curRoom = normRoom(voiceState.roomId);
+            fetch(`/v1/mesh/voice/peers?roomId=${encodeURIComponent(curRoom)}`)
+              .then(r => r.json())
+              .then(res => {
+                if (res && res.success && Array.isArray(res.peers)) {
+                  const serverHasMe = res.peers.some(p => p.peerId === localPeerId);
+                  if (!serverHasMe) {
+                    fetch('/v1/mesh/voice/join', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        roomId: curRoom,
+                        peerId: localPeerId,
+                        handle: localHandle,
+                        avatar: localAvatar,
+                        isListenOnly: voiceState.isListenOnly,
+                      })
+                    }).catch(() => {});
+                  }
+                  voiceState.voicePeers.clear();
+                  res.peers.forEach(p => voiceState.voicePeers.set(p.peerId, p));
+                  updateVoiceUI();
+                  res.peers.forEach(p => {
+                    if (p.peerId !== localPeerId) {
+                      getOrCreatePeerConnection(p.peerId, false);
+                    }
+                  });
+                }
+              })
+              .catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('[Mesh] Error parsing init event:', err);
+      }
+    });
+
+    sseSource.addEventListener('voice_peer_joined', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        handleVoicePeerJoined(data);
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('voice_peer_left', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        handleVoicePeerLeft(data);
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('voice_signal', (e) => {
+      try {
+        const signal = JSON.parse(e.data);
+        handleVoiceSignal(signal);
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('voice_state_changed', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        handleVoiceStateChanged(data);
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('room_create', (e) => {
+      try {
+        const room = JSON.parse(e.data);
+        roomsMap.set(room.id, room);
+        renderRoomsList();
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('peer_joined', (e) => {
+      try {
+        const peer = JSON.parse(e.data);
+        peersMap.set(peer.id, peer);
+        renderPeersList();
+        updateBrowsePeerSelect();
+        appendMeshChatMessage({
+          id: 'sys_' + Date.now(),
+          senderId: 'system',
+          senderHandle: 'System',
+          senderAvatar: '🌐',
+          type: 'system',
+          text: `👋 **${peer.handle}** entered the lobby.`,
+          timestamp: new Date().toISOString(),
+          roomId: 'lounge',
+        });
+        if (!peer.isResident && peer.id !== 'nexus_ai' && peer.id !== localPeerId) {
+          playJoinChime();
+        }
+        updateHeaderStats(peersMap.size + 1, Array.from(peersMap.values()).reduce((sum, p) => sum + (p.sharedTotalBytes || p.sharedBytes || 0), 0));
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('peer_left', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const peer = peersMap.get(data.peerId);
+        const name = peer ? peer.handle : 'A peer';
+        peersMap.delete(data.peerId);
+        renderPeersList();
+        updateBrowsePeerSelect();
+        appendMeshChatMessage({
+          id: 'sys_' + Date.now(),
+          senderId: 'system',
+          senderHandle: 'System',
+          senderAvatar: '🚪',
+          type: 'system',
+          text: `🚪 **${name}** left the lobby.`,
+          timestamp: new Date().toISOString(),
+          roomId: 'lounge',
+        });
+        updateHeaderStats(peersMap.size + 1, Array.from(peersMap.values()).reduce((sum, p) => sum + (p.sharedTotalBytes || p.sharedBytes || 0), 0));
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('peer_updated', (e) => {
+      try {
+        const peer = JSON.parse(e.data);
+        peersMap.set(peer.id, peer);
+        renderPeersList();
+        updateBrowsePeerSelect();
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('chat_message', (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        appendMeshChatMessage(msg);
+        if (msg.peerId === 'nexus_ai' || msg.senderId === 'nexus_ai') {
+          hideAiTyping();
+        } else if (!msg.isSystem && msg.peerId !== localPeerId) {
+          playJoinChime();
+        }
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('chat_cleared', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (!data.roomId || data.roomId === currentRoomId) {
+          const chatContainer = document.getElementById('meshChatMessages');
+          if (chatContainer) chatContainer.innerHTML = '';
+        }
+      } catch (err) {}
+    });
+
+    sseSource.addEventListener('shares_updated', () => {
+      loadStatus();
+      if (currentTab === 'browse' && currentBrowsePeerId === 'local') {
+        loadBrowseTree(true);
+      }
+    });
+
+    sseSource.onerror = () => {
+      const statsEl = document.getElementById('meshHeaderStats');
+      if (statsEl) {
+        statsEl.innerHTML = `<span class="status-dot" style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-right: 4px;"></span> Reconnecting to Mesh...`;
+      }
+    };
+
+    // Heartbeat every 25 seconds
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(() => {
+      fetch('/v1/mesh/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peerId: localPeerId }),
+      }).catch(() => {});
+    }, 25000);
+  }
+
+  // Chat Rendering
+  function appendMeshChatMessage(msg) {
+    const chatContainer = document.getElementById('meshChatMessages');
+    if (!chatContainer || !msg) return;
+
+    if (msg.id && renderedMessageIds.has(msg.id)) return;
+    if (msg.id) renderedMessageIds.add(msg.id);
+
+    const normMsgRoom = (msg.roomId || 'lounge').toLowerCase().replace(/^#/, '').trim();
+    const normCurRoom = (currentRoomId || 'lounge').toLowerCase().replace(/^#/, '').trim();
+    if (normMsgRoom !== normCurRoom) {
+      const cur = roomUnreadMap.get(normMsgRoom) || 0;
+      roomUnreadMap.set(normMsgRoom, cur + 1);
+      renderRoomsList();
+      return;
+    }
+
+    const isNearBottom = chatContainer.scrollHeight - chatContainer.clientHeight - chatContainer.scrollTop < 80;
+    const msgEl = document.createElement('div');
+    const isAi = msg.type === 'ai' || msg.senderId === 'nexus_ai' || msg.peerId === 'nexus_ai' || msg.isAi;
+    const isSys = msg.type === 'system' || msg.isSystem;
+    const isActionStep = typeof msg.text === 'string' && msg.text.includes('*[Autonomous Action]*');
+
+    msgEl.className = `mesh-chat-msg ${isAi ? 'is-ai' : ''} ${isSys ? 'is-system' : ''} ${isActionStep ? 'is-action-step' : ''}`;
+
+    const avatar = escapeHtml(msg.senderAvatar || msg.avatar || (isAi ? '⚡' : (isSys ? '📢' : '👤')));
+    const handle = escapeHtml(msg.senderHandle || msg.handle || (isAi ? 'Nexus AI' : (isSys ? 'System' : 'Unknown')));
+    const time = formatMeshTime(msg.timestamp);
+
+    // Markdown or text formatting
+    let contentHtml = '';
+    if (typeof formatMarkdown === 'function') {
+      contentHtml = formatMarkdown(msg.text);
+    } else {
+      contentHtml = escapeHtml(msg.text).replace(/\n/g, '<br/>');
+    }
+
+    // Media attachment preview - extract from attachments array or mediaUrl
+    let mediaHtml = '';
+    const mediaItems = [];
+    if (Array.isArray(msg.attachments)) {
+      for (const att of msg.attachments) {
+        if (att && att.url) {
+          mediaItems.push({
+            url: att.url,
+            name: att.name || 'attachment',
+            type: att.type || '',
+          });
+        }
+      }
+    }
+    if (msg.mediaUrl && !mediaItems.some(m => m.url === msg.mediaUrl)) {
+      mediaItems.push({
+        url: msg.mediaUrl,
+        name: msg.mediaName || (msg.mediaType === 'video' ? 'render.mp4' : 'render.png'),
+        type: msg.mediaType || '',
+      });
+    }
+
+    if (mediaItems.length > 0) {
+      let cards = '';
+      for (const m of mediaItems) {
+        const url = m.url;
+        const name = m.name || url.split('/').pop()?.split('?')[0] || 'media';
+        const isVid = (m.type && m.type.startsWith('video/')) || /\.(mp4|webm|mov|mkv)$/i.test(url) || /\.(mp4|webm|mov|mkv)$/i.test(name);
+        const isAud = (m.type && m.type.startsWith('audio/')) || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(url) || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(name);
+        const dlUrl = url + (url.includes('?') ? '&' : '?') + 'download=1';
+        const safeDlName = name.replace(/"/g, '&quot;');
+
+        if (isVid) {
+          cards += `
+            <div class="mesh-chat-media-card">
+              <div class="mesh-chat-media-viewport">
+                <video src="${escapeHtml(url)}" controls playsinline preload="metadata" style="max-width: 100%; max-height: 340px; display: block;"></video>
+              </div>
+              <div class="mesh-chat-media-actions">
+                <span class="mesh-chat-media-title" title="${safeDlName}">🎬 ${escapeHtml(name)}</span>
+                <div class="mesh-chat-media-btns">
+                  <a href="${escapeHtml(dlUrl)}" download="${safeDlName}" class="btn-mesh-action btn-mesh-download" title="Download to Phone / PC">⬇️ Download</a>
+                  <button type="button" class="btn-mesh-action btn-mesh-share" onclick="downloadOrShareMedia('${escapeHtml(url)}', '${safeDlName}', 'Generated Video')" title="Save to Photos or Share">📲 Save / Share</button>
+                  <a href="${escapeHtml(url)}" target="_blank" class="btn-mesh-action" title="Open Fullscreen">🔍 View</a>
+                </div>
+              </div>
+            </div>
+          `;
+        } else if (isAud) {
+          cards += `
+            <div class="mesh-chat-media-card mesh-chat-audio-card">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="font-size: 14px;">🎵</span>
+                <span class="mesh-chat-media-title" title="${safeDlName}">${escapeHtml(name)}</span>
+              </div>
+              <audio src="${escapeHtml(url)}" controls preload="metadata" style="width: 100%; height: 36px; display: block; margin-bottom: 8px;"></audio>
+              <div class="mesh-chat-media-actions" style="margin-top: 4px;">
+                <span></span>
+                <div class="mesh-chat-media-btns">
+                  <button type="button" class="btn-mesh-action" onclick="if(window.playAudioPreview) playAudioPreview('${escapeHtml(url)}', '${safeDlName}')" title="Play in Docked Player">▶️ Preview Bar</button>
+                  <a href="${escapeHtml(dlUrl)}" download="${safeDlName}" class="btn-mesh-action btn-mesh-download" title="Download Audio">⬇️ Download</a>
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          // Image
+          cards += `
+            <div class="mesh-chat-media-card">
+              <div class="mesh-chat-media-viewport">
+                <a href="${escapeHtml(url)}" target="_blank" title="Tap to view full resolution" style="display: block; width: 100%; text-align: center;">
+                  <img src="${escapeHtml(url)}" alt="${safeDlName}" loading="lazy" style="max-width: 100%; max-height: 340px; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto; cursor: pointer;">
+                </a>
+              </div>
+              <div class="mesh-chat-media-actions">
+                <span class="mesh-chat-media-title" title="${safeDlName}">🖼️ ${escapeHtml(name)}</span>
+                <div class="mesh-chat-media-btns">
+                  <a href="${escapeHtml(dlUrl)}" download="${safeDlName}" class="btn-mesh-action btn-mesh-download" title="Download to Phone / PC">⬇️ Download</a>
+                  <button type="button" class="btn-mesh-action btn-mesh-share" onclick="downloadOrShareMedia('${escapeHtml(url)}', '${safeDlName}', 'Generated Artwork')" title="Save to Photos / Camera Roll">📲 Save / Share</button>
+                  <a href="${escapeHtml(url)}" target="_blank" class="btn-mesh-action" title="Open Fullscreen">🔍 View</a>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+      mediaHtml = `<div class="mesh-chat-media-group">${cards}</div>`;
+    }
+
+    msgEl.innerHTML = `
+      <div class="mesh-peer-avatar">${avatar}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;">
+          <span style="font-size: 12.5px; font-weight: 700; color: ${isAi ? '#c084fc' : (isSys ? '#38bdf8' : '#f8fafc')};">${handle}</span>
+          ${isAi ? '<span style="font-size: 10px; background: rgba(168, 85, 247, 0.2); color: #c084fc; padding: 1px 5px; border-radius: 4px; font-weight: 700;">AI BOT</span>' : ''}
+          <span style="font-size: 11px; color: #64748b; margin-left: auto;">${time}</span>
+        </div>
+        <div style="font-size: 13px; color: #cbd5e1; line-height: 1.45; word-break: break-word;">${contentHtml}</div>
+        ${mediaHtml}
+      </div>
+    `;
+
+    chatContainer.appendChild(msgEl);
+    if (isNearBottom) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // Spoken Audio TTS for Bot replies if enabled
+    if (isAi || msg.peerId === 'nexus_ai' || msg.peerId === 'peer_retro' || msg.peerId === 'peer_acid') {
+      speakBotMessage(msg.text, msg.senderHandle || msg.handle || handle);
+    }
+  }
+
+  function showAiTyping() {
+    const el = document.getElementById('meshAiTyping');
+    if (el) el.style.display = 'flex';
+  }
+  function hideAiTyping() {
+    const el = document.getElementById('meshAiTyping');
+    if (el) el.style.display = 'none';
+  }
+
+  // Chat Send Logic
+  const chatInput = document.getElementById('meshChatInput');
+  const sendChatBtn = document.getElementById('meshSendChatBtn');
+
+  async function sendChatMessage() {
+    if (!chatInput) return;
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    if (text.startsWith('@nexus') || text.startsWith('/art') || text.startsWith('/video')) {
+      showAiTyping();
+    }
+
+    const originalText = text;
+    chatInput.value = '';
+    chatInput.focus();
+
+    try {
+      const res = await fetch('/v1/mesh/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: originalText,
+          roomId: currentRoomId,
+          senderHandle: localHandle,
+          senderAvatar: localAvatar,
+          peerId: localPeerId,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.success && data.message) {
+        appendMeshChatMessage(data.message);
+      } else {
+        hideAiTyping();
+        chatInput.value = originalText;
+        const errDetail = (data?.message && data.message !== 'Internal Server Error')
+          ? data.message
+          : ((data?.error && data.error !== 'Internal Server Error')
+              ? data.error
+              : (res.status === 503 ? '503 Tunnel Unavailable (please retry or use direct Wi-Fi link)' : (res.status === 500 ? '500 Server Error' : 'Server error ' + res.status)));
+        appendMeshChatMessage({
+          id: 'err_' + Date.now(),
+          senderId: 'system',
+          senderHandle: 'System Notice',
+          senderAvatar: '⚠️',
+          type: 'system',
+          text: `⚠️ **Message not sent:** ${errDetail}\n\n*Your text was preserved in the input box so you can resend.*`,
+          timestamp: new Date().toISOString(),
+          roomId: currentRoomId,
+        });
+      }
+    } catch (err) {
+      console.error('[Mesh] Failed to send chat message:', err);
+      hideAiTyping();
+      chatInput.value = originalText;
+      appendMeshChatMessage({
+        id: 'err_' + Date.now(),
+        senderId: 'system',
+        senderHandle: 'Network Notice',
+        senderAvatar: '⚠️',
+        type: 'system',
+        text: `⚠️ **Network connection error:** ${err.message}. *Your message was preserved in the box.*`,
+        timestamp: new Date().toISOString(),
+        roomId: currentRoomId,
+      });
+    }
+  }
+
+  if (sendChatBtn) sendChatBtn.addEventListener('click', sendChatMessage);
+  if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+  }
+
+  // Quick Agent & Command Buttons
+  const quickNexusBtn = document.getElementById('meshQuickNexusBtn');
+  const quickRetroBtn = document.getElementById('meshQuickRetroBtn');
+  const quickAcidBtn = document.getElementById('meshQuickAcidBtn');
+  const quickArtBtn = document.getElementById('meshQuickArtBtn');
+  const quickVideoBtn = document.getElementById('meshQuickVideoBtn');
+  const clearChatBtn = document.getElementById('meshClearChatBtn');
+
+  if (quickNexusBtn) {
+    quickNexusBtn.addEventListener('click', () => {
+      if (!chatInput) return;
+      chatInput.value = '@nexus ';
+      chatInput.focus();
+    });
+  }
+  if (quickRetroBtn) {
+    quickRetroBtn.addEventListener('click', () => {
+      if (!chatInput) return;
+      chatInput.value = '@retro ';
+      chatInput.focus();
+    });
+  }
+  if (quickAcidBtn) {
+    quickAcidBtn.addEventListener('click', () => {
+      if (!chatInput) return;
+      chatInput.value = '@acid ';
+      chatInput.focus();
+    });
+  }
+  if (quickArtBtn) {
+    quickArtBtn.addEventListener('click', () => {
+      if (!chatInput) return;
+      chatInput.value = '/art ';
+      chatInput.focus();
+    });
+  }
+  if (quickVideoBtn) {
+    quickVideoBtn.addEventListener('click', () => {
+      if (!chatInput) return;
+      chatInput.value = '/video ';
+      chatInput.focus();
+    });
+  }
+  if (clearChatBtn) {
+    clearChatBtn.addEventListener('click', async () => {
+      const chatContainer = document.getElementById('meshChatMessages');
+      if (chatContainer) chatContainer.innerHTML = '';
+      try {
+        await fetch(`/v1/mesh/messages?roomId=${encodeURIComponent(currentRoomId || 'lounge')}`, {
+          method: 'DELETE'
+        });
+        showNotification('🧹 Chat cleared!');
+      } catch (err) {
+        console.warn('Failed to clear mesh messages:', err);
+      }
+    });
+  }
+
+  // --- Verbal Voice Recognition (STT) & Speech Synthesis (TTS) ---
+  let isVoiceListening = false;
+  let speechRecognitionInstance = null;
+  let isVoiceOutputEnabled = localStorage.getItem('nexus_mesh_voice_tts') === 'true';
+
+  function initVoiceFeatures() {
+    const voiceMicBtn = document.getElementById('meshChatVoiceBtn');
+    const voiceToggleBtn = document.getElementById('meshVoiceOutputToggleBtn');
+    const inputField = document.getElementById('meshChatInput');
+
+    if (voiceToggleBtn) {
+      function updateVoiceToggleUI() {
+        if (isVoiceOutputEnabled) {
+          voiceToggleBtn.textContent = '🔊 Voice: ON';
+          voiceToggleBtn.classList.add('is-active');
+        } else {
+          voiceToggleBtn.textContent = '🔈 Voice: OFF';
+          voiceToggleBtn.classList.remove('is-active');
+        }
+      }
+      updateVoiceToggleUI();
+
+      voiceToggleBtn.addEventListener('click', () => {
+        isVoiceOutputEnabled = !isVoiceOutputEnabled;
+        localStorage.setItem('nexus_mesh_voice_tts', String(isVoiceOutputEnabled));
+        updateVoiceToggleUI();
+        if (isVoiceOutputEnabled && 'speechSynthesis' in window) {
+          speakBotMessage("Voice activated! NexusAI is locked and loaded.", "NexusAI");
+        } else if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      });
+    }
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (voiceMicBtn) {
+      if (!SpeechRec) {
+        voiceMicBtn.title = "Voice recognition not supported in this browser (Use Chrome, Edge, Safari)";
+        voiceMicBtn.addEventListener('click', () => {
+          alert("Speech recognition is supported in Chrome, Microsoft Edge, and Safari on iOS/macOS.");
+        });
+        return;
+      }
+
+      try {
+        speechRecognitionInstance = new SpeechRec();
+        speechRecognitionInstance.continuous = false;
+        speechRecognitionInstance.interimResults = true;
+        speechRecognitionInstance.lang = 'en-US';
+
+        speechRecognitionInstance.onstart = () => {
+          isVoiceListening = true;
+          voiceMicBtn.classList.add('is-recording');
+          if (inputField) inputField.placeholder = "Listening... speak now! 🎙️";
+        };
+
+        speechRecognitionInstance.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (inputField && transcript) {
+            inputField.value = transcript;
+          }
+        };
+
+        speechRecognitionInstance.onerror = (e) => {
+          console.warn('[VoiceRec] Error:', e.error);
+          stopVoiceRec();
+        };
+
+        speechRecognitionInstance.onend = () => {
+          stopVoiceRec();
+        };
+
+        function stopVoiceRec() {
+          isVoiceListening = false;
+          voiceMicBtn.classList.remove('is-recording');
+          if (inputField) inputField.placeholder = "Say something in the lobby, or tag @nexus / run /art...";
+        }
+
+        voiceMicBtn.addEventListener('click', () => {
+          if (!isVoiceListening) {
+            try {
+              speechRecognitionInstance.start();
+            } catch (err) {
+              console.warn('[VoiceRec] Start error:', err);
+            }
+          } else {
+            speechRecognitionInstance.stop();
+          }
+        });
+      } catch (err) {
+        console.warn('[VoiceRec] Init error:', err);
+      }
+    }
+  }
+
+  function speakBotMessage(rawText, botHandle) {
+    if (!isVoiceOutputEnabled || !('speechSynthesis' in window) || !rawText) return;
+
+    let clean = rawText
+      .replace(/```[\s\S]*?```/g, "I have saved the code to your shared folder.")
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/⚡|🤖|🕹️|📼|💾|💿|🔊|🎙️|🎬|🎨/g, '')
+      .trim();
+
+    if (!clean) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(clean);
+
+    if (botHandle === 'RetroJunkie') {
+      utterance.rate = 1.0;
+      utterance.pitch = 0.95;
+    } else if (botHandle === 'AcidArchivist') {
+      utterance.rate = 1.03;
+      utterance.pitch = 1.0;
+    } else {
+      // NexusAI (Pryor/Murphy standup comedic energy)
+      utterance.rate = 1.12;
+      utterance.pitch = 1.08;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    const enVoices = voices.filter(v => v.lang.startsWith('en'));
+    if (enVoices.length > 0) {
+      utterance.voice = enVoices[0];
+    }
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // Initialize voice features immediately
+  initVoiceFeatures();
+
+  // Online Peers List Rendering
+  const peersListEl = document.getElementById('meshPeersList');
+  const peerFilterInput = document.getElementById('meshPeerFilterInput');
+
+  function renderPeersList() {
+    if (!peersListEl) return;
+    const filter = (peerFilterInput?.value || '').toLowerCase().trim();
+
+    peersListEl.innerHTML = '';
+
+    // Separate human peers from resident bots
+    const allPeers = Array.from(peersMap.values());
+    const humanPeers = allPeers.filter(p => !p.isResident && p.id !== 'nexus_ai' && p.id !== 'host' && p.id !== localPeerId);
+    const residentBots = allPeers.filter(p => p.isResident || p.id === 'nexus_ai');
+
+    // Section 1: LIVE HUMANS
+    const humanSection = document.createElement('div');
+    humanSection.style.marginBottom = '14px';
+    humanSection.innerHTML = `
+      <div style="font-size: 11px; font-weight: 800; color: #4ade80; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+        <span>🟢 Live Humans (${humanPeers.length + 1})</span>
+        <button type="button" id="meshSideInviteBtn" style="background: none; border: none; color: #4ade80; font-size: 10px; cursor: pointer; text-decoration: underline; font-weight: 700;">+ Invite</button>
+      </div>
+      <div id="meshHumanPeersContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
+    `;
+    peersListEl.appendChild(humanSection);
+
+    const humanContainer = humanSection.querySelector('#meshHumanPeersContainer');
+    const sideInviteBtn = humanSection.querySelector('#meshSideInviteBtn');
+    if (sideInviteBtn) {
+      sideInviteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openInviteModal();
+      });
+    }
+
+    // Always render Local Card (YOU) in Live Humans
+    const localCard = document.createElement('div');
+    localCard.className = 'mesh-peer-card is-host';
+    localCard.innerHTML = `
+      <div class="mesh-peer-avatar">${escapeHtml(localAvatar)}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 13px; font-weight: 700; color: #f8fafc;">${escapeHtml(localHandle)}</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <button type="button" class="mesh-edit-identity-btn" style="background: rgba(168,85,247,0.18); border: 1px solid rgba(168,85,247,0.35); color: #c084fc; font-size: 10px; padding: 1px 6px; border-radius: 4px; cursor: pointer;" title="Change your handle and avatar">✏️</button>
+            <span style="font-size: 10px; background: rgba(34, 197, 94, 0.25); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 1px 5px; border-radius: 4px; font-weight: 700;">YOU</span>
+          </div>
+        </div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Local Node · ${isGuestMode ? 'Guest Client' : 'Hub Operator'}</div>
+      </div>
+    `;
+    const editBtn = localCard.querySelector('.mesh-edit-identity-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openProfileModal();
+      });
+    }
+    localCard.addEventListener('click', () => {
+      switchTab('browse');
+      currentBrowsePeerId = 'local';
+      if (browsePeerSelect) browsePeerSelect.value = 'local';
+      loadBrowseTree();
+    });
+    humanContainer.appendChild(localCard);
+
+    // Other humans
+    humanPeers.forEach(peer => {
+      if (filter && !peer.handle.toLowerCase().includes(filter)) return;
+      const card = createPeerCardElement(peer, true);
+      humanContainer.appendChild(card);
+    });
+
+    if (humanPeers.length === 0) {
+      const loneMsg = document.createElement('div');
+      loneMsg.style.cssText = 'padding: 8px 10px; background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(255,255,255,0.1); border-radius: 6px; font-size: 11px; color: #94a3b8; line-height: 1.4;';
+      loneMsg.innerHTML = `No other friends yet! Click <strong style="color: #4ade80; cursor: pointer;" id="meshEmptyInviteLink">Invite Friends</strong> to join from phone or invite a mate.`;
+      humanContainer.appendChild(loneMsg);
+      loneMsg.querySelector('#meshEmptyInviteLink')?.addEventListener('click', openInviteModal);
+    }
+
+    // Section 2: RESIDENT ARCHIVISTS & BOTS
+    const botsSection = document.createElement('div');
+    botsSection.style.marginTop = '10px';
+    botsSection.innerHTML = `
+      <div style="font-size: 11px; font-weight: 800; color: #c084fc; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">
+        🤖 Resident Bots &amp; Archives (${residentBots.length})
+      </div>
+      <div id="meshBotPeersContainer" style="display: flex; flex-direction: column; gap: 6px;"></div>
+    `;
+    peersListEl.appendChild(botsSection);
+
+    const botContainer = botsSection.querySelector('#meshBotPeersContainer');
+    residentBots.forEach(peer => {
+      if (filter && !peer.handle.toLowerCase().includes(filter)) return;
+      const card = createPeerCardElement(peer, false);
+      botContainer.appendChild(card);
+    });
+  }
+
+  function createPeerCardElement(peer, isHuman) {
+    const card = document.createElement('div');
+    card.className = 'mesh-peer-card' + (isHuman ? ' is-human-remote' : ' is-bot');
+    const sharedBytes = peer.sharedTotalBytes || peer.sharedBytes || 0;
+    const sharedInfo = `${peer.sharedFilesCount || 0} files · ${formatMeshBytes(sharedBytes)}`;
+
+    card.innerHTML = `
+      <div class="mesh-peer-avatar">${escapeHtml(peer.avatar || (isHuman ? '👤' : '🤖'))}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 13px; font-weight: 600; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(peer.handle)}</span>
+          <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${isHuman ? '#22c55e' : '#a855f7'};"></span>
+        </div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          ${escapeHtml(sharedInfo)}
+        </div>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      browseUserShares(peer.id);
+    });
+
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, peer);
+    });
+
+    return card;
+  }
+
+  if (peerFilterInput) {
+    peerFilterInput.addEventListener('input', renderPeersList);
+  }
+
+  // Peer Context Menu
+  const contextMenu = document.getElementById('meshPeerContextMenu');
+  const ctxBrowseBtn = document.getElementById('meshCtxBrowseBtn');
+  const ctxPmBtn = document.getElementById('meshCtxPmBtn');
+
+  function showContextMenu(x, y, peer) {
+    if (!contextMenu) return;
+    contextTargetPeer = peer;
+    contextMenu.style.left = `${Math.min(x, window.innerWidth - 210)}px`;
+    contextMenu.style.top = `${Math.min(y, window.innerHeight - 100)}px`;
+    contextMenu.style.display = 'block';
+  }
+
+  function hideContextMenu() {
+    if (contextMenu) contextMenu.style.display = 'none';
+    contextTargetPeer = null;
+  }
+
+  document.addEventListener('click', (e) => {
+    if (contextMenu && !contextMenu.contains(e.target)) {
+      hideContextMenu();
+    }
+  });
+
+  if (ctxBrowseBtn) {
+    ctxBrowseBtn.addEventListener('click', () => {
+      if (contextTargetPeer) {
+        browseUserShares(contextTargetPeer.id);
+      }
+      hideContextMenu();
+    });
+  }
+
+  if (ctxPmBtn) {
+    ctxPmBtn.addEventListener('click', () => {
+      if (contextTargetPeer) {
+        switchTab('lobby');
+        if (chatInput) {
+          chatInput.value = `@${contextTargetPeer.handle} `;
+          chatInput.focus();
+        }
+      }
+      hideContextMenu();
+    });
+  }
+
+  function browseUserShares(peerId) {
+    currentBrowsePeerId = peerId;
+    switchTab('browse');
+    if (browsePeerSelect) {
+      browsePeerSelect.value = peerId;
+    }
+    loadBrowseTree();
+  }
+
+  // Browse Shares Tab (Soulseek / DC++ Tree Explorer)
+  const browsePeerSelect = document.getElementById('meshBrowsePeerSelect');
+  const refreshTreeBtn = document.getElementById('meshRefreshTreeBtn');
+  const browseBreadcrumbs = document.getElementById('meshBrowseBreadcrumbs');
+  const browseFilterInput = document.getElementById('meshBrowseFilterInput');
+  const folderTreeContainer = document.getElementById('meshFolderTreeContainer');
+  const fileListTable = document.getElementById('meshFileListTable');
+  const fileListTableBody = document.getElementById('meshFileListTableBody');
+  const galleryGridContainer = document.getElementById('meshGalleryGridContainer');
+  const viewModeListBtn = document.getElementById('meshViewModeListBtn');
+  const viewModeGalleryBtn = document.getElementById('meshViewModeGalleryBtn');
+  const downloadCurrentFolderZipBtn = document.getElementById('meshDownloadCurrentFolderZipBtn');
+  const saveCurrentFolderUnpackedBtn = document.getElementById('meshSaveCurrentFolderUnpackedBtn');
+
+  let currentBrowseViewMode = 'list';
+  let browseFolderStack = [];
+
+  // Folder Download Helpers (ZIP & File System Access API)
+  function downloadFolderZip(folderPath, folderName) {
+    if (!folderPath) return;
+    const cleanName = (folderName || folderPath.split('/').pop() || 'folder').replace(/[^a-zA-Z0-9_\-\. ]/g, '_');
+    const query = `path=${encodeURIComponent(folderPath)}`;
+    const url = `/v1/mesh/shares/download-folder?${query}`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${cleanName}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    if (typeof showToast === 'function') {
+      showToast(`⏳ Packaging "${cleanName}" as ZIP... Download starting!`, 'info');
+    }
+  }
+
+  async function saveFolderUnpacked(folderPath, folderName) {
+    if (!folderPath) return;
+    const cleanName = (folderName || folderPath.split('/').pop() || 'folder').replace(/[^a-zA-Z0-9_\-\. ]/g, '_');
+
+    if (!('showDirectoryPicker' in window)) {
+      if (typeof showToast === 'function') {
+        showToast(`📁 Direct unpacked folder saving requires desktop File System Access. Downloading as .ZIP instead!`, 'info');
+      }
+      downloadFolderZip(folderPath, folderName);
+      return;
+    }
+
+    try {
+      if (typeof showToast === 'function') {
+        showToast(`📁 Select a destination folder on your device to save "${cleanName}"...`, 'info');
+      }
+      const rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const targetDirHandle = await rootDirHandle.getDirectoryHandle(cleanName, { create: true });
+
+      if (typeof showToast === 'function') {
+        showToast(`⏳ Retrieving files index for "${cleanName}"...`, 'info');
+      }
+      const res = await fetch(`/v1/mesh/shares/folder-files?path=${encodeURIComponent(folderPath)}`);
+      if (!res.ok) throw new Error('Failed to retrieve folder files index');
+      const data = await res.json();
+      const files = data.files || [];
+
+      if (files.length === 0) {
+        if (typeof showToast === 'function') showToast(`Folder "${cleanName}" is empty.`, 'info');
+        return;
+      }
+
+      let savedCount = 0;
+      for (const file of files) {
+        const parts = file.relativePath.split('/');
+        let currentHandle = targetDirHandle;
+        for (let i = 0; i < parts.length - 1; i++) {
+          currentHandle = await currentHandle.getDirectoryHandle(parts[i], { create: true });
+        }
+        const fileName = parts[parts.length - 1];
+        const dlRes = await fetch(`/v1/mesh/shares/download?path=${encodeURIComponent(folderPath + '/' + file.relativePath)}`);
+        if (!dlRes.ok) continue;
+
+        const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await dlRes.body.pipeTo(writable);
+        savedCount++;
+        if (savedCount % 5 === 0 || savedCount === files.length) {
+          if (typeof showToast === 'function') {
+            showToast(`📁 Saving "${cleanName}": ${savedCount}/${files.length} files...`, 'info');
+          }
+        }
+      }
+
+      if (typeof showToast === 'function') {
+        showToast(`✅ Successfully saved "${cleanName}" (${savedCount} files) directly to your drive!`, 'success');
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.warn('saveFolderUnpacked error:', err);
+      if (typeof showToast === 'function') {
+        showToast(`Could not save unpacked folder: ${err.message}. Falling back to ZIP download.`, 'warning');
+      }
+      downloadFolderZip(folderPath, folderName);
+    }
+  }
+
+  // Media Lightbox Modal Implementation
+  let lightboxMediaList = [];
+  let currentLightboxIndex = 0;
+
+  const lightboxModal = document.getElementById('meshMediaLightboxModal');
+  const lightboxIcon = document.getElementById('meshLightboxIcon');
+  const lightboxTitle = document.getElementById('meshLightboxTitle');
+  const lightboxMeta = document.getElementById('meshLightboxMeta');
+  const lightboxImg = document.getElementById('meshLightboxImg');
+  const lightboxVideo = document.getElementById('meshLightboxVideo');
+  const lightboxPrevBtn = document.getElementById('meshLightboxPrevBtn');
+  const lightboxNextBtn = document.getElementById('meshLightboxNextBtn');
+  const lightboxDownloadBtn = document.getElementById('meshLightboxDownloadBtn');
+  const lightboxCloseBtn = document.getElementById('meshLightboxCloseBtn');
+
+  function openMediaLightbox(mediaList, startIndex = 0) {
+    if (!mediaList || mediaList.length === 0 || !lightboxModal) return;
+    lightboxMediaList = mediaList;
+    currentLightboxIndex = Math.max(0, Math.min(startIndex, mediaList.length - 1));
+    lightboxModal.classList.remove('hidden');
+    renderLightboxItem();
+  }
+
+  function closeMediaLightbox() {
+    if (!lightboxModal) return;
+    lightboxModal.classList.add('hidden');
+    if (lightboxVideo) {
+      lightboxVideo.pause();
+      lightboxVideo.src = '';
+    }
+    if (lightboxImg) {
+      lightboxImg.src = '';
+    }
+  }
+
+  function renderLightboxItem() {
+    if (!lightboxMediaList || lightboxMediaList.length === 0) return;
+    const file = lightboxMediaList[currentLightboxIndex];
+    if (!file) return;
+
+    const filePath = file.path || file.relativePath || file.name;
+    const fileUrl = `/v1/mesh/shares/download?path=${encodeURIComponent(filePath)}&inline=1`;
+    const isVideo = file.category === 'video' || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
+
+    if (lightboxTitle) lightboxTitle.textContent = file.name;
+    if (lightboxMeta) {
+      lightboxMeta.textContent = `${currentLightboxIndex + 1} / ${lightboxMediaList.length} • ${formatMeshBytes(file.size || 0)}`;
+    }
+    if (lightboxIcon) lightboxIcon.textContent = isVideo ? '🎬' : '🖼️';
+
+    if (isVideo) {
+      if (lightboxImg) lightboxImg.style.display = 'none';
+      if (lightboxVideo) {
+        lightboxVideo.style.display = 'block';
+        lightboxVideo.src = fileUrl;
+        lightboxVideo.play().catch(() => {});
+      }
+    } else {
+      if (lightboxVideo) {
+        lightboxVideo.pause();
+        lightboxVideo.style.display = 'none';
+      }
+      if (lightboxImg) {
+        lightboxImg.style.display = 'block';
+        lightboxImg.src = fileUrl;
+      }
+    }
+
+    if (lightboxPrevBtn) lightboxPrevBtn.style.display = lightboxMediaList.length > 1 ? 'flex' : 'none';
+    if (lightboxNextBtn) lightboxNextBtn.style.display = lightboxMediaList.length > 1 ? 'flex' : 'none';
+  }
+
+  if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', closeMediaLightbox);
+  if (lightboxPrevBtn) {
+    lightboxPrevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentLightboxIndex > 0) {
+        currentLightboxIndex--;
+      } else {
+        currentLightboxIndex = lightboxMediaList.length - 1;
+      }
+      renderLightboxItem();
+    });
+  }
+  if (lightboxNextBtn) {
+    lightboxNextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentLightboxIndex < lightboxMediaList.length - 1) {
+        currentLightboxIndex++;
+      } else {
+        currentLightboxIndex = 0;
+      }
+      renderLightboxItem();
+    });
+  }
+  if (lightboxDownloadBtn) {
+    lightboxDownloadBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const file = lightboxMediaList[currentLightboxIndex];
+      if (file) {
+        const peerHandle = currentBrowsePeerId === 'local' ? localHandle : (peersMap.get(currentBrowsePeerId)?.handle || 'Peer');
+        startFileDownload(file.name, file.path || file.relativePath, file.size, peerHandle, currentBrowsePeerId);
+      }
+    });
+  }
+
+  // Close on modal backdrop click
+  if (lightboxModal) {
+    lightboxModal.addEventListener('click', (e) => {
+      if (e.target === lightboxModal || e.target.id === 'meshLightboxContentArea') {
+        closeMediaLightbox();
+      }
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!lightboxModal || lightboxModal.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeMediaLightbox();
+    if (e.key === 'ArrowLeft' && lightboxPrevBtn) lightboxPrevBtn.click();
+    if (e.key === 'ArrowRight' && lightboxNextBtn) lightboxNextBtn.click();
+  });
+
+  // Code & Document Viewer Modal
+  const codeViewerModal = document.getElementById('meshCodeViewerModal');
+  const codeViewerTitle = document.getElementById('meshCodeViewerTitle');
+  const codeViewerBadge = document.getElementById('meshCodeViewerBadge');
+  const codeViewerMeta = document.getElementById('meshCodeViewerMeta');
+  const codeViewerIcon = document.getElementById('meshCodeViewerIcon');
+  const codeViewerContent = document.getElementById('meshCodeViewerContent');
+  const codeCopyBtn = document.getElementById('meshCodeCopyBtn');
+  const codeCopyIcon = document.getElementById('meshCodeCopyIcon');
+  const codeCopyLabel = document.getElementById('meshCodeCopyLabel');
+  const codeDownloadBtn = document.getElementById('meshCodeDownloadBtn');
+  const closeCodeViewerBtn = document.getElementById('closeMeshCodeViewerBtn');
+
+  let currentCodeRaw = '';
+  let currentCodeFile = null;
+
+  function getCodeLanguageInfo(filename) {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    const map = {
+      dsp: { lang: 'FAUST DSP', icon: '🎛️' },
+      cpp: { lang: 'C++', icon: '⚡' },
+      c: { lang: 'C', icon: '⚡' },
+      h: { lang: 'HEADER', icon: '⚡' },
+      hpp: { lang: 'HEADER', icon: '⚡' },
+      js: { lang: 'JAVASCRIPT', icon: '📜' },
+      ts: { lang: 'TYPESCRIPT', icon: '📘' },
+      mjs: { lang: 'ES MODULE', icon: '📜' },
+      cjs: { lang: 'COMMONJS', icon: '📜' },
+      py: { lang: 'PYTHON', icon: '🐍' },
+      json: { lang: 'JSON', icon: '📋' },
+      md: { lang: 'MARKDOWN', icon: '📝' },
+      txt: { lang: 'TEXT', icon: '📄' },
+      html: { lang: 'HTML', icon: '🌐' },
+      css: { lang: 'CSS', icon: '🎨' },
+      sql: { lang: 'SQL', icon: '🗄️' },
+      sh: { lang: 'SHELL', icon: '💻' },
+      bat: { lang: 'BATCH', icon: '⚙️' },
+      asm: { lang: 'ASSEMBLY', icon: '⚙️' },
+      s: { lang: 'ASSEMBLY', icon: '⚙️' },
+      rs: { lang: 'RUST', icon: '🦀' },
+      go: { lang: 'GO', icon: '🔷' },
+      java: { lang: 'JAVA', icon: '☕' },
+      kt: { lang: 'KOTLIN', icon: '🎯' },
+      yaml: { lang: 'YAML', icon: '⚙️' },
+      yml: { lang: 'YAML', icon: '⚙️' }
+    };
+    return map[ext] || { lang: ext.toUpperCase() || 'CODE', icon: '💻' };
+  }
+
+  async function openCodeViewer(file, peerHandle, peerId) {
+    if (!file || !codeViewerModal) return;
+    currentCodeFile = { ...file, peerHandle, peerId };
+    currentCodeRaw = '';
+
+    const filePath = file.path || file.relativePath || file.name;
+    const langInfo = getCodeLanguageInfo(file.name);
+
+    if (codeViewerTitle) codeViewerTitle.textContent = file.name;
+    if (codeViewerBadge) codeViewerBadge.textContent = langInfo.lang;
+    if (codeViewerIcon) codeViewerIcon.textContent = langInfo.icon;
+    if (codeViewerMeta) {
+      codeViewerMeta.textContent = `Streaming file • ${formatMeshBytes(file.size || 0)} • ${peerHandle || 'Peer'}`;
+    }
+
+    if (codeViewerContent) {
+      codeViewerContent.innerHTML = '<div style="padding: 30px; text-align: center; color: #64748b;">Loading document...</div>';
+    }
+
+    codeViewerModal.classList.remove('hidden');
+
+    try {
+      let res;
+      if (file.isWorkspace || filePath.startsWith('projects/') || !filePath.startsWith('shared/')) {
+        const cleanPath = filePath.replace(/^[/\\]+/, '').replace(/^workspace\//, '');
+        res = await fetch(`/v1/workspace/files/${encodeURIComponent(cleanPath)}?raw=1`);
+        if (!res.ok) {
+          res = await fetch(`/v1/mesh/shares/download?path=${encodeURIComponent(filePath)}&inline=1`);
+        }
+      } else {
+        res = await fetch(`/v1/mesh/shares/download?path=${encodeURIComponent(filePath)}&inline=1`);
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load file`);
+      const contentType = res.headers.get('content-type') || '';
+      let text = '';
+      if (contentType.includes('application/json')) {
+        const json = await res.json();
+        text = json.content !== undefined ? json.content : JSON.stringify(json, null, 2);
+      } else {
+        text = await res.text();
+      }
+      currentCodeRaw = text;
+
+      const lines = text.split('\n');
+      if (codeViewerMeta) {
+        codeViewerMeta.textContent = `${lines.length} ${lines.length === 1 ? 'line' : 'lines'} • ${formatMeshBytes(file.size || text.length)} • ${peerHandle || 'Peer'}`;
+      }
+
+      if (codeViewerContent) {
+        const formattedHtml = lines.map((line, idx) => {
+          const lineNr = idx + 1;
+          const safeLine = escapeHtml(line);
+          return `<div class="mesh-code-line"><span class="mesh-code-linenr">${lineNr}</span><span class="mesh-code-linetext">${safeLine || ' '}</span></div>`;
+        }).join('');
+        codeViewerContent.innerHTML = formattedHtml || '<div style="padding: 20px; color: #64748b;">(Empty file)</div>';
+      }
+    } catch (err) {
+      if (codeViewerContent) {
+        codeViewerContent.innerHTML = `<div style="padding: 30px; color: #ef4444;">Error loading file: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+  }
+
+  function closeCodeViewer() {
+    if (!codeViewerModal) return;
+    codeViewerModal.classList.add('hidden');
+  }
+
+  window.openCodeViewer = openCodeViewer;
+  window.closeCodeViewer = closeCodeViewer;
+
+  if (closeCodeViewerBtn) {
+    closeCodeViewerBtn.addEventListener('click', closeCodeViewer);
+  }
+
+  if (codeViewerModal) {
+    codeViewerModal.addEventListener('click', (e) => {
+      if (e.target === codeViewerModal) {
+        closeCodeViewer();
+      }
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!codeViewerModal || codeViewerModal.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeCodeViewer();
+  });
+
+  if (codeCopyBtn) {
+    codeCopyBtn.addEventListener('click', async () => {
+      if (!currentCodeRaw) return;
+      try {
+        await navigator.clipboard.writeText(currentCodeRaw);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = currentCodeRaw;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      if (codeCopyIcon) codeCopyIcon.textContent = '✅';
+      if (codeCopyLabel) codeCopyLabel.textContent = 'Copied!';
+      codeCopyBtn.style.borderColor = 'rgba(74, 222, 128, 0.6)';
+      codeCopyBtn.style.color = '#4ade80';
+      setTimeout(() => {
+        if (codeCopyIcon) codeCopyIcon.textContent = '📋';
+        if (codeCopyLabel) codeCopyLabel.textContent = 'Copy Code';
+        codeCopyBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        codeCopyBtn.style.color = '#38bdf8';
+      }, 2000);
+    });
+  }
+
+  if (codeDownloadBtn) {
+    codeDownloadBtn.addEventListener('click', () => {
+      if (!currentCodeFile) return;
+      const filePath = currentCodeFile.path || currentCodeFile.relativePath || currentCodeFile.name;
+      startFileDownload(currentCodeFile.name, filePath, currentCodeFile.size, currentCodeFile.peerHandle || localHandle, currentCodeFile.peerId || 'local');
+    });
+  }
+
+  window.openCodeViewer = openCodeViewer;
+
+  // View Mode Switcher Handlers
+  if (viewModeListBtn) {
+    viewModeListBtn.addEventListener('click', () => {
+      currentBrowseViewMode = 'list';
+      viewModeListBtn.classList.add('active');
+      viewModeGalleryBtn?.classList.remove('active');
+      if (fileListTable) fileListTable.classList.remove('hidden');
+      if (galleryGridContainer) galleryGridContainer.classList.add('hidden');
+      renderFileListTable();
+    });
+  }
+
+  if (viewModeGalleryBtn) {
+    viewModeGalleryBtn.addEventListener('click', () => {
+      currentBrowseViewMode = 'gallery';
+      viewModeGalleryBtn.classList.add('active');
+      viewModeListBtn?.classList.remove('active');
+      if (fileListTable) fileListTable.classList.add('hidden');
+      if (galleryGridContainer) galleryGridContainer.classList.remove('hidden');
+      renderFileListTable();
+    });
+  }
+
+  // Header Folder Action Buttons
+  if (downloadCurrentFolderZipBtn) {
+    downloadCurrentFolderZipBtn.addEventListener('click', () => {
+      if (selectedBrowseFolder) {
+        const folderPath = selectedBrowseFolder.path || selectedBrowseFolder.relativePath || selectedBrowseFolder.name;
+        downloadFolderZip(folderPath, selectedBrowseFolder.name);
+      }
+    });
+  }
+
+  if (saveCurrentFolderUnpackedBtn) {
+    saveCurrentFolderUnpackedBtn.addEventListener('click', () => {
+      if (selectedBrowseFolder) {
+        const folderPath = selectedBrowseFolder.path || selectedBrowseFolder.relativePath || selectedBrowseFolder.name;
+        saveFolderUnpacked(folderPath, selectedBrowseFolder.name);
+      }
+    });
+  }
+
+  function updateBrowsePeerSelect() {
+    if (!browsePeerSelect) return;
+    const currentVal = browsePeerSelect.value;
+    browsePeerSelect.innerHTML = `<option value="local">My Shared Drive (You)</option>`;
+
+    peersMap.forEach(peer => {
+      const opt = document.createElement('option');
+      opt.value = peer.id;
+      const totalBytes = peer.sharedTotalBytes || peer.sharedBytes || 0;
+      opt.textContent = `${peer.avatar || '👤'} ${peer.handle}'s Drive (${formatMeshBytes(totalBytes)})`;
+      browsePeerSelect.appendChild(opt);
+    });
+
+    if (currentVal && Array.from(browsePeerSelect.options).some(o => o.value === currentVal)) {
+      browsePeerSelect.value = currentVal;
+    }
+  }
+
+  if (browsePeerSelect) {
+    browsePeerSelect.addEventListener('change', () => {
+      currentBrowsePeerId = browsePeerSelect.value;
+      browseFolderStack = [];
+      loadBrowseTree();
+    });
+  }
+
+  if (refreshTreeBtn) {
+    refreshTreeBtn.addEventListener('click', () => {
+      loadBrowseTree(true);
+    });
+  }
+
+  async function loadBrowseTree(force = false) {
+    if (!folderTreeContainer || !fileListTableBody) return;
+    folderTreeContainer.innerHTML = '<div style="color: #64748b; font-size: 11px; padding: 10px;">Scanning directory tree...</div>';
+    fileListTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 20px;">Loading files...</td></tr>';
+    if (galleryGridContainer) galleryGridContainer.innerHTML = '<div style="color: #64748b; font-size: 12px; padding: 20px; text-align: center; grid-column: 1/-1;">Loading files...</div>';
+
+    try {
+      if (currentBrowsePeerId === 'local' && isGuestMode) {
+        if (peersMap.has('peer_acid')) {
+          currentBrowsePeerId = 'peer_acid';
+        } else if (peersMap.has('host')) {
+          currentBrowsePeerId = 'host';
+        }
+        if (browsePeerSelect) browsePeerSelect.value = currentBrowsePeerId;
+      }
+
+      const query = currentBrowsePeerId === 'local' ? '' : `?peerId=${encodeURIComponent(currentBrowsePeerId)}`;
+      const res = await fetch(`/v1/mesh/shares/tree${query}`);
+      if (!res.ok) throw new Error('Failed to fetch tree');
+      const data = await res.json();
+      currentBrowseTree = data.tree || [];
+      selectedBrowseFolder = null;
+      browseFolderStack = [];
+
+      renderFolderTree(currentBrowseTree);
+      renderFileListTable();
+    } catch (err) {
+      folderTreeContainer.innerHTML = `<div style="color: #ef4444; font-size: 11px; padding: 10px;">Error: ${err.message}</div>`;
+      fileListTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444; padding: 20px;">Failed to load shares.</td></tr>`;
+      if (galleryGridContainer) galleryGridContainer.innerHTML = `<div style="color: #ef4444; font-size: 12px; padding: 20px; text-align: center; grid-column: 1/-1;">Failed to load shares: ${err.message}</div>`;
+    }
+  }
+
+  function renderFolderTree(nodes, container = folderTreeContainer, level = 0) {
+    if (level === 0) {
+      container.innerHTML = '';
+
+      // Top Root item: "🏠 All Shared Drives"
+      const rootOverviewDiv = document.createElement('div');
+      rootOverviewDiv.className = 'mesh-tree-item' + (!selectedBrowseFolder ? ' active' : '');
+      rootOverviewDiv.innerHTML = `
+        <span style="font-size: 13px;">🏠</span>
+        <span style="font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">All Shared Drives</span>
+        <span style="font-size: 10px; color: #64748b;">(${nodes.length})</span>
+      `;
+      rootOverviewDiv.addEventListener('click', () => {
+        document.querySelectorAll('.mesh-tree-item').forEach(el => el.classList.remove('active'));
+        rootOverviewDiv.classList.add('active');
+        browseFolderStack = [];
+        selectFolder(null, false);
+      });
+      container.appendChild(rootOverviewDiv);
+    }
+
+    nodes.forEach(node => {
+      const isDir = node.isDirectory || node.type === 'directory';
+      if (!isDir) return;
+
+      const subDirs = (node.children || []).filter(c => c.isDirectory || c.type === 'directory');
+      const hasSubDirs = subDirs.length > 0;
+      const fileCount = (node.children || []).filter(c => !c.isDirectory && c.type !== 'directory').length;
+
+      const nodeWrapper = document.createElement('div');
+
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'mesh-tree-item';
+      itemDiv.style.paddingLeft = `${6 + level * 14}px`;
+      if (selectedBrowseFolder && (selectedBrowseFolder.path === node.path || (selectedBrowseFolder.name === node.name && !selectedBrowseFolder.path))) {
+        itemDiv.classList.add('active');
+      }
+
+      // Expand/collapse carat
+      const toggleSpan = document.createElement('span');
+      toggleSpan.className = 'mesh-tree-toggle';
+      toggleSpan.textContent = hasSubDirs ? '▶' : '•';
+      if (!hasSubDirs) toggleSpan.style.opacity = '0.3';
+
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = hasSubDirs ? '📂' : '📁';
+      iconSpan.style.fontSize = '13px';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = node.name;
+      nameSpan.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;';
+
+      const countSpan = document.createElement('span');
+      countSpan.textContent = `(${hasSubDirs ? subDirs.length + 'd' : fileCount})`;
+      countSpan.style.cssText = 'font-size: 10px; color: #64748b; margin-left: 4px;';
+
+      itemDiv.appendChild(toggleSpan);
+      itemDiv.appendChild(iconSpan);
+      itemDiv.appendChild(nameSpan);
+      itemDiv.appendChild(countSpan);
+
+      nodeWrapper.appendChild(itemDiv);
+
+      let childContainer = null;
+      if (hasSubDirs) {
+        childContainer = document.createElement('div');
+        childContainer.className = 'mesh-tree-children collapsed';
+        nodeWrapper.appendChild(childContainer);
+
+        const toggleChildren = (e) => {
+          if (e) e.stopPropagation();
+          const isCollapsed = childContainer.classList.contains('collapsed');
+          if (isCollapsed) {
+            childContainer.classList.remove('collapsed');
+            toggleSpan.textContent = '▼';
+            if (childContainer.children.length === 0) {
+              renderFolderTree(subDirs, childContainer, level + 1);
+            }
+          } else {
+            childContainer.classList.add('collapsed');
+            toggleSpan.textContent = '▶';
+          }
+        };
+
+        toggleSpan.addEventListener('click', toggleChildren);
+
+        itemDiv.addEventListener('click', () => {
+          document.querySelectorAll('.mesh-tree-item').forEach(el => el.classList.remove('active'));
+          itemDiv.classList.add('active');
+          if (childContainer.classList.contains('collapsed')) {
+            toggleChildren();
+          }
+          selectFolder(node, true);
+        });
+      } else {
+        itemDiv.addEventListener('click', () => {
+          document.querySelectorAll('.mesh-tree-item').forEach(el => el.classList.remove('active'));
+          itemDiv.classList.add('active');
+          selectFolder(node, true);
+        });
+      }
+
+      container.appendChild(nodeWrapper);
+    });
+  }
+
+  function selectFolder(node, pushToStack = true) {
+    if (pushToStack && selectedBrowseFolder && selectedBrowseFolder !== node) {
+      browseFolderStack.push(selectedBrowseFolder);
+    }
+    selectedBrowseFolder = node;
+    if (browseBreadcrumbs) {
+      if (!node) {
+        browseBreadcrumbs.textContent = '🏠 All Shared Drives';
+        if (downloadCurrentFolderZipBtn) downloadCurrentFolderZipBtn.classList.add('hidden');
+        if (saveCurrentFolderUnpackedBtn) saveCurrentFolderUnpackedBtn.classList.add('hidden');
+      } else {
+        const displayPath = node.path || node.relativePath || node.name;
+        browseBreadcrumbs.textContent = `🏠 All Shared Drives / ${displayPath}`;
+        if (downloadCurrentFolderZipBtn) downloadCurrentFolderZipBtn.classList.remove('hidden');
+        if (saveCurrentFolderUnpackedBtn) saveCurrentFolderUnpackedBtn.classList.remove('hidden');
+      }
+    }
+    renderFileListTable();
+  }
+
+  function renderFileListTable() {
+    if (!fileListTableBody) return;
+    const filter = (browseFilterInput?.value || '').toLowerCase().trim();
+    fileListTableBody.innerHTML = '';
+    if (galleryGridContainer) galleryGridContainer.innerHTML = '';
+
+    // If no folder is selected, show Root Shared Drives Overview
+    if (!selectedBrowseFolder) {
+      if (browseBreadcrumbs) browseBreadcrumbs.textContent = '🏠 All Shared Drives';
+      if (downloadCurrentFolderZipBtn) downloadCurrentFolderZipBtn.classList.add('hidden');
+      if (saveCurrentFolderUnpackedBtn) saveCurrentFolderUnpackedBtn.classList.add('hidden');
+
+      if (currentBrowseTree.length === 0) {
+        fileListTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 30px;">No shared drives or folders available. Mount folders in the "My Shares" tab!</td></tr>';
+        if (galleryGridContainer) galleryGridContainer.innerHTML = '<div style="color: #64748b; padding: 30px; text-align: center; grid-column: 1/-1;">No shared drives or folders available.</div>';
+        return;
+      }
+
+      const matchingRoots = currentBrowseTree.filter(r => !filter || r.name.toLowerCase().includes(filter));
+      if (matchingRoots.length === 0) {
+        fileListTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 30px;">No matching shared drives found.</td></tr>';
+        if (galleryGridContainer) galleryGridContainer.innerHTML = '<div style="color: #64748b; padding: 30px; text-align: center; grid-column: 1/-1;">No matching shared drives found.</div>';
+        return;
+      }
+
+      matchingRoots.forEach(root => {
+        const subDirs = (root.children || []).filter(c => c.isDirectory || c.type === 'directory').length;
+        const fileCount = (root.children || []).filter(c => !c.isDirectory && c.type !== 'directory').length;
+        const totalItemsDesc = `${subDirs} ${subDirs === 1 ? 'folder' : 'folders'}, ${fileCount} ${fileCount === 1 ? 'file' : 'files'}`;
+        const rootPath = root.path || root.relativePath || root.name;
+
+        // Table Row (List Mode)
+        const tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(56, 189, 248, 0.03); cursor: pointer; transition: background 0.15s;';
+        tr.onmouseenter = () => tr.style.background = 'rgba(56, 189, 248, 0.1)';
+        tr.onmouseleave = () => tr.style.background = 'rgba(56, 189, 248, 0.03)';
+
+        tr.innerHTML = `
+          <td style="padding: 10px 12px; font-weight: 600; color: #f8fafc; vertical-align: middle;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%;">
+              <span style="font-size: 18px; flex-shrink: 0;">📁</span>
+              <div style="min-width: 0; flex: 1; overflow: hidden;">
+                <div style="color: #38bdf8; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(root.name)}/</div>
+                <div style="font-size: 10.5px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${totalItemsDesc}</div>
+              </div>
+            </div>
+          </td>
+          <td style="padding: 10px 12px; vertical-align: middle;">
+            <span class="mesh-category-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">Root Drive</span>
+          </td>
+          <td style="padding: 10px 12px; color: #94a3b8; font-family: monospace; text-align: right; vertical-align: middle;">${formatMeshBytes(root.size || 0)}</td>
+          <td style="padding: 10px 12px; text-align: right; vertical-align: middle;">
+            <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
+              <button type="button" class="action-tag-btn root-open-btn" style="padding: 4px 8px; font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 4px;">
+                <span>Open</span> <span class="action-btn-label">Drive</span> ➡️
+              </button>
+              <button type="button" class="action-tag-btn root-zip-btn" style="padding: 4px 8px; font-size: 11px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); display: inline-flex; align-items: center; gap: 4px;" title="Download entire drive as a .ZIP archive">
+                <span>⬇️</span> <span class="action-btn-label">ZIP</span>
+              </button>
+            </div>
+          </td>
+        `;
+
+        tr.querySelector('.root-open-btn')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectFolder(root, true);
+        });
+        tr.querySelector('.root-zip-btn')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          downloadFolderZip(rootPath, root.name);
+        });
+        tr.addEventListener('click', () => {
+          selectFolder(root, true);
+        });
+        fileListTableBody.appendChild(tr);
+
+        // Gallery Card (Gallery Mode)
+        if (galleryGridContainer) {
+          const card = document.createElement('div');
+          card.className = 'mesh-gallery-card';
+          card.innerHTML = `
+            <div class="mesh-gallery-thumb-area" style="background: rgba(56, 189, 248, 0.08);">
+              <span style="font-size: 42px;">📁</span>
+              <span class="mesh-gallery-badge" style="background: rgba(56, 189, 248, 0.6);">Drive</span>
+            </div>
+            <div class="mesh-gallery-info">
+              <div class="mesh-gallery-title" style="color: #38bdf8;">${escapeHtml(root.name)}/</div>
+              <div class="mesh-gallery-sub">
+                <span>${totalItemsDesc}</span>
+                <button type="button" class="action-tag-btn gallery-card-zip" style="padding: 2px 6px; font-size: 10px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">⬇️ ZIP</button>
+              </div>
+            </div>
+          `;
+          card.querySelector('.gallery-card-zip')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            downloadFolderZip(rootPath, root.name);
+          });
+          card.addEventListener('click', () => selectFolder(root, true));
+          galleryGridContainer.appendChild(card);
+        }
+      });
+      return;
+    }
+
+    const allChildren = selectedBrowseFolder.children || [];
+    const subDirs = allChildren.filter(c => c.isDirectory || c.type === 'directory');
+    const files = allChildren.filter(c => !c.isDirectory && c.type !== 'directory');
+
+    const peerHandle = currentBrowsePeerId === 'local' ? localHandle : (peersMap.get(currentBrowsePeerId)?.handle || 'Peer');
+
+    // 1. Up / Back row if inside a folder or subfolder
+    const backTr = document.createElement('tr');
+    backTr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(56, 189, 248, 0.05); cursor: pointer; transition: background 0.15s;';
+    backTr.onmouseenter = () => backTr.style.background = 'rgba(56, 189, 248, 0.12)';
+    backTr.onmouseleave = () => backTr.style.background = 'rgba(56, 189, 248, 0.05)';
+
+    if (browseFolderStack.length > 0) {
+      const parentFolder = browseFolderStack[browseFolderStack.length - 1];
+      backTr.innerHTML = `
+        <td colspan="4" style="padding: 8px 12px; font-weight: 600; color: #38bdf8; vertical-align: middle;">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%;">
+            <span style="flex-shrink: 0;">⬅️</span>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Up to parent: <strong>${escapeHtml(parentFolder.name)}</strong></span>
+          </div>
+        </td>
+      `;
+      backTr.addEventListener('click', () => {
+        const prev = browseFolderStack.pop();
+        selectFolder(prev, false);
+      });
+    } else {
+      backTr.innerHTML = `
+        <td colspan="4" style="padding: 8px 12px; font-weight: 600; color: #38bdf8; vertical-align: middle;">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%;">
+            <span style="flex-shrink: 0;">⬅️</span>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Up to: <strong>All Shared Drives</strong></span>
+          </div>
+        </td>
+      `;
+      backTr.addEventListener('click', () => {
+        selectFolder(null, false);
+      });
+    }
+    fileListTableBody.appendChild(backTr);
+
+    // 2. Subdirectory rows
+    const matchingDirs = subDirs.filter(d => !filter || d.name.toLowerCase().includes(filter));
+    matchingDirs.forEach(dir => {
+      const dirPath = dir.path || dir.relativePath || dir.name;
+      const childCount = dir.children ? dir.children.length : 0;
+
+      const dirTr = document.createElement('tr');
+      dirTr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.05); background: rgba(168, 85, 247, 0.04); cursor: pointer; transition: background 0.15s;';
+      dirTr.onmouseenter = () => dirTr.style.background = 'rgba(168, 85, 247, 0.12)';
+      dirTr.onmouseleave = () => dirTr.style.background = 'rgba(168, 85, 247, 0.04)';
+
+      dirTr.innerHTML = `
+        <td style="padding: 8px 12px; font-weight: 600; color: #f8fafc; vertical-align: middle;">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%;">
+            <span style="font-size: 16px; flex-shrink: 0;">📁</span>
+            <span style="color: #c084fc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(dir.name)}/</span>
+          </div>
+        </td>
+        <td style="padding: 8px 12px; vertical-align: middle;">
+          <span class="mesh-category-badge" style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);">Folder</span>
+        </td>
+        <td style="padding: 8px 12px; color: #94a3b8; font-family: monospace; text-align: right; vertical-align: middle;">${childCount} ${childCount === 1 ? 'item' : 'items'}</td>
+        <td style="padding: 8px 12px; text-align: right; vertical-align: middle;">
+          <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
+            <button type="button" class="action-tag-btn dir-open-btn" style="padding: 4px 8px; font-size: 11px; color: #c084fc; border-color: rgba(168, 85, 247, 0.4); display: inline-flex; align-items: center; gap: 4px;">
+              <span>Open</span> ➡️
+            </button>
+            <button type="button" class="action-tag-btn dir-zip-btn" style="padding: 4px 6px; font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 4px;" title="Download folder as a .ZIP archive">
+              <span>⬇️</span> <span class="action-btn-label">ZIP</span>
+            </button>
+            <button type="button" class="action-tag-btn dir-save-btn" style="padding: 4px 6px; font-size: 11px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); display: inline-flex; align-items: center; gap: 4px;" title="Save directly as unpacked folder">
+              <span>📁</span> <span class="action-btn-label">Save</span>
+            </button>
+          </div>
+        </td>
+      `;
+      dirTr.querySelector('.dir-open-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectFolder(dir, true);
+      });
+      dirTr.querySelector('.dir-zip-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadFolderZip(dirPath, dir.name);
+      });
+      dirTr.querySelector('.dir-save-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        saveFolderUnpacked(dirPath, dir.name);
+      });
+      dirTr.addEventListener('click', () => {
+        selectFolder(dir, true);
+      });
+      fileListTableBody.appendChild(dirTr);
+
+      // Gallery Card for subfolders
+      if (galleryGridContainer) {
+        const card = document.createElement('div');
+        card.className = 'mesh-gallery-card';
+        card.innerHTML = `
+          <div class="mesh-gallery-thumb-area" style="background: rgba(168, 85, 247, 0.08);">
+            <span style="font-size: 38px;">📁</span>
+            <span class="mesh-gallery-badge" style="background: rgba(168, 85, 247, 0.6);">Folder</span>
+          </div>
+          <div class="mesh-gallery-info">
+            <div class="mesh-gallery-title" style="color: #c084fc;">${escapeHtml(dir.name)}/</div>
+            <div class="mesh-gallery-sub">
+              <span>${childCount} items</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="action-tag-btn gallery-card-zip" style="padding: 2px 6px; font-size: 10px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">⬇️ ZIP</button>
+              </div>
+            </div>
+          </div>
+        `;
+        card.querySelector('.gallery-card-zip')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          downloadFolderZip(dirPath, dir.name);
+        });
+        card.addEventListener('click', () => selectFolder(dir, true));
+        galleryGridContainer.appendChild(card);
+      }
+    });
+
+    // 3. File rows & media items
+    const matchingFiles = files.filter(f => !filter || f.name.toLowerCase().includes(filter));
+    const currentFolderAudioTracks = matchingFiles.filter(f => f.category === 'audio' || /\.(wav|mp3|ogg|flac|aac|m4a|opus|wma|mid|mod|s3m)$/i.test(f.name));
+    const currentFolderMediaFiles = matchingFiles.filter(f =>
+      f.category === 'image' || f.category === 'video' ||
+      /\.(jpe?g|png|webp|gif|bmp|svg|mp4|webm|mov|mkv|avi)$/i.test(f.name)
+    );
+
+    if (matchingFiles.length === 0 && matchingDirs.length === 0) {
+      const emptyMsg = filter ? 'No matching files or folders found' : 'No files or folders in this directory';
+      fileListTableBody.innerHTML += `<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 30px;">${emptyMsg}</td></tr>`;
+      if (galleryGridContainer) galleryGridContainer.innerHTML += `<div style="color: #64748b; padding: 30px; text-align: center; grid-column: 1/-1;">${emptyMsg}</div>`;
+      return;
+    }
+
+    matchingFiles.forEach((file) => {
+      const catInfo = getCategoryInfo(file.category);
+      const isAudio = file.category === 'audio' || /\.(wav|mp3|ogg|flac|aac|m4a|opus|wma|mid|mod|s3m)$/i.test(file.name);
+      const isImage = file.category === 'image' || /\.(jpe?g|png|webp|gif|bmp|svg)$/i.test(file.name);
+      const isVideo = file.category === 'video' || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
+      const isCodeOrDoc = file.category === 'code' || file.category === 'docs' ||
+        /\.(md|txt|js|ts|py|json|css|html|cpp|c|h|hpp|dsp|sql|sh|s|asm|bat|mjs|cjs|yaml|yml|rs|go|java|kt)$/i.test(file.name);
+      const filePath = file.path || file.relativePath || file.name;
+      const fileInlineUrl = `/v1/mesh/shares/download?path=${encodeURIComponent(filePath)}&inline=1`;
+
+      let visualThumbnail = `<span>${catInfo.icon}</span>`;
+      if (isImage) {
+        visualThumbnail = `
+          <div class="mesh-thumbnail-wrap" title="Tap to view fullscreen photo">
+            <img class="mesh-thumbnail-img" src="${fileInlineUrl}" loading="lazy" alt="${escapeHtml(file.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';" />
+            <span style="display: none; font-size: 16px;">🖼️</span>
+          </div>
+        `;
+      } else if (isVideo) {
+        visualThumbnail = `
+          <div class="mesh-thumbnail-wrap" style="background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.35);" title="Tap to play video preview">
+            <span style="font-size: 16px;">🎬</span>
+          </div>
+        `;
+      } else if (isCodeOrDoc) {
+        visualThumbnail = `
+          <div class="mesh-thumbnail-wrap" style="background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); cursor: pointer;" title="Tap to view code or document">
+            <span style="font-size: 16px;">${catInfo.icon || '📄'}</span>
+          </div>
+        `;
+      }
+
+      // List Table Row
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.style.transition = 'background 0.15s';
+      tr.onmouseenter = () => tr.style.background = 'rgba(168, 85, 247, 0.06)';
+      tr.onmouseleave = () => tr.style.background = 'none';
+
+      tr.innerHTML = `
+        <td style="padding: 8px 10px; font-weight: 500; color: #f8fafc; vertical-align: middle; cursor: ${(isImage || isVideo || isCodeOrDoc) ? 'pointer' : 'default'};">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%;">
+            <div style="flex-shrink: 0; display: inline-flex; align-items: center;">${visualThumbnail}</div>
+            <span class="mesh-file-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; font-size: 12px;">${escapeHtml(file.name)}</span>
+          </div>
+        </td>
+        <td style="padding: 8px 10px; vertical-align: middle;">
+          <span class="mesh-category-badge ${catInfo.class}">${catInfo.label}</span>
+        </td>
+        <td style="padding: 8px 8px; color: #94a3b8; font-family: monospace; text-align: right; vertical-align: middle; white-space: nowrap;">${formatMeshBytes(file.size)}</td>
+        <td style="padding: 8px 8px; text-align: right; vertical-align: middle;">
+          <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
+            ${(isImage || isVideo) ? `
+              <button type="button" class="action-tag-btn mesh-preview-btn" style="padding: 4px 8px; font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;" title="Preview fullscreen">
+                <span>👁️</span> <span class="action-btn-label">Preview</span>
+              </button>
+            ` : ''}
+            ${isCodeOrDoc ? `
+              <button type="button" class="action-tag-btn mesh-code-view-btn" style="padding: 4px 8px; font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;" title="View code or document in app">
+                <span>👁️</span> <span class="action-btn-label">View</span>
+              </button>
+            ` : ''}
+            ${isAudio ? `
+              <button type="button" class="action-tag-btn mesh-play-btn" style="padding: 4px 8px; font-size: 11px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;" title="Listen in app before downloading">
+                <span>▶️</span> <span class="action-btn-label">Play</span>
+              </button>
+            ` : ''}
+            <button type="button" class="action-tag-btn mesh-dl-btn" style="padding: 4px 8px; font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;" title="Download file to your device">
+              <span>⬇️</span> <span class="action-btn-label">Download</span>
+            </button>
+          </div>
+        </td>
+      `;
+
+      if (isAudio) {
+        const playBtn = tr.querySelector('.mesh-play-btn');
+        if (playBtn) {
+          playBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trackIdx = currentFolderAudioTracks.findIndex(t => (t.path || t.relativePath) === filePath);
+            playAudioPreview(file, peerHandle, currentBrowsePeerId, currentFolderAudioTracks, trackIdx);
+          });
+        }
+      }
+
+      if (isImage || isVideo) {
+        const previewHandler = (e) => {
+          e.stopPropagation();
+          const mediaIdx = currentFolderMediaFiles.findIndex(m => (m.path || m.relativePath) === filePath);
+          openMediaLightbox(currentFolderMediaFiles, mediaIdx !== -1 ? mediaIdx : 0);
+        };
+        tr.querySelector('.mesh-preview-btn')?.addEventListener('click', previewHandler);
+        tr.querySelector('.mesh-thumbnail-wrap')?.addEventListener('click', previewHandler);
+        tr.querySelector('.mesh-file-title')?.addEventListener('click', previewHandler);
+      }
+
+      if (isCodeOrDoc) {
+        const viewCodeHandler = (e) => {
+          e.stopPropagation();
+          openCodeViewer(file, peerHandle, currentBrowsePeerId);
+        };
+        tr.querySelector('.mesh-code-view-btn')?.addEventListener('click', viewCodeHandler);
+        tr.querySelector('.mesh-thumbnail-wrap')?.addEventListener('click', viewCodeHandler);
+        tr.querySelector('.mesh-file-title')?.addEventListener('click', viewCodeHandler);
+      }
+
+      const dlBtn = tr.querySelector('.mesh-dl-btn');
+      if (dlBtn) {
+        dlBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          startFileDownload(file.name, filePath, file.size, peerHandle, currentBrowsePeerId);
+        });
+      }
+
+      fileListTableBody.appendChild(tr);
+
+      // Gallery Card
+      if (galleryGridContainer) {
+        const card = document.createElement('div');
+        card.className = 'mesh-gallery-card';
+
+        let thumbContent = '';
+        if (isImage) {
+          thumbContent = `
+            <img class="mesh-gallery-thumb-img" src="${fileInlineUrl}" loading="lazy" alt="${escapeHtml(file.name)}" onerror="this.parentElement.innerHTML='<span style=\\'font-size:38px\\'>🖼️</span>';" />
+            <span class="mesh-gallery-badge">🖼️ Photo</span>
+          `;
+        } else if (isVideo) {
+          thumbContent = `
+            <div style="font-size: 40px;">🎬</div>
+            <span class="mesh-gallery-badge" style="background: rgba(168, 85, 247, 0.7);">▶️ Video</span>
+          `;
+        } else if (isAudio) {
+          thumbContent = `
+            <div style="font-size: 38px;">🎵</div>
+            <span class="mesh-gallery-badge" style="background: rgba(236, 72, 153, 0.7);">Audio</span>
+          `;
+        } else if (isCodeOrDoc) {
+          thumbContent = `
+            <div style="font-size: 38px;">${catInfo.icon || '💻'}</div>
+            <span class="mesh-gallery-badge" style="background: rgba(56, 189, 248, 0.7);">Code</span>
+          `;
+        } else {
+          thumbContent = `
+            <div style="font-size: 38px;">${catInfo.icon}</div>
+            <span class="mesh-gallery-badge">${catInfo.label}</span>
+          `;
+        }
+
+        card.innerHTML = `
+          <div class="mesh-gallery-thumb-area">
+            ${thumbContent}
+          </div>
+          <div class="mesh-gallery-info">
+            <div class="mesh-gallery-title" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+            <div class="mesh-gallery-sub">
+              <span>${formatMeshBytes(file.size)}</span>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                ${isCodeOrDoc ? `<button type="button" class="action-tag-btn gallery-card-view" style="padding: 2px 6px; font-size: 10px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">👁️</button>` : ''}
+                <button type="button" class="action-tag-btn gallery-card-dl" style="padding: 2px 6px; font-size: 10px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">⬇️</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        card.querySelector('.gallery-card-view')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCodeViewer(file, peerHandle, currentBrowsePeerId);
+        });
+
+        card.querySelector('.gallery-card-dl')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          startFileDownload(file.name, filePath, file.size, peerHandle, currentBrowsePeerId);
+        });
+
+        card.addEventListener('click', () => {
+          if (isImage || isVideo) {
+            const mediaIdx = currentFolderMediaFiles.findIndex(m => (m.path || m.relativePath) === filePath);
+            openMediaLightbox(currentFolderMediaFiles, mediaIdx !== -1 ? mediaIdx : 0);
+          } else if (isAudio) {
+            const trackIdx = currentFolderAudioTracks.findIndex(t => (t.path || t.relativePath) === filePath);
+            playAudioPreview(file, peerHandle, currentBrowsePeerId, currentFolderAudioTracks, trackIdx);
+          } else if (isCodeOrDoc) {
+            openCodeViewer(file, peerHandle, currentBrowsePeerId);
+          } else {
+            startFileDownload(file.name, filePath, file.size, peerHandle, currentBrowsePeerId);
+          }
+        });
+
+        galleryGridContainer.appendChild(card);
+      }
+    });
+  }
+
+  if (browseFilterInput) {
+    browseFilterInput.addEventListener('input', renderFileListTable);
+  }
+
+  // Global Network Search Tab
+  const globalSearchInput = document.getElementById('meshGlobalSearchInput');
+  const globalSearchBtn = document.getElementById('meshGlobalSearchBtn');
+  const searchResultsCount = document.getElementById('meshSearchResultsCount');
+  const searchResultsBody = document.getElementById('meshGlobalSearchResultsBody');
+  const categoryFilterBtns = document.querySelectorAll('.mesh-filter-btn');
+
+  let activeSearchCategory = 'all';
+
+  categoryFilterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      categoryFilterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeSearchCategory = btn.dataset.category || 'all';
+      performGlobalSearch();
+    });
+  });
+
+  async function performGlobalSearch() {
+    if (!searchResultsBody) return;
+    const query = (globalSearchInput?.value || '').trim();
+
+    searchResultsBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b; padding: 25px;">Searching across mesh nodes...</td></tr>';
+    if (searchResultsCount) searchResultsCount.textContent = 'Searching...';
+
+    try {
+      const catParam = activeSearchCategory !== 'all' ? `&category=${encodeURIComponent(activeSearchCategory)}` : '';
+      const res = await fetch(`/v1/mesh/shares/search?q=${encodeURIComponent(query)}${catParam}`);
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      const results = data.results || [];
+
+      if (searchResultsCount) {
+        searchResultsCount.textContent = `${results.length} ${results.length === 1 ? 'result' : 'results'}`;
+      }
+
+      if (results.length === 0) {
+        searchResultsBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #64748b; padding: 35px;">No files found ${query ? `matching "${escapeHtml(query)}"` : 'in mesh catalogs'}</td></tr>`;
+        return;
+      }
+
+      searchResultsBody.innerHTML = '';
+      results.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+        tr.style.transition = 'background 0.15s';
+        tr.onmouseenter = () => tr.style.background = 'rgba(168, 85, 247, 0.06)';
+        tr.onmouseleave = () => tr.style.background = 'none';
+
+        const catInfo = getCategoryInfo(item.category);
+        const peerAvatar = escapeHtml(item.peerAvatar || '👤');
+        const peerHandle = escapeHtml(item.peerHandle || 'Local');
+        const fileRelPath = item.relativePath || item.relPath || item.name;
+
+        const isResident = item.peerId?.startsWith('peer_') || item.peerId === 'nexus_ai';
+        const isHost = item.peerId === 'host' || !item.peerId || item.peerId === 'local';
+        const peerBadgeText = isResident ? 'Resident Archive' : (isHost ? 'Local Drive' : 'Remote Peer');
+        const peerBadgeColor = isResident ? '#c084fc' : (isHost ? '#38bdf8' : '#4ade80');
+        const peerBadgeBg = isResident ? 'rgba(168, 85, 247, 0.15)' : (isHost ? 'rgba(56, 189, 248, 0.15)' : 'rgba(34, 197, 94, 0.15)');
+
+        const isAudio = item.category === 'audio' || /\.(wav|mp3|ogg|flac|aac|m4a|mid|mod|s3m)$/i.test(item.name);
+        const isCodeOrDoc = item.category === 'code' || item.category === 'docs' ||
+          /\.(md|txt|js|ts|py|json|css|html|cpp|c|h|hpp|dsp|sql|sh|s|asm|bat|mjs|cjs|yaml|yml|rs|go|java|kt)$/i.test(item.name);
+
+        tr.innerHTML = `
+          <td style="padding: 10px 14px; font-weight: 500; color: #f8fafc; display: flex; align-items: center; gap: 8px; cursor: ${isCodeOrDoc ? 'pointer' : 'default'};">
+            <span>${catInfo.icon}</span>
+            <span class="mesh-search-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;" title="${escapeHtml(fileRelPath)}">${escapeHtml(item.name)}</span>
+          </td>
+          <td style="padding: 10px 14px; color: #cbd5e1;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span>${peerAvatar}</span>
+              <span style="font-weight: 600; color: #f8fafc;">${peerHandle}</span>
+              <span style="font-size: 10px; font-weight: 700; color: ${peerBadgeColor}; background: ${peerBadgeBg}; padding: 1px 6px; border-radius: 4px; border: 1px solid ${peerBadgeColor}40;">${peerBadgeText}</span>
+            </div>
+          </td>
+          <td style="padding: 10px 14px;">
+            <span class="mesh-category-badge ${catInfo.class}">${catInfo.label}</span>
+          </td>
+          <td style="padding: 10px 14px; color: #94a3b8; font-family: monospace;">${formatMeshBytes(item.size)}</td>
+          <td style="padding: 10px 14px;">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              ${isCodeOrDoc ? `
+                <button type="button" class="action-tag-btn mesh-search-code-btn mesh-code-view-btn" style="padding: 4px 10px; font-size: 11.5px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: flex; align-items: center; gap: 4px; cursor: pointer;" title="View code or document">
+                  <span>👁️</span> View
+                </button>
+              ` : ''}
+              ${isAudio ? `
+                <button type="button" class="action-tag-btn mesh-search-play-btn" style="padding: 4px 10px; font-size: 11.5px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); display: flex; align-items: center; gap: 4px; cursor: pointer;" title="Preview audio">
+                  <span>▶️</span> Play
+                </button>
+              ` : ''}
+              <button type="button" class="action-tag-btn mesh-search-dl-btn" style="padding: 4px 10px; font-size: 11.5px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <span>⬇️</span> Download
+              </button>
+            </div>
+          </td>
+        `;
+
+        if (isCodeOrDoc) {
+          const viewSearchCode = (e) => {
+            e.stopPropagation();
+            openCodeViewer({ name: item.name, path: fileRelPath, size: item.size, category: item.category }, peerHandle, item.peerId || 'local');
+          };
+          tr.querySelector('.mesh-search-code-btn')?.addEventListener('click', viewSearchCode);
+          tr.querySelector('.mesh-search-title')?.addEventListener('click', viewSearchCode);
+        }
+
+        if (isAudio) {
+          const playBtn = tr.querySelector('.mesh-search-play-btn');
+          if (playBtn) {
+            playBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              playAudioPreview({ name: item.name, path: fileRelPath, size: item.size }, peerHandle, item.peerId || 'local');
+            });
+          }
+        }
+
+        const dlBtn = tr.querySelector('.mesh-search-dl-btn');
+        if (dlBtn) {
+          dlBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startFileDownload(item.name, fileRelPath, item.size, item.peerHandle || localHandle, item.peerId || 'local');
+          });
+        }
+
+        searchResultsBody.appendChild(tr);
+      });
+
+    } catch (err) {
+      searchResultsBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 25px;">Search error: ${err.message}</td></tr>`;
+    }
+  }
+
+  if (globalSearchBtn) globalSearchBtn.addEventListener('click', performGlobalSearch);
+  let searchDebounce = null;
+  if (globalSearchInput) {
+    globalSearchInput.addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => {
+        performGlobalSearch();
+      }, 250);
+    });
+    globalSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        performGlobalSearch();
+      }
+    });
+  }
+
+  // Create Channel Modal Wiring
+  const openCreateRoomBtn = document.getElementById('meshOpenCreateRoomBtn');
+  const createRoomModal = document.getElementById('meshCreateRoomModal');
+  const closeCreateRoomBtn = document.getElementById('closeMeshCreateRoomBtn');
+  const cancelCreateRoomBtn = document.getElementById('cancelMeshCreateRoomBtn');
+  const submitCreateRoomBtn = document.getElementById('submitMeshCreateRoomBtn');
+  const newRoomNameInput = document.getElementById('meshNewRoomName');
+  const newRoomTopicInput = document.getElementById('meshNewRoomTopic');
+  const newRoomAvatarInput = document.getElementById('meshNewRoomAvatar');
+  const newRoomPinInput = document.getElementById('meshNewRoomPin');
+
+  function openCreateRoom() {
+    if (createRoomModal) {
+      createRoomModal.classList.remove('hidden');
+      if (newRoomNameInput) {
+        newRoomNameInput.value = '';
+        newRoomNameInput.focus();
+      }
+    }
+  }
+
+  function closeCreateRoom() {
+    if (createRoomModal) createRoomModal.classList.add('hidden');
+  }
+
+  if (openCreateRoomBtn) openCreateRoomBtn.addEventListener('click', openCreateRoom);
+  if (closeCreateRoomBtn) closeCreateRoomBtn.addEventListener('click', closeCreateRoom);
+  if (cancelCreateRoomBtn) cancelCreateRoomBtn.addEventListener('click', closeCreateRoom);
+
+  if (submitCreateRoomBtn) {
+    submitCreateRoomBtn.addEventListener('click', async () => {
+      const name = (newRoomNameInput?.value || '').trim();
+      if (!name) {
+        alert('Please enter a room name');
+        return;
+      }
+      const topic = (newRoomTopicInput?.value || '').trim();
+      const avatar = (newRoomAvatarInput?.value || '💬').trim();
+      const pin = (newRoomPinInput?.value || '').trim();
+
+      try {
+        const res = await fetch('/v1/mesh/rooms/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, topic, avatar, pin, createdBy: localHandle }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.room) {
+            roomsMap.set(data.room.id, data.room);
+            renderRoomsList();
+            closeCreateRoom();
+            switchRoom(data.room.id);
+          }
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'Failed to create room');
+        }
+      } catch (e) {
+        alert('Error creating room: ' + e.message);
+      }
+    });
+  }
+
+  // Connect Remote Hub Modal Wiring
+  const openRemoteHubModalBtn = document.getElementById('meshOpenRemoteHubModalBtn');
+  const remoteHubModal = document.getElementById('meshRemoteHubModal');
+  const closeRemoteHubBtn = document.getElementById('closeMeshRemoteHubBtn');
+  const cancelRemoteHubBtn = document.getElementById('cancelMeshRemoteHubBtn');
+  const submitRemoteHubBtn = document.getElementById('submitMeshRemoteHubBtn');
+  const remoteHubUrlInput = document.getElementById('meshRemoteHubUrlInput');
+
+  function openRemoteHub() {
+    if (remoteHubModal) {
+      remoteHubModal.classList.remove('hidden');
+      if (remoteHubUrlInput) {
+        remoteHubUrlInput.focus();
+      }
+    }
+  }
+
+  function closeRemoteHub() {
+    if (remoteHubModal) remoteHubModal.classList.add('hidden');
+  }
+
+  if (openRemoteHubModalBtn) openRemoteHubModalBtn.addEventListener('click', openRemoteHub);
+  if (closeRemoteHubBtn) closeRemoteHubBtn.addEventListener('click', closeRemoteHub);
+  if (cancelRemoteHubBtn) cancelRemoteHubBtn.addEventListener('click', closeRemoteHub);
+
+  if (submitRemoteHubBtn) {
+    submitRemoteHubBtn.addEventListener('click', () => {
+      let rawUrl = (remoteHubUrlInput?.value || '').trim();
+      if (!rawUrl) {
+        alert('Please enter a remote hub address (e.g. http://192.168.1.120:3000)');
+        return;
+      }
+      if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+        rawUrl = 'http://' + rawUrl;
+      }
+      const targetUrl = rawUrl.includes('#') ? rawUrl : (rawUrl + '/#mesh');
+      closeRemoteHub();
+      window.open(targetUrl, '_blank');
+    });
+  }
+
+  // Transfers Dock & Resumable Streaming Manager
+  const transfersContainer = document.getElementById('meshTransfersContainer');
+  const activeDlCountEl = document.getElementById('meshActiveDlCount');
+  const completedDlCountEl = document.getElementById('meshCompletedDlCount');
+  const transfersBadge = document.getElementById('meshTransfersBadge');
+  // In-App Audio Preview Player Controller (Retro Synth Deck)
+  const audioPlayerBar = document.getElementById('meshAudioPlayerBar');
+  const audioTitle = document.getElementById('meshAudioTitle');
+  const audioSubtext = document.getElementById('meshAudioSubtext');
+  const audioPlayPauseBtn = document.getElementById('meshAudioPlayPauseBtn');
+  const audioPrevBtn = document.getElementById('meshAudioPrevBtn');
+  const audioNextBtn = document.getElementById('meshAudioNextBtn');
+  const audioAutoplayBtn = document.getElementById('meshAudioAutoplayBtn');
+  const audioThumb = document.getElementById('meshAudioThumb');
+  const audioIconFallback = document.getElementById('meshAudioIconFallback');
+  const audioTrackBadge = document.getElementById('meshAudioTrackBadge');
+  const audioCurrentTimeEl = document.getElementById('meshAudioCurrentTime');
+  const audioDurationEl = document.getElementById('meshAudioDuration');
+  const audioScrubber = document.getElementById('meshAudioScrubber');
+  const audioDownloadCurrentBtn = document.getElementById('meshAudioDownloadCurrentBtn');
+  const audioCloseBtn = document.getElementById('meshAudioCloseBtn');
+  const audioElement = document.getElementById('meshAudioElement');
+
+  let currentPlayingTrack = null;
+  let audioPlaylist = [];
+  let currentTrackIndex = -1;
+  let isAutoplayActive = true;
+
+  function formatAudioTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  function playAudioPreview(file, peerHandle, peerId, playlist, index) {
+    if (!audioPlayerBar || !audioElement) return;
+    const filePath = file.path || file.relativePath;
+    const streamUrl = `/v1/mesh/shares/download?path=${encodeURIComponent(filePath)}&inline=1`;
+
+    if (playlist && Array.isArray(playlist) && playlist.length > 0) {
+      audioPlaylist = playlist;
+      currentTrackIndex = typeof index === 'number' && index >= 0 ? index : audioPlaylist.findIndex(t => (t.path || t.relativePath) === filePath);
+    } else {
+      if (selectedBrowseFolder && selectedBrowseFolder.children) {
+        audioPlaylist = selectedBrowseFolder.children.filter(c => !c.isDirectory && (c.category === 'audio' || /\.(wav|mp3|ogg|flac|aac|m4a|opus|wma|mid|mod|s3m)$/i.test(c.name)));
+        currentTrackIndex = audioPlaylist.findIndex(t => (t.path || t.relativePath) === filePath);
+      } else {
+        audioPlaylist = [file];
+        currentTrackIndex = 0;
+      }
+    }
+
+    if (currentTrackIndex === -1) currentTrackIndex = 0;
+
+    currentPlayingTrack = {
+      name: file.name,
+      path: filePath,
+      size: file.size,
+      peerHandle: peerHandle || 'Peer',
+      peerId: peerId || currentBrowsePeerId,
+    };
+
+    if (audioTitle) audioTitle.textContent = file.name;
+    if (audioSubtext) audioSubtext.textContent = `Streaming from ${peerHandle || 'Peer'} · ${formatMeshBytes(file.size)}`;
+
+    if (audioTrackBadge) {
+      if (audioPlaylist.length > 1) {
+        audioTrackBadge.textContent = `${currentTrackIndex + 1}\u00A0/\u00A0${audioPlaylist.length}`;
+        audioTrackBadge.classList.remove('hidden');
+      } else {
+        audioTrackBadge.classList.add('hidden');
+      }
+    }
+
+    // Cover art thumbnail detection
+    if (audioThumb && audioIconFallback) {
+      let coverArtUrl = null;
+      if (selectedBrowseFolder && selectedBrowseFolder.children) {
+        const imageFiles = selectedBrowseFolder.children.filter(c => !c.isDirectory && /\.(jpe?g|png|webp)$/i.test(c.name));
+        const baseWithoutExt = file.name.replace(/\.[^/.]+$/, '').toLowerCase();
+        const matchedBase = imageFiles.find(img => img.name.replace(/\.[^/.]+$/, '').toLowerCase() === baseWithoutExt);
+        const standardCover = imageFiles.find(img => /^(cover|folder|albumart|album_art|art|front)\./i.test(img.name));
+        const pickedImg = matchedBase || standardCover || imageFiles[0];
+        if (pickedImg) {
+          const imgPath = pickedImg.path || pickedImg.relativePath;
+          coverArtUrl = `/v1/mesh/shares/download?path=${encodeURIComponent(imgPath)}&inline=1`;
+        }
+      }
+      if (!coverArtUrl) {
+        coverArtUrl = `/v1/mesh/shares/cover-art?path=${encodeURIComponent(filePath)}`;
+      }
+
+      audioThumb.onload = () => {
+        audioThumb.classList.remove('hidden');
+        audioIconFallback.classList.add('hidden');
+      };
+      audioThumb.onerror = () => {
+        audioThumb.classList.add('hidden');
+        audioIconFallback.classList.remove('hidden');
+      };
+      audioThumb.src = coverArtUrl;
+    }
+
+    audioPlayerBar.classList.remove('hidden');
+
+    audioElement.src = streamUrl;
+    try {
+      audioElement.load();
+    } catch {}
+
+    const playPromise = audioElement.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        if (audioPlayPauseBtn) audioPlayPauseBtn.textContent = '⏸️';
+      }).catch(err => {
+        console.warn('[Audio] Playback failed:', err);
+        if (audioSubtext) audioSubtext.textContent = `Tap ▶️ to start (${err.name === 'NotAllowedError' ? 'tap required' : err.message})`;
+        if (audioPlayPauseBtn) audioPlayPauseBtn.textContent = '▶️';
+      });
+    }
+  }
+
+  function playNextTrack() {
+    if (audioPlaylist.length === 0) return;
+    const nextIdx = (currentTrackIndex + 1) % audioPlaylist.length;
+    const nextTrack = audioPlaylist[nextIdx];
+    const peerHandle = currentPlayingTrack?.peerHandle || 'Peer';
+    const peerId = currentPlayingTrack?.peerId || currentBrowsePeerId;
+    playAudioPreview(nextTrack, peerHandle, peerId, audioPlaylist, nextIdx);
+  }
+
+  function playPrevTrack() {
+    if (audioPlaylist.length === 0) return;
+    const prevIdx = (currentTrackIndex - 1 + audioPlaylist.length) % audioPlaylist.length;
+    const prevTrack = audioPlaylist[prevIdx];
+    const peerHandle = currentPlayingTrack?.peerHandle || 'Peer';
+    const peerId = currentPlayingTrack?.peerId || currentBrowsePeerId;
+    playAudioPreview(prevTrack, peerHandle, peerId, audioPlaylist, prevIdx);
+  }
+
+  if (audioPrevBtn) {
+    audioPrevBtn.addEventListener('click', () => {
+      playPrevTrack();
+    });
+  }
+
+  if (audioNextBtn) {
+    audioNextBtn.addEventListener('click', () => {
+      playNextTrack();
+    });
+  }
+
+  if (audioAutoplayBtn) {
+    audioAutoplayBtn.addEventListener('click', () => {
+      isAutoplayActive = !isAutoplayActive;
+      if (isAutoplayActive) {
+        audioAutoplayBtn.classList.add('active');
+        audioAutoplayBtn.textContent = '🔁 Autoplay ON';
+      } else {
+        audioAutoplayBtn.classList.remove('active');
+        audioAutoplayBtn.textContent = '🔁 Autoplay OFF';
+      }
+    });
+  }
+
+  if (audioPlayPauseBtn && audioElement) {
+    audioPlayPauseBtn.addEventListener('click', () => {
+      if (audioElement.paused) {
+        audioElement.play().then(() => {
+          audioPlayPauseBtn.textContent = '⏸️';
+        }).catch(err => {
+          console.warn('[Audio] Play failed:', err);
+        });
+      } else {
+        audioElement.pause();
+        audioPlayPauseBtn.textContent = '▶️';
+      }
+    });
+  }
+
+  if (audioElement) {
+    audioElement.addEventListener('error', () => {
+      const err = audioElement.error;
+      console.warn('[Audio] Element error:', err);
+      if (audioSubtext && currentPlayingTrack) {
+        const code = err ? err.code : 'unknown';
+        audioSubtext.textContent = `⚠️ Playback error (code ${code}): check format/connection`;
+      }
+      if (audioPlayPauseBtn) audioPlayPauseBtn.textContent = '▶️';
+    });
+
+    audioElement.addEventListener('timeupdate', () => {
+      if (!audioElement.duration) return;
+      const cur = audioElement.currentTime;
+      const dur = audioElement.duration;
+      if (audioCurrentTimeEl) audioCurrentTimeEl.textContent = formatAudioTime(cur);
+      if (audioDurationEl) audioDurationEl.textContent = formatAudioTime(dur);
+      if (audioScrubber && !audioScrubber.matches(':active')) {
+        audioScrubber.value = (cur / dur) * 100;
+      }
+    });
+
+    audioElement.addEventListener('loadedmetadata', () => {
+      if (audioDurationEl && audioElement.duration) {
+        audioDurationEl.textContent = formatAudioTime(audioElement.duration);
+      }
+    });
+
+    audioElement.addEventListener('ended', () => {
+      if (isAutoplayActive && audioPlaylist.length > 1) {
+        playNextTrack();
+      } else {
+        if (audioPlayPauseBtn) audioPlayPauseBtn.textContent = '▶️';
+        if (audioScrubber) audioScrubber.value = 0;
+        if (audioCurrentTimeEl) audioCurrentTimeEl.textContent = '0:00';
+      }
+    });
+  }
+
+  if (audioScrubber && audioElement) {
+    audioScrubber.addEventListener('input', () => {
+      if (audioElement.duration) {
+        audioElement.currentTime = (audioScrubber.value / 100) * audioElement.duration;
+      }
+    });
+  }
+
+  if (audioCloseBtn) {
+    audioCloseBtn.addEventListener('click', () => {
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.src = '';
+      }
+      if (audioPlayerBar) audioPlayerBar.classList.add('hidden');
+      currentPlayingTrack = null;
+    });
+  }
+
+  if (audioDownloadCurrentBtn) {
+    audioDownloadCurrentBtn.addEventListener('click', () => {
+      if (currentPlayingTrack) {
+        startFileDownload(
+          currentPlayingTrack.name,
+          currentPlayingTrack.path,
+          currentPlayingTrack.size,
+          currentPlayingTrack.peerHandle,
+          currentPlayingTrack.peerId
+        );
+      }
+    });
+  }
+
+  // Mobile Downloads Info Modal & Native Desktop Folder Opener
+  const openDownloadsFolderBtn = document.getElementById('meshOpenDownloadsFolderBtn');
+  const downloadsInfoModal = document.getElementById('meshDownloadsInfoModal');
+  const closeMeshDownloadsInfoBtn = document.getElementById('closeMeshDownloadsInfoBtn');
+  const ackMeshDownloadsInfoBtn = document.getElementById('ackMeshDownloadsInfoBtn');
+
+  if (closeMeshDownloadsInfoBtn && downloadsInfoModal) {
+    closeMeshDownloadsInfoBtn.addEventListener('click', () => downloadsInfoModal.classList.add('hidden'));
+  }
+  if (ackMeshDownloadsInfoBtn && downloadsInfoModal) {
+    ackMeshDownloadsInfoBtn.addEventListener('click', () => downloadsInfoModal.classList.add('hidden'));
+  }
+
+  if (openDownloadsFolderBtn) {
+    openDownloadsFolderBtn.addEventListener('click', async () => {
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 768;
+      if (isMobile) {
+        if (downloadsInfoModal) downloadsInfoModal.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/v1/mesh/open-downloads', { method: 'POST' });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.success) {
+          const originalText = openDownloadsFolderBtn.textContent;
+          openDownloadsFolderBtn.textContent = '✅ Folder Opened!';
+          setTimeout(() => {
+            openDownloadsFolderBtn.textContent = originalText;
+          }, 2200);
+        } else {
+          if (downloadsInfoModal) downloadsInfoModal.classList.remove('hidden');
+        }
+      } catch {
+        if (downloadsInfoModal) downloadsInfoModal.classList.remove('hidden');
+      }
+    });
+  }
+
+  function updateTransferBadges() {
+    let active = 0;
+    activeDownloads.forEach(t => {
+      if (t.status === 'downloading') active++;
+    });
+    if (activeDlCountEl) activeDlCountEl.textContent = `${active}`;
+    if (completedDlCountEl) completedDlCountEl.textContent = `${completedCount}`;
+    if (transfersBadge) transfersBadge.textContent = `${active}`;
+  }
+
+  function startFileDownload(filename, relativePath, size, peerHandle, peerId) {
+    const id = 'dl_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const item = {
+      id,
+      filename,
+      relativePath,
+      size,
+      peerHandle,
+      peerId,
+      receivedBytes: 0,
+      status: 'downloading',
+      speed: 0,
+      startTime: Date.now(),
+      lastUpdate: Date.now(),
+      lastBytes: 0,
+    };
+
+    activeDownloads.set(id, item);
+    updateTransferBadges();
+    renderTransfersList();
+
+    // Switch to transfers view automatically so user sees the progress bar
+    switchTab('transfers');
+
+    // Start streaming fetch with byte tracking
+    const downloadUrl = `/v1/mesh/shares/download?path=${encodeURIComponent(relativePath)}`;
+
+    fetch(downloadUrl)
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+        const contentLength = +(response.headers.get('Content-Length') || size || 0);
+        item.size = contentLength || size;
+
+        const reader = response.body.getReader();
+        const chunks = [];
+
+        function readChunk() {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              item.status = 'completed';
+              item.receivedBytes = item.size;
+              completedCount++;
+              updateTransferBadges();
+              renderTransfersList();
+
+              // Trigger browser file save
+              const blob = new Blob(chunks, { type: 'application/octet-stream' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 10000);
+              return;
+            }
+
+            chunks.push(value);
+            item.receivedBytes += value.length;
+
+            const now = Date.now();
+            const timeDiff = (now - item.lastUpdate) / 1000;
+            if (timeDiff >= 0.5) {
+              const bytesDiff = item.receivedBytes - item.lastBytes;
+              item.speed = bytesDiff / timeDiff;
+              item.lastUpdate = now;
+              item.lastBytes = item.receivedBytes;
+              updateTransferRow(item);
+            }
+
+            return readChunk();
+          });
+        }
+
+        return readChunk();
+      })
+      .catch(err => {
+        console.error('[Mesh] Download error:', err);
+        item.status = 'failed';
+        item.error = err.message;
+        updateTransferBadges();
+        renderTransfersList();
+      });
+  }
+
+  function renderTransfersList() {
+    if (!transfersContainer) return;
+
+    if (activeDownloads.size === 0) {
+      transfersContainer.innerHTML = `
+        <div style="text-align: center; color: #64748b; padding: 40px 0; font-size: 13px;">
+          No active or past transfers yet. Browse a peer's drive or search files to start downloading!
+        </div>
+      `;
+      return;
+    }
+
+    transfersContainer.innerHTML = '';
+    activeDownloads.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'mesh-transfer-row';
+      row.id = `transfer_row_${item.id}`;
+
+      const pct = item.size > 0 ? Math.min(100, Math.round((item.receivedBytes / item.size) * 100)) : (item.status === 'completed' ? 100 : 0);
+      const isDone = item.status === 'completed';
+      const isFailed = item.status === 'failed';
+
+      let statusBadge = `<span style="font-size: 11px; color: #38bdf8; font-weight: 600;">Downloading (${formatMeshBytes(item.speed)}/s)</span>`;
+      if (isDone) statusBadge = `<span style="font-size: 11px; color: #22c55e; font-weight: 700;">✓ Completed</span>`;
+      if (isFailed) statusBadge = `<span style="font-size: 11px; color: #ef4444; font-weight: 700;">❌ Failed: ${escapeHtml(item.error || 'Error')}</span>`;
+
+      row.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px;">📦</span>
+            <span style="font-size: 13px; font-weight: 600; color: #f8fafc;">${escapeHtml(item.filename)}</span>
+            <span style="font-size: 11px; color: #94a3b8;">from <strong>${escapeHtml(item.peerHandle)}</strong></span>
+          </div>
+          <div>${statusBadge}</div>
+        </div>
+        <div class="mesh-progress-bar-bg">
+          <div class="mesh-progress-bar-fill" style="width: ${pct}%; background: ${isDone ? '#22c55e' : (isFailed ? '#ef4444' : 'linear-gradient(90deg, #9333ea, #38bdf8)')};"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; font-family: monospace;">
+          <span>${formatMeshBytes(item.receivedBytes)} / ${formatMeshBytes(item.size)}</span>
+          <span>${pct}%</span>
+        </div>
+      `;
+
+      transfersContainer.appendChild(row);
+    });
+  }
+
+  function updateTransferRow(item) {
+    const row = document.getElementById(`transfer_row_${item.id}`);
+    if (!row) {
+      renderTransfersList();
+      return;
+    }
+    const pct = item.size > 0 ? Math.min(100, Math.round((item.receivedBytes / item.size) * 100)) : 0;
+    const fill = row.querySelector('.mesh-progress-bar-fill');
+    if (fill) fill.style.width = `${pct}%`;
+
+    const statsSpan = row.querySelectorAll('div > span');
+    if (statsSpan.length >= 2) {
+      statsSpan[statsSpan.length - 2].textContent = `${formatMeshBytes(item.receivedBytes)} / ${formatMeshBytes(item.size)}`;
+      statsSpan[statsSpan.length - 1].textContent = `${pct}%`;
+    }
+  }
+
+  // Settings & My Shares Tab
+  const settingAvatar = document.getElementById('meshSettingAvatar');
+  const settingHandle = document.getElementById('meshSettingHandle');
+  const sharedDirsList = document.getElementById('meshSharedDirsList');
+  const newFolderInput = document.getElementById('meshNewFolderInput');
+  const addFolderBtn = document.getElementById('meshAddFolderBtn');
+  const rescanSharesBtn = document.getElementById('meshRescanSharesBtn');
+  const settingRoomTitle = document.getElementById('meshSettingRoomTitle');
+  const settingMotd = document.getElementById('meshSettingMotd');
+  const settingPin = document.getElementById('meshSettingPin');
+  const saveSettingsBtn = document.getElementById('meshSaveSettingsBtn');
+
+  // Load saved local user info
+  if (settingAvatar) settingAvatar.value = localAvatar;
+  if (settingHandle) settingHandle.value = localHandle;
+
+  async function loadSettingsView() {
+    try {
+      const res = await fetch('/v1/mesh/status');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (sharedDirsList && data.sharedFolders) {
+        sharedDirsList.innerHTML = '';
+        data.sharedFolders.forEach(folder => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(30, 41, 59, 0.4); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); font-size: 12.5px;';
+          row.innerHTML = `
+            <span style="font-family: monospace; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📁 ${escapeHtml(folder)}</span>
+            <button type="button" class="action-tag-btn mesh-remove-folder-btn" style="padding: 2px 6px; font-size: 11px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">❌ Remove</button>
+          `;
+          const rmBtn = row.querySelector('.mesh-remove-folder-btn');
+          if (rmBtn) {
+            rmBtn.addEventListener('click', async () => {
+              await fetch('/v1/mesh/shares/remove-folder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder, folderPath: folder }),
+              });
+              loadSettingsView();
+              loadBrowseTree(true);
+            });
+          }
+          sharedDirsList.appendChild(row);
+        });
+      }
+
+      // Populate detected desktop folders
+      const desktopSuggestionsEl = document.getElementById('meshDesktopSuggestionsList');
+      if (desktopSuggestionsEl) {
+        try {
+          const sugRes = await fetch('/v1/mesh/shares/suggested-folders');
+          if (sugRes.ok) {
+            const sugData = await sugRes.json();
+            const folders = sugData.folders || [];
+            if (folders.length > 0) {
+              desktopSuggestionsEl.innerHTML = '';
+              folders.forEach(f => {
+                const badge = document.createElement('button');
+                badge.type = 'button';
+                badge.className = 'action-tag-btn';
+                if (f.mounted) {
+                  badge.style.cssText = 'padding: 4px 10px; font-size: 11.5px; background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.4); color: #4ade80; cursor: default;';
+                  badge.innerHTML = `<span>✓</span> <strong>${escapeHtml(f.name)}</strong> (Mounted)`;
+                } else {
+                  badge.style.cssText = 'padding: 4px 10px; font-size: 11.5px; color: #c084fc; border-color: rgba(168, 85, 247, 0.5); cursor: pointer; display: flex; align-items: center; gap: 4px;';
+                  badge.innerHTML = `<span>➕</span> Mount <strong>${escapeHtml(f.name)}</strong>`;
+                  badge.addEventListener('click', async () => {
+                    badge.disabled = true;
+                    badge.textContent = 'Mounting...';
+                    try {
+                      const mRes = await fetch('/v1/mesh/shares/mount-desktop', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ folderPath: f.path, folderName: f.name }),
+                      });
+                      const mData = await mRes.json();
+                      if (mData.success) {
+                        loadSettingsView();
+                        loadBrowseTree(true);
+                      }
+                    } catch (err) {
+                      alert('Error mounting folder: ' + err.message);
+                    }
+                  });
+                }
+                desktopSuggestionsEl.appendChild(badge);
+              });
+            } else {
+              desktopSuggestionsEl.innerHTML = '<span style="font-size: 11px; color: #64748b;">No common desktop dev folders detected.</span>';
+            }
+          }
+        } catch { }
+      }
+
+      if (data.config) {
+        if (settingRoomTitle && data.config.roomTitle) settingRoomTitle.value = data.config.roomTitle;
+        if (settingMotd && data.config.motd) settingMotd.value = data.config.motd;
+      }
+    } catch (e) {
+      console.warn('[Mesh] Error loading settings:', e);
+    }
+  }
+
+  // Mobile multi-file upload into named folder
+  const mobileUploadBtn = document.getElementById('meshMobileUploadBtn');
+  const mobileFileInput = document.getElementById('meshMobileFileInput');
+  if (mobileUploadBtn && mobileFileInput) {
+    mobileUploadBtn.addEventListener('click', () => {
+      mobileFileInput.click();
+    });
+    mobileFileInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+
+      const folderName = prompt('Enter a folder name for your shared files (e.g. Android Uploads):', 'Mobile Shares') || 'Mobile Shares';
+      mobileUploadBtn.disabled = true;
+      mobileUploadBtn.textContent = `⏳ Uploading ${files.length} files...`;
+
+      try {
+        const payloadFiles = [];
+        for (const f of files) {
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(f);
+          });
+          payloadFiles.push({ name: f.name, dataUrl, size: f.size });
+        }
+
+        const res = await fetch('/v1/mesh/shares/upload-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderName, files: payloadFiles }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Successfully uploaded ${data.savedCount} files to shared/${data.folderName}!`);
+          loadSettingsView();
+          loadBrowseTree(true);
+        } else {
+          alert('Upload failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Upload error: ' + err.message);
+      } finally {
+        mobileFileInput.value = '';
+        mobileUploadBtn.disabled = false;
+        mobileUploadBtn.textContent = '📱 Share Files from Phone';
+      }
+    });
+  }
+
+  // Lounge chat attachment button
+  const chatAttachBtn = document.getElementById('meshChatAttachBtn');
+  const chatFileInput = document.getElementById('meshChatFileInput');
+  if (chatAttachBtn && chatFileInput) {
+    chatAttachBtn.addEventListener('click', () => {
+      chatFileInput.click();
+    });
+    chatFileInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+
+      chatAttachBtn.disabled = true;
+      chatAttachBtn.textContent = '⏳';
+
+      try {
+        const payloadFiles = [];
+        for (const f of files) {
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(f);
+          });
+          payloadFiles.push({ name: f.name, dataUrl, size: f.size });
+        }
+
+        const res = await fetch('/v1/mesh/shares/upload-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderName: 'lounge_shares', files: payloadFiles }),
+        });
+        const data = await res.json();
+        if (data.success && data.files && data.files.length > 0) {
+          for (const sf of data.files) {
+            const streamUrl = `/v1/mesh/shares/download?path=${encodeURIComponent(sf.relPath)}&inline=1`;
+            const isImg = /\.(jpe?g|png|webp|gif)$/i.test(sf.name);
+            const isAud = /\.(mp3|wav|ogg|flac|m4a)$/i.test(sf.name);
+            const mType = isImg ? 'image' : (isAud ? 'audio' : 'file');
+
+            await fetch('/v1/mesh/messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomId: currentRoomId || 'lounge',
+                text: `Shared file: ${sf.name} (${formatMeshBytes(sf.size)})`,
+                senderHandle: localHandle,
+                senderAvatar: localAvatar,
+                mediaUrl: streamUrl,
+                mediaType: mType,
+                attachments: [{ name: sf.name, url: streamUrl, type: mType, size: sf.size }],
+              }),
+            });
+          }
+          fetchRoomMessages(currentRoomId || 'lounge');
+        }
+      } catch (err) {
+        console.error('Chat file share error:', err);
+      } finally {
+        chatFileInput.value = '';
+        chatAttachBtn.disabled = false;
+        chatAttachBtn.textContent = '📎';
+      }
+    });
+  }
+
+  if (addFolderBtn && newFolderInput) {
+    addFolderBtn.addEventListener('click', async () => {
+      const folderPath = newFolderInput.value.trim();
+      if (!folderPath) {
+        alert('Please enter a folder path to share');
+        return;
+      }
+
+      try {
+        const res = await fetch('/v1/mesh/shares/add-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder: folderPath, folderPath }),
+        });
+        const d = await res.json();
+        if (res.ok && d.success) {
+          newFolderInput.value = '';
+          loadSettingsView();
+        } else {
+          alert(d.error || 'Failed to add folder. Ensure path exists on this computer.');
+        }
+      } catch (err) {
+        alert('Network error adding folder: ' + err.message);
+      }
+    });
+  }
+
+  if (rescanSharesBtn) {
+    rescanSharesBtn.addEventListener('click', async () => {
+      rescanSharesBtn.disabled = true;
+      rescanSharesBtn.textContent = 'Scanning...';
+      try {
+        await fetch('/v1/mesh/shares/rescan', { method: 'POST' });
+        loadStatus();
+        loadSettingsView();
+      } finally {
+        rescanSharesBtn.disabled = false;
+        rescanSharesBtn.textContent = '🔄 Re-scan All Now';
+      }
+    });
+  }
+
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', async () => {
+      // Save profile
+      if (settingAvatar) {
+        localAvatar = settingAvatar.value.trim() || '⚡';
+        localStorage.setItem('nexus_mesh_avatar', localAvatar);
+      }
+      if (settingHandle) {
+        localHandle = settingHandle.value.trim() || 'NexusHost';
+        localStorage.setItem('nexus_mesh_handle', localHandle);
+      }
+
+      // Re-register peer profile
+      await fetch('/v1/mesh/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peerId: localPeerId,
+          handle: localHandle,
+          avatar: localAvatar,
+        }),
+      }).catch(() => {});
+
+      // Save room config
+      const body = {
+        roomTitle: settingRoomTitle?.value.trim(),
+        motd: settingMotd?.value.trim(),
+        pin: settingPin?.value.trim() || undefined,
+      };
+
+      try {
+        const res = await fetch('/v1/mesh/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          saveSettingsBtn.textContent = '✓ Saved Successfully!';
+          setTimeout(() => { saveSettingsBtn.textContent = 'Save Mesh Profile & Settings'; }, 2000);
+          loadStatus();
+        }
+      } catch (err) {
+        alert('Failed to save settings: ' + err.message);
+      }
+    });
+  }
+
+  // Invite Friends Modal Controls
+  const inviteModal = document.getElementById('meshInviteModal');
+  const openInviteModalBtn = document.getElementById('meshOpenInviteModalBtn');
+  const heroInviteMeshBtn = document.getElementById('heroInviteMeshBtn');
+  const closeInviteModalBtn = document.getElementById('closeMeshInviteModalBtn');
+  const copyLanUrlBtn = document.getElementById('meshCopyLanUrlBtn');
+  const lanUrlInput = document.getElementById('meshLanUrlInput');
+  const copyLanHttpsUrlBtn = document.getElementById('meshCopyLanHttpsUrlBtn');
+  const lanHttpsUrlInput = document.getElementById('meshLanHttpsUrlInput');
+  const startTunnelBtn = document.getElementById('meshStartTunnelBtn');
+  const tunnelResultBox = document.getElementById('meshTunnelResultBox');
+  const tunnelUrlInput = document.getElementById('meshTunnelUrlInput');
+  const copyTunnelUrlBtn = document.getElementById('meshCopyTunnelUrlBtn');
+  const tunnelBadge = document.getElementById('meshTunnelBadge');
+  const launchGuestBtn = document.getElementById('meshLaunchGuestBtn');
+  const launchGuestWindowBtn = document.getElementById('meshLaunchGuestWindowBtn');
+
+  async function copyToClipboardSafe(text, btnElement, inputElement) {
+    let success = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        success = true;
+      } catch (e) {
+        console.warn('navigator.clipboard.writeText failed:', e);
+      }
+    }
+    if (!success) {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+        success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (e) {
+        console.warn('execCommand copy failed:', e);
+      }
+    }
+    if (!success && inputElement) {
+      try {
+        inputElement.focus();
+        inputElement.select();
+        inputElement.setSelectionRange(0, 99999);
+      } catch {}
+    }
+    if (btnElement) {
+      const originalText = btnElement.textContent;
+      btnElement.textContent = success ? '✓ Copied!' : '⚠️ Selected! Tap Copy';
+      setTimeout(() => { btnElement.textContent = originalText; }, 2500);
+    }
+    if (window.showNotification) {
+      window.showNotification(success ? '📋 Link copied to clipboard!' : '📋 Link selected — please tap Copy on your screen!');
+    }
+  }
+
+  async function openInviteModal() {
+    if (!inviteModal) return;
+    inviteModal.classList.remove('hidden');
+    try {
+      const res = await fetch('/v1/mesh/network-info');
+      const data = await res.json();
+      if (data.lanUrl && lanUrlInput) {
+        lanUrlInput.value = data.lanUrl;
+      }
+      if (data.lanIp && lanHttpsUrlInput) {
+        lanHttpsUrlInput.value = `https://${data.lanIp}:3001/#mesh`;
+      }
+      if (data.tunnelUrl && tunnelUrlInput && tunnelResultBox && tunnelBadge) {
+        const fullTunnel = data.tunnelUrl + '/#mesh';
+        tunnelUrlInput.value = fullTunnel;
+        tunnelResultBox.style.display = 'block';
+        tunnelBadge.textContent = 'Active ⚡';
+        tunnelBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+        tunnelBadge.style.color = '#22c55e';
+        const qrImg = document.getElementById('meshTunnelQrImg');
+        if (qrImg) {
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=2&data=${encodeURIComponent(fullTunnel)}`;
+        }
+      }
+    } catch (e) {
+      console.warn('[Mesh] Error fetching network info:', e);
+    }
+  }
+
+  function launchGuestWindow() {
+    const width = 920;
+    const height = 750;
+    const left = Math.max(20, window.screen.availWidth - width - 40);
+    const top = 50;
+    window.open('http://localhost:3000/?guest=1#mesh', '_blank', `width=${width},height=${height},left=${left},top=${top}`);
+  }
+
+  if (openInviteModalBtn) openInviteModalBtn.addEventListener('click', openInviteModal);
+  if (heroInviteMeshBtn) heroInviteMeshBtn.addEventListener('click', openInviteModal);
+  if (closeInviteModalBtn) closeInviteModalBtn.addEventListener('click', () => {
+    inviteModal.classList.add('hidden');
+  });
+
+  if (launchGuestBtn) launchGuestBtn.addEventListener('click', launchGuestWindow);
+  if (launchGuestWindowBtn) launchGuestWindowBtn.addEventListener('click', launchGuestWindow);
+
+  if (copyLanUrlBtn && lanUrlInput) {
+    copyLanUrlBtn.addEventListener('click', () => {
+      copyToClipboardSafe(lanUrlInput.value, copyLanUrlBtn, lanUrlInput);
+    });
+  }
+
+  if (copyLanHttpsUrlBtn && lanHttpsUrlInput) {
+    copyLanHttpsUrlBtn.addEventListener('click', () => {
+      copyToClipboardSafe(lanHttpsUrlInput.value, copyLanHttpsUrlBtn, lanHttpsUrlInput);
+    });
+  }
+
+  if (copyTunnelUrlBtn && tunnelUrlInput) {
+    copyTunnelUrlBtn.addEventListener('click', () => {
+      copyToClipboardSafe(tunnelUrlInput.value, copyTunnelUrlBtn, tunnelUrlInput);
+    });
+  }
+
+  if (startTunnelBtn) {
+    startTunnelBtn.addEventListener('click', async () => {
+      startTunnelBtn.disabled = true;
+      startTunnelBtn.innerHTML = `<span>⏳</span> Connecting Cloudflare Tunnel...`;
+      try {
+        const res = await fetch('/v1/mesh/tunnel/start', { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.tunnelUrl) {
+          const fullTunnel = data.tunnelUrl + '/#mesh';
+          if (tunnelUrlInput) tunnelUrlInput.value = fullTunnel;
+          if (tunnelResultBox) tunnelResultBox.style.display = 'block';
+          if (tunnelBadge) {
+            tunnelBadge.textContent = 'Active ⚡';
+            tunnelBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+            tunnelBadge.style.color = '#22c55e';
+          }
+          const qrImg = document.getElementById('meshTunnelQrImg');
+          if (qrImg) {
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=2&data=${encodeURIComponent(fullTunnel)}`;
+          }
+          startTunnelBtn.innerHTML = `<span>✅</span> Cloudflare Tunnel Live!`;
+        } else {
+          startTunnelBtn.disabled = false;
+          startTunnelBtn.innerHTML = `<span>⚠️</span> ${data.error || 'Failed to start tunnel'}`;
+        }
+      } catch (e) {
+        startTunnelBtn.disabled = false;
+        startTunnelBtn.innerHTML = `<span>⚠️</span> Error starting tunnel: ${e.message}`;
+      }
+    });
+  }
+
+  // Pre-load status on boot
+  loadStatus();
+
+  // Auto-open if URL has ?openMesh or #mesh or isGuestMode or /lounge
+  function handleMeshHash() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryMesh = urlParams.get('openMesh');
+    const hash = window.location.hash;
+    const pathname = window.location.pathname;
+
+    if (queryMesh !== null || hash.startsWith('#mesh') || isGuestMode || pathname === '/lounge' || pathname === '/mesh') {
+      openMeshLounge();
+      if (queryMesh === 'browse' || hash === '#mesh-browse') {
+        switchTab('browse');
+      } else if (queryMesh === 'search' || hash === '#mesh-search') {
+        switchTab('search');
+      } else if (queryMesh === 'transfers' || hash === '#mesh-transfers') {
+        switchTab('transfers');
+      } else if (queryMesh === 'settings' || hash === '#mesh-settings') {
+        switchTab('settings');
+      } else {
+        switchTab('lobby');
+      }
+    }
+  }
+  handleMeshHash();
+  window.addEventListener('hashchange', handleMeshHash);
+
+  // Auto-reconnect when user returns to tab on phone or wakes screen
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && meshModal && !meshModal.classList.contains('hidden')) {
+      connectSSE();
+      loadStatus();
+    }
+  });
+  window.addEventListener('focus', () => {
+    if (meshModal && !meshModal.classList.contains('hidden')) {
+      connectSSE();
+      loadStatus();
+    }
+  });
+}
+
+// Initialize Nexus AI Music, Vocal & Grand Prompt Studio
+initNexusStudio();
+
+function initNexusStudio() {
+  const studioModal = document.getElementById('nexusStudioModal');
+  if (!studioModal) return;
+
+  const btnOpenStudio = document.getElementById('navOpenStudioBtn');
+  const heroOpenStudioBtn = document.getElementById('heroOpenStudioBtn');
+  const btnCloseStudio = document.getElementById('btnCloseNexusStudio');
+  const tabs = document.querySelectorAll('.studio-tab-btn');
+  const panes = document.querySelectorAll('.studio-tab-pane');
+
+  // Tab 1 Elements: Grand Prompts & AI Lyricist
+  const tempoSlider = document.getElementById('studioTempoSlider');
+  const tempoInput = document.getElementById('studioTempoInput');
+  const tempoDisplay = document.getElementById('studioTempoDisplay');
+  const genreSelect = document.getElementById('studioGenreSelect');
+  const keySelect = document.getElementById('studioKeySelect');
+  const moodSelect = document.getElementById('studioMoodSelect');
+  const vocalTypeSelect = document.getElementById('studioVocalTypeSelect');
+  const instrumentsInput = document.getElementById('studioInstrumentsInput');
+  const sceneDescInput = document.getElementById('studioSceneDescInput');
+  const modelSelect = document.getElementById('studioModelSelect');
+  const btnCraftPrompts = document.getElementById('btnStudioCraftPrompts');
+  const btnGenLyrics = document.getElementById('btnStudioGenLyrics');
+  const outputAltPrompt = document.getElementById('studioOutputAltPrompt');
+  const outputSunoTags = document.getElementById('studioOutputSunoTags');
+  const outputLyrics = document.getElementById('studioOutputLyrics');
+  const btnCopyAltPrompt = document.getElementById('btnCopyAltPrompt');
+  const btnCopySunoTags = document.getElementById('btnCopySunoTags');
+  const btnCopyLyrics = document.getElementById('btnCopyLyrics');
+  const btnSendLyricsToTts = document.getElementById('btnSendLyricsToTts');
+
+  // Tab 2 Elements: Text-to-Speech & Singing Synth
+  const ttsEngineSelect = document.getElementById('studioTtsEngineSelect');
+  const ttsVoiceSelect = document.getElementById('studioTtsVoiceSelect');
+  const ttsRateSlider = document.getElementById('studioTtsRateSlider');
+  const ttsRateVal = document.getElementById('studioTtsRateVal');
+  const ttsVolSlider = document.getElementById('studioTtsVolSlider');
+  const ttsVolVal = document.getElementById('studioTtsVolVal');
+  const ttsTextInput = document.getElementById('studioTtsTextInput');
+  const btnSpeakTts = document.getElementById('btnStudioSpeakTts');
+  const btnDownloadTts = document.getElementById('btnStudioDownloadTts');
+  const btnSendTtsToVocal = document.getElementById('btnStudioSendTtsToVocal');
+  const ttsAudioPlayer = document.getElementById('studioTtsAudioPlayer');
+  let currentTtsBlob = null;
+  let currentTtsUrl = null;
+
+  // Tab 3 Elements: Vocal Lab & Virtual Keyboard
+  const btnRecordMic = document.getElementById('btnStudioRecordMic');
+  const uploadVocalInput = document.getElementById('studioUploadVocalInput');
+  const btnUploadVocal = document.getElementById('btnStudioUploadVocal');
+  const btnLoadPresetVocal = document.getElementById('btnStudioLoadPresetVocal');
+  const vocalSampleInfo = document.getElementById('vocalSampleInfo');
+  const vocalSampleText = document.getElementById('vocalSampleText');
+  const vocalRootPitchText = document.getElementById('vocalRootPitchText');
+  const vocalActiveScaleText = document.getElementById('vocalActiveScaleText');
+  const scaleSelect = document.getElementById('studioScaleSelect');
+  const formantSlider = document.getElementById('studioFormantSlider');
+  const formantVal = document.getElementById('studioFormantVal');
+  const vocoderToggle = document.getElementById('studioVocoderToggle');
+  const carrierSelect = document.getElementById('studioCarrierSelect');
+  const reverbSlider = document.getElementById('studioReverbSlider');
+  const reverbVal = document.getElementById('studioReverbVal');
+  const btnRecordMelody = document.getElementById('btnStudioRecordMelody');
+  const btnStopMelody = document.getElementById('btnStudioStopMelody');
+  const pianoKeyboard = document.getElementById('vocalPianoKeyboard');
+  const visualizerCanvas = document.getElementById('vocalVisualizerCanvas');
+
+  // Tab 4 Elements: Desktop Maestro AI Outputs Crate & Backing Beats
+  const maestroTracksList = document.getElementById('maestroTracksList');
+  const btnRescanMaestro = document.getElementById('btnRescanMaestro');
+  const maestroActiveTrackMeta = document.getElementById('maestroActiveTrackMeta');
+  const backingPresetSelect = document.getElementById('studioBackingPreset');
+  const backingTempoSlider = document.getElementById('studioBackingTempo');
+  const backingTempoVal = document.getElementById('studioBackingTempoVal');
+  const btnPlayBacking = document.getElementById('btnStudioPlayBacking');
+  const btnStopBacking = document.getElementById('btnStudioStopBacking');
+
+  // Persistent Docked Player Bar Elements
+  const studioPlayerPlayBtn = document.getElementById('studioPlayerPlayBtn');
+  const studioPlayerPlayIcon = document.getElementById('studioPlayerPlayIcon');
+  const studioPlayerTrackTitle = document.getElementById('studioPlayerTrackTitle');
+  const studioPlayerTrackSub = document.getElementById('studioPlayerTrackSub');
+  const studioPlayerSeekSlider = document.getElementById('studioPlayerSeekSlider');
+  const studioPlayerCurrentTime = document.getElementById('studioPlayerCurrentTime');
+  const studioPlayerDuration = document.getElementById('studioPlayerDuration');
+  const studioPlayerVolumeSlider = document.getElementById('studioPlayerVolumeSlider');
+  const studioPlayerShareLoungeBtn = document.getElementById('studioPlayerShareLoungeBtn');
+
+  // Audio Context & State
+  let audioCtx = null;
+  let vocalSampleBuffer = null;
+  let rootPitchHz = 220; // Default A3
+  let isRecordingMic = false;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let currentPlayingTrack = null;
+  let backingInterval = null;
+  let backingStep = 0;
+  let isBackingPlaying = false;
+  let performanceRecorder = null;
+  let performanceChunks = [];
+
+  // Core Audio Element for Docked Player
+  let studioAudio = document.getElementById('studioCoreAudioPlayer');
+  if (!studioAudio) {
+    studioAudio = document.createElement('audio');
+    studioAudio.id = 'studioCoreAudioPlayer';
+    document.body.appendChild(studioAudio);
+  }
+
+  function getAudioCtx() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextClass();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  // Open & Close Studio Modal
+  function openStudio(initialTab) {
+    studioModal.classList.remove('hidden');
+    getAudioCtx();
+    if (initialTab) {
+      switchTab(initialTab);
+    }
+    loadTtsVoices();
+    loadMaestroTracks();
+    if (!vocalSampleBuffer) {
+      createDefaultVocalSample();
+    }
+    startVisualizerLoop();
+    if (typeof syncCivitaiInstalledToStudio === 'function') {
+      syncCivitaiInstalledToStudio();
+    }
+  }
+
+  function closeStudio() {
+    studioModal.classList.add('hidden');
+    stopBackingBeat();
+  }
+
+  if (btnOpenStudio) btnOpenStudio.addEventListener('click', () => openStudio('prompts'));
+  if (heroOpenStudioBtn) heroOpenStudioBtn.addEventListener('click', () => openStudio('prompts'));
+  if (btnCloseStudio) btnCloseStudio.addEventListener('click', closeStudio);
+
+  studioModal.addEventListener('click', (e) => {
+    if (e.target === studioModal) closeStudio();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !studioModal.classList.contains('hidden')) {
+      closeStudio();
+    }
+  });
+
+  // Mobile Drawer Integration
+  document.addEventListener('click', (e) => {
+    const tile = e.target.closest('.mobile-nav-tile');
+    if (tile && tile.getAttribute('data-action') === 'studio') {
+      const drawer = document.getElementById('mobileNavDrawer');
+      if (drawer) drawer.classList.add('hidden');
+      openStudio('prompts');
+    }
+  });
+
+  // Tab Switching
+  function switchTab(tabName) {
+    tabs.forEach(t => {
+      if (t.getAttribute('data-tab') === tabName) {
+        t.classList.add('active');
+      } else {
+        t.classList.remove('active');
+      }
+    });
+    panes.forEach(p => {
+      const id = p.id;
+      if (id === `studioPane${tabName.charAt(0).toUpperCase() + tabName.slice(1)}` ||
+          (tabName === 'prompts' && id === 'studioPanePrompts') ||
+          (tabName === 'tts' && id === 'studioPaneTts') ||
+          (tabName === 'vocal' && id === 'studioPaneVocal') ||
+          (tabName === 'maestro' && id === 'studioPaneMaestro') ||
+          (tabName === 'export' && id === 'studioPaneExport')) {
+        p.classList.add('active');
+      } else {
+        p.classList.remove('active');
+      }
+    });
+
+    if (tabName === 'maestro') {
+      loadMaestroTracks();
+    } else if (tabName === 'tts') {
+      loadTtsVoices();
+    }
+  }
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+      switchTab(tab);
+    });
+  });
+
+  // ==========================================================================
+  // TAB 1: Grand Prompts & AI Lyricist
+  // ==========================================================================
+
+  if (tempoSlider && tempoInput && tempoDisplay) {
+    tempoSlider.addEventListener('input', () => {
+      tempoInput.value = tempoSlider.value;
+      tempoDisplay.textContent = tempoSlider.value;
+    });
+    tempoInput.addEventListener('input', () => {
+      tempoSlider.value = tempoInput.value;
+      tempoDisplay.textContent = tempoInput.value;
+    });
+  }
+
+  // Genre Preset Auto-fill
+  if (genreSelect) {
+    genreSelect.addEventListener('change', () => {
+      const val = genreSelect.value;
+      if (val.includes('60s')) {
+        tempoSlider.value = 120;
+        tempoInput.value = 120;
+        tempoDisplay.textContent = '120';
+        keySelect.value = 'E Major';
+        moodSelect.value = 'Nostalgic, romantic, yearning, late 60s warmth';
+        vocalTypeSelect.value = 'Male, mid-range baritone, smooth and passionate delivery';
+        instrumentsInput.value = 'Twangy electric guitar (with heavy vibrato), Hammond B3 organ, driving bass, tight drums';
+        sceneDescInput.value = "60's love soldiers fighting for love on a distant neon battlefield";
+      } else if (val.includes('Synthwave')) {
+        tempoSlider.value = 124;
+        tempoInput.value = 124;
+        tempoDisplay.textContent = '124';
+        keySelect.value = 'F# Minor';
+        moodSelect.value = 'High-energy, relentless, adrenaline rush';
+        vocalTypeSelect.value = 'Robotic vocoder / synthetic harmonized vocals';
+        instrumentsInput.value = 'Analog Synthesizers, LinnDrum, tight driving bassline, twangy chorus guitar';
+        sceneDescInput.value = 'Late night rainy highway drive through towering cyberpunk neon skyscrapers';
+      } else if (val.includes('Lo-Fi')) {
+        tempoSlider.value = 85;
+        tempoInput.value = 85;
+        tempoDisplay.textContent = '85';
+        keySelect.value = 'C Major';
+        moodSelect.value = 'Melancholic, atmospheric, rain-soaked';
+        vocalTypeSelect.value = 'Whispered close-mic intimate ASMR vocal';
+        instrumentsInput.value = 'Mellow Rhodes piano, vinyl crackle, warm upright bass, relaxed boom-bap drums';
+        sceneDescInput.value = 'Study session beside an open window with gentle thunder and rain';
+      }
+    });
+  }
+
+  // Craft Grand Prompts
+  if (btnCraftPrompts) {
+    btnCraftPrompts.addEventListener('click', async () => {
+      btnCraftPrompts.disabled = true;
+      btnCraftPrompts.innerHTML = '<span>⏳</span> Crafting Prompts...';
+      try {
+        const resp = await fetch('/v1/studio/prompts/grand', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            genre: genreSelect.value,
+            tempo: parseInt(tempoSlider.value, 10),
+            key: keySelect.value,
+            mood: moodSelect.value,
+            vocalType: vocalTypeSelect.value,
+            instruments: instrumentsInput.value ? [instrumentsInput.value] : [],
+            description: sceneDescInput.value || 'atmospheric journey',
+            model: modelSelect.value,
+          }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          outputAltPrompt.value = data.altPrompt;
+          outputSunoTags.value = data.sunoTags;
+          if (!outputLyrics.value.trim()) {
+            outputLyrics.value = data.structurePrompt;
+          }
+          if (window.showNotification) window.showNotification('✨ Grand Musical Prompts Crafted!');
+        } else {
+          alert('Failed to craft prompts: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error crafting prompts: ' + err.message);
+      } finally {
+        btnCraftPrompts.disabled = false;
+        btnCraftPrompts.innerHTML = '<span>✨</span> Craft Grand Prompts';
+      }
+    });
+  }
+
+  // Generate Full Lyrics with Ollama / Gemma
+  if (btnGenLyrics) {
+    btnGenLyrics.addEventListener('click', async () => {
+      btnGenLyrics.disabled = true;
+      btnGenLyrics.innerHTML = '<span>🧠</span> Writing Lyrics (Local AI)...';
+      try {
+        const resp = await fetch('/v1/studio/lyrics/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: sceneDescInput.value || `${genreSelect.value} track in ${keySelect.value}`,
+            genre: genreSelect.value,
+            mood: moodSelect.value,
+            vocalStyle: vocalTypeSelect.value,
+            model: modelSelect.value,
+          }),
+        });
+        const data = await resp.json();
+        if (data.success && data.lyrics) {
+          outputLyrics.value = data.lyrics;
+          if (window.showNotification) window.showNotification(`🎵 Lyrics generated with ${data.modelUsed || 'AI Lyricist'}!`);
+        } else {
+          alert('Failed to generate lyrics: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error generating lyrics: ' + err.message);
+      } finally {
+        btnGenLyrics.disabled = false;
+        btnGenLyrics.innerHTML = '<span>🤖</span> Write Full Lyrics';
+      }
+    });
+  }
+
+  // Copy Buttons
+  function setupCopyButton(btn, targetEl, label) {
+    if (!btn || !targetEl) return;
+    btn.addEventListener('click', async () => {
+      const text = targetEl.value || targetEl.textContent || '';
+      if (!text.trim()) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<span>✅</span> Copied!';
+        setTimeout(() => { btn.innerHTML = orig; }, 1800);
+        if (window.showNotification) window.showNotification(`📋 Copied ${label} to clipboard!`);
+      } catch {
+        targetEl.select();
+        document.execCommand('copy');
+      }
+    });
+  }
+  setupCopyButton(btnCopyAltPrompt, outputAltPrompt, 'YuE2 Prompt');
+  setupCopyButton(btnCopySunoTags, outputSunoTags, 'Tags');
+  setupCopyButton(btnCopyLyrics, outputLyrics, 'Lyrics');
+
+  // Send Lyrics to TTS
+  if (btnSendLyricsToTts) {
+    btnSendLyricsToTts.addEventListener('click', () => {
+      const lyrics = outputLyrics.value;
+      if (!lyrics.trim()) {
+        alert('Please write or craft lyrics first!');
+        return;
+      }
+      const ttsInput = document.getElementById('studioTtsTextInput');
+      if (ttsInput) {
+        ttsInput.value = lyrics;
+      }
+      switchTab('tts');
+    });
+  }
+
+  // ==========================================================================
+  // TAB 2: Text-to-Speech & Singing Synth
+  // ==========================================================================
+  if (ttsRateSlider && ttsRateVal) {
+    ttsRateSlider.addEventListener('input', () => {
+      ttsRateVal.textContent = ttsRateSlider.value;
+    });
+  }
+  if (ttsVolSlider && ttsVolVal) {
+    ttsVolSlider.addEventListener('input', () => {
+      ttsVolVal.textContent = `${ttsVolSlider.value}%`;
+    });
+  }
+
+  // Load Voices from backend
+  async function loadTtsVoices() {
+    if (!ttsVoiceSelect) return;
+    try {
+      const resp = await fetch('/v1/studio/tts/voices');
+      const data = await resp.json();
+      if (data.success && data.voices && data.voices.length > 0) {
+        ttsVoiceSelect.innerHTML = '';
+        data.voices.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v.name;
+          opt.textContent = `${v.name} (${v.gender || 'Voice'} • ${v.culture || 'Default'})`;
+          ttsVoiceSelect.appendChild(opt);
+        });
+      }
+    } catch (err) {
+      console.warn('[Studio] Failed to load system voices:', err);
+    }
+  }
+
+  // Preset Chips
+  document.querySelectorAll('.studio-chip-btn').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const voice = chip.getAttribute('data-voice');
+      const rate = chip.getAttribute('data-rate');
+      if (voice && ttsVoiceSelect) ttsVoiceSelect.value = voice;
+      if (rate !== null && ttsRateSlider && ttsRateVal) {
+        ttsRateSlider.value = rate;
+        ttsRateVal.textContent = rate;
+      }
+    });
+  });
+
+  // Synthesize Speech
+  if (btnSpeakTts) {
+    btnSpeakTts.addEventListener('click', async () => {
+      const text = ttsTextInput.value.trim();
+      if (!text) {
+        alert('Please enter text to synthesize!');
+        return;
+      }
+      btnSpeakTts.disabled = true;
+      btnSpeakTts.innerHTML = '<span>⏳</span> Synthesizing WAV...';
+
+      try {
+        const engine = ttsEngineSelect ? ttsEngineSelect.value : 'system_speech';
+
+        if (engine === 'browser_speech' && 'speechSynthesis' in window) {
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.rate = 1 + (parseInt(ttsRateSlider.value, 10) / 10);
+          window.speechSynthesis.speak(utter);
+          btnSpeakTts.disabled = false;
+          btnSpeakTts.innerHTML = '<span>🔊</span> Synthesize Speech (WAV)';
+          return;
+        }
+
+        // Offline Windows System.Speech WAV Endpoint
+        const resp = await fetch('/v1/studio/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            voice: ttsVoiceSelect.value,
+            rate: parseInt(ttsRateSlider.value, 10),
+            volume: parseInt(ttsVolSlider.value, 10),
+          }),
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${resp.status}`);
+        }
+
+        const blob = await resp.blob();
+        currentTtsBlob = blob;
+        if (currentTtsUrl) URL.revokeObjectURL(currentTtsUrl);
+        currentTtsUrl = URL.createObjectURL(blob);
+
+        ttsAudioPlayer.src = currentTtsUrl;
+        ttsAudioPlayer.play();
+
+        if (btnDownloadTts) btnDownloadTts.disabled = false;
+        loadTrackIntoStudioPlayer(currentTtsUrl, `TTS - ${ttsVoiceSelect.value}`, 'Windows System.Speech Offline WAV');
+        if (window.showNotification) window.showNotification('🔊 Speech synthesized in offline WAV!');
+      } catch (err) {
+        alert('TTS synthesis error: ' + err.message);
+      } finally {
+        btnSpeakTts.disabled = false;
+        btnSpeakTts.innerHTML = '<span>🔊</span> Synthesize Speech (WAV)';
+      }
+    });
+  }
+
+  // Download TTS WAV
+  if (btnDownloadTts) {
+    btnDownloadTts.addEventListener('click', () => {
+      if (!currentTtsBlob) return;
+      const a = document.createElement('a');
+      a.href = currentTtsUrl;
+      a.download = `nexus_speech_${Date.now()}.wav`;
+      a.click();
+    });
+  }
+
+  // Load TTS WAV into Vocal Lab
+  if (btnSendTtsToVocal) {
+    btnSendTtsToVocal.addEventListener('click', async () => {
+      if (!currentTtsBlob) {
+        // Synthesize first if not present
+        if (btnSpeakTts) await btnSpeakTts.click();
+        if (!currentTtsBlob) return;
+      }
+      const arrayBuf = await currentTtsBlob.arrayBuffer();
+      const ctx = getAudioCtx();
+      ctx.decodeAudioData(arrayBuf, (audioBuf) => {
+        loadVocalAudioBuffer(audioBuf, `TTS: ${ttsVoiceSelect.value}`);
+        switchTab('vocal');
+        if (window.showNotification) window.showNotification('🎙️ TTS voice loaded into 1-Shot Vocal Lab!');
+      }, (err) => {
+        alert('Failed to decode TTS audio buffer: ' + err);
+      });
+    });
+  }
+
+  // ==========================================================================
+  // TAB 3: One-Shot Vocal Lab (Sampler, Autotune, Virtual Piano Keyboard)
+  // ==========================================================================
+  if (formantSlider && formantVal) {
+    formantSlider.addEventListener('input', () => {
+      formantVal.textContent = `${formantSlider.value > 0 ? '+' : ''}${formantSlider.value} ST`;
+    });
+  }
+  if (reverbSlider && reverbVal) {
+    reverbSlider.addEventListener('input', () => {
+      reverbVal.textContent = `${reverbSlider.value}%`;
+    });
+  }
+  if (scaleSelect && vocalActiveScaleText) {
+    scaleSelect.addEventListener('change', () => {
+      vocalActiveScaleText.textContent = scaleSelect.options[scaleSelect.selectedIndex].text;
+    });
+  }
+
+  // Autocorrelation Pitch Detector (F0 estimation)
+  function detectRootPitch(buffer) {
+    const data = buffer.getChannelData(0);
+    const sampleRate = buffer.sampleRate;
+    const size = Math.min(data.length, 4096);
+    let rms = 0;
+    for (let i = 0; i < size; i++) {
+      rms += data[i] * data[i];
+    }
+    rms = Math.sqrt(rms / size);
+    if (rms < 0.01) return 220; // default A3 if silent
+
+    let r1 = 0, r2 = size - 1, thres = 0.2;
+    for (let i = 0; i < size / 2; i++) {
+      if (Math.abs(data[i]) < thres) { r1 = i; break; }
+    }
+    for (let i = 1; i < size / 2; i++) {
+      if (Math.abs(data[size - i]) < thres) { r2 = size - i; break; }
+    }
+
+    const trimmed = data.slice(r1, r2);
+    const trimmedSize = trimmed.length;
+    const c = new Float32Array(trimmedSize);
+
+    for (let i = 0; i < trimmedSize; i++) {
+      for (let j = 0; j < trimmedSize - i; j++) {
+        c[i] += trimmed[j] * trimmed[j + i];
+      }
+    }
+
+    let d = 0;
+    while (c[d] > c[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < trimmedSize; i++) {
+      if (c[i] > maxval) {
+        maxval = c[i];
+        maxpos = i;
+      }
+    }
+
+    if (maxpos <= 0) return 220;
+    const detectedHz = sampleRate / maxpos;
+    return Math.max(55, Math.min(880, detectedHz)); // Bound between A1 and A5
+  }
+
+  function freqToNoteName(freq) {
+    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+    const name = names[(midi % 12 + 12) % 12];
+    const oct = Math.floor(midi / 12) - 1;
+    return `${name}${oct}`;
+  }
+
+  function loadVocalAudioBuffer(audioBuf, label) {
+    vocalSampleBuffer = audioBuf;
+    rootPitchHz = detectRootPitch(audioBuf);
+    const noteName = freqToNoteName(rootPitchHz);
+    const dur = audioBuf.duration.toFixed(1);
+
+    if (vocalRootPitchText) {
+      vocalRootPitchText.textContent = `${noteName} (${Math.round(rootPitchHz)} Hz)`;
+    }
+    if (vocalSampleText) {
+      vocalSampleText.textContent = `Sample: "${label}" (${dur}s) • Root Pitch: ${noteName} (${Math.round(rootPitchHz)} Hz) • Playable across keyboard!`;
+    }
+  }
+
+  // Create Default Synthetic Voice Sample (Warm Vowel Vibe)
+  function createDefaultVocalSample() {
+    const ctx = getAudioCtx();
+    const duration = 2.0;
+    const sampleRate = ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
+    const data = buffer.getChannelData(0);
+    const f0 = 220; // A3
+
+    for (let i = 0; i < data.length; i++) {
+      const t = i / sampleRate;
+      // Vowel harmonics: F0, 2*F0, 3*F0, 4*F0, 5*F0 with formant peaks
+      const vibrato = 1 + 0.015 * Math.sin(2 * Math.PI * 5.2 * t);
+      const s1 = 0.5 * Math.sin(2 * Math.PI * f0 * vibrato * t);
+      const s2 = 0.35 * Math.sin(2 * Math.PI * 2 * f0 * vibrato * t);
+      const s3 = 0.2 * Math.sin(2 * Math.PI * 3 * f0 * vibrato * t);
+      const s4 = 0.15 * Math.sin(2 * Math.PI * 4 * f0 * vibrato * t);
+      // Gentle attack and decay envelope
+      const env = Math.min(1, t / 0.05) * Math.max(0, 1 - (t - 0.5) / 1.5);
+      data[i] = (s1 + s2 + s3 + s4) * env * 0.8;
+    }
+    loadVocalAudioBuffer(buffer, 'Default Analog Vowel Vibe');
+  }
+
+  if (btnLoadPresetVocal) {
+    btnLoadPresetVocal.addEventListener('click', () => {
+      createDefaultVocalSample();
+      if (window.showNotification) window.showNotification('✨ Default Vocal Sample Loaded!');
+    });
+  }
+
+  // Microphone Recording
+  if (btnRecordMic) {
+    btnRecordMic.addEventListener('click', async () => {
+      if (isRecordingMic) {
+        // Stop recording
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const ctx = getAudioCtx();
+        mediaRecorder = new MediaRecorder(stream);
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          isRecordingMic = false;
+          btnRecordMic.classList.remove('recording');
+          btnRecordMic.querySelector('#studioRecordLabel').textContent = 'Record 1-Shot Voice';
+          stream.getTracks().forEach(t => t.stop());
+
+          const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+          const arrayBuf = await blob.arrayBuffer();
+          ctx.decodeAudioData(arrayBuf, (audioBuf) => {
+            loadVocalAudioBuffer(audioBuf, 'Live Mic Vocal Take');
+            if (window.showNotification) window.showNotification('🎙️ Voice recorded and tuned to keyboard!');
+          });
+        };
+
+        mediaRecorder.start();
+        isRecordingMic = true;
+        btnRecordMic.classList.add('recording');
+        btnRecordMic.querySelector('#studioRecordLabel').textContent = 'Stop Recording (Sing a note!)';
+
+        // Auto-stop after 3 seconds for 1-shot note
+        setTimeout(() => {
+          if (isRecordingMic) mediaRecorder.stop();
+        }, 3200);
+      } catch (err) {
+        alert('Microphone access error: ' + err.message);
+      }
+    });
+  }
+
+  // File Upload
+  if (btnUploadVocal && uploadVocalInput) {
+    btnUploadVocal.addEventListener('click', () => uploadVocalInput.click());
+    uploadVocalInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const ctx = getAudioCtx();
+      const arrayBuf = await file.arrayBuffer();
+      ctx.decodeAudioData(arrayBuf, (audioBuf) => {
+        loadVocalAudioBuffer(audioBuf, file.name);
+        if (window.showNotification) window.showNotification(`📁 Sample "${file.name}" loaded!`);
+      }, (err) => {
+        alert('Error decoding audio file: ' + err);
+      });
+    });
+  }
+
+  // Convert Web Audio AudioBuffer to 16-bit PCM WAV Data URL
+  function audioBufferToWavDataUrl(buffer) {
+    const numChannels = buffer.numberOfChannels || 1;
+    const sampleRate = buffer.sampleRate || 24000;
+    const format = 1; // PCM
+    const bitDepth = 16;
+    const numSamples = buffer.length;
+    const byteRate = (sampleRate * numChannels * bitDepth) / 8;
+    const blockAlign = (numChannels * bitDepth) / 8;
+    const dataSize = numSamples * numChannels * (bitDepth / 8);
+    const headerSize = 44;
+    const totalSize = headerSize + dataSize;
+    const arrayBuffer = new ArrayBuffer(totalSize);
+    const view = new DataView(arrayBuffer);
+
+    function writeString(offset, string) {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for (let i = 0; i < numSamples; i++) {
+      for (let channel = 0; channel < numChannels; channel++) {
+        let sample = buffer.getChannelData(channel)[i];
+        sample = Math.max(-1, Math.min(1, sample));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        offset += 2;
+      }
+    }
+
+    let binary = '';
+    const bytes = new Uint8Array(arrayBuffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+  }
+
+  // --- F5-TTS Flow Matching 1-Shot Voice Cloning UI Handlers ---
+  const btnF5CloneVoice = document.getElementById('btnF5CloneVoice');
+  const f5CloneBtnText = document.getElementById('f5CloneBtnText');
+  const f5RefTextInput = document.getElementById('f5RefTextInput');
+  const f5GenTextInput = document.getElementById('f5GenTextInput');
+  const btnF5UseVocalSample = document.getElementById('btnF5UseVocalSample');
+  const f5StatusNotice = document.getElementById('f5StatusNotice');
+  const f5ResultContainer = document.getElementById('f5ResultContainer');
+  const f5ResultAudio = document.getElementById('f5ResultAudio');
+  const f5ResultTitle = document.getElementById('f5ResultTitle');
+  const f5ResultMeta = document.getElementById('f5ResultMeta');
+  const btnF5PlayResult = document.getElementById('btnF5PlayResult');
+  const btnF5ShareLounge = document.getElementById('btnF5ShareLounge');
+  const btnF5LoadToSampler = document.getElementById('btnF5LoadToSampler');
+  let lastF5ClonedAudioUrl = '';
+
+  if (btnF5UseVocalSample) {
+    btnF5UseVocalSample.addEventListener('click', () => {
+      if (!vocalSampleBuffer) {
+        createDefaultVocalSample();
+      }
+      if (f5StatusNotice) {
+        f5StatusNotice.textContent = 'Active sample linked as reference voice! Enter transcript below.';
+        f5StatusNotice.style.color = '#38bdf8';
+      }
+      if (f5RefTextInput && !f5RefTextInput.value.trim()) {
+        f5RefTextInput.value = 'Hello, this is my natural voice sample.';
+      }
+      if (f5GenTextInput && !f5GenTextInput.value.trim()) {
+        f5GenTextInput.value = 'Welcome to the Nexus Route and Mesh production studio.';
+      }
+      if (window.showNotification) window.showNotification('🎙️ Active sample linked to F5-TTS reference!');
+    });
+  }
+
+  if (btnF5CloneVoice) {
+    btnF5CloneVoice.addEventListener('click', async () => {
+      const genText = f5GenTextInput ? f5GenTextInput.value.trim() : '';
+      if (!genText) {
+        if (f5StatusNotice) {
+          f5StatusNotice.textContent = 'Please enter target text to synthesize.';
+          f5StatusNotice.style.color = '#ef4444';
+        }
+        if (f5GenTextInput) f5GenTextInput.focus();
+        return;
+      }
+
+      if (!vocalSampleBuffer) {
+        createDefaultVocalSample();
+      }
+
+      const refText = f5RefTextInput ? f5RefTextInput.value.trim() : '';
+      const refAudioDataUrl = audioBufferToWavDataUrl(vocalSampleBuffer);
+
+      if (f5CloneBtnText) f5CloneBtnText.textContent = 'Cloning with F5-TTS...';
+      if (btnF5CloneVoice) btnF5CloneVoice.disabled = true;
+      if (f5StatusNotice) {
+        f5StatusNotice.textContent = '🧬 Running Flow Matching DiT inference on NVIDIA RTX 4060...';
+        f5StatusNotice.style.color = '#c084fc';
+      }
+
+      try {
+        const resp = await fetch('/v1/studio/vocal/clone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            refAudioDataUrl,
+            refText,
+            genText,
+            speed: 1.0,
+          }),
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          lastF5ClonedAudioUrl = data.audioUrl;
+          if (f5ResultContainer) f5ResultContainer.classList.remove('hidden');
+          if (f5ResultAudio) {
+            f5ResultAudio.src = data.audioUrl;
+            f5ResultAudio.load();
+          }
+          if (f5ResultTitle) {
+            f5ResultTitle.textContent = genText.length > 50 ? genText.slice(0, 50) + '...' : genText;
+          }
+          if (f5ResultMeta) {
+            f5ResultMeta.textContent = `${data.engine || 'F5-TTS Flow Matching'} · ${data.duration || '2.0'}s · ${data.sampleRate || 24000}Hz PCM`;
+          }
+          if (f5StatusNotice) {
+            f5StatusNotice.textContent = `✅ Voice cloned successfully! (${data.engine || 'F5-TTS'})`;
+            f5StatusNotice.style.color = '#4ade80';
+          }
+          if (window.showNotification) window.showNotification('🧬 Voice cloned and synthesized with F5-TTS!');
+        } else {
+          throw new Error(data.error || 'Failed to clone voice');
+        }
+      } catch (err) {
+        if (f5StatusNotice) {
+          f5StatusNotice.textContent = `❌ Cloning notice: ${err.message}`;
+          f5StatusNotice.style.color = '#ef4444';
+        }
+      } finally {
+        if (f5CloneBtnText) f5CloneBtnText.textContent = 'Clone & Synthesize with F5-TTS';
+        if (btnF5CloneVoice) btnF5CloneVoice.disabled = false;
+      }
+    });
+  }
+
+  if (btnF5PlayResult) {
+    btnF5PlayResult.addEventListener('click', () => {
+      if (f5ResultAudio) f5ResultAudio.play().catch(() => {});
+    });
+  }
+
+  if (btnF5ShareLounge) {
+    btnF5ShareLounge.addEventListener('click', async () => {
+      if (!lastF5ClonedAudioUrl) return;
+      try {
+        const fileParam = lastF5ClonedAudioUrl.includes('file=')
+          ? decodeURIComponent(lastF5ClonedAudioUrl.split('file=')[1].split('&')[0])
+          : (lastF5ClonedAudioUrl.includes('path=') ? decodeURIComponent(lastF5ClonedAudioUrl.split('path=')[1].split('&')[0]) : 'cloned_voice.wav');
+        await fetch('/v1/studio/maestro/share-to-lounge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file: fileParam,
+            comment: `🧬 Cloned Voice Take: "${(f5GenTextInput ? f5GenTextInput.value : 'F5 Take').slice(0, 60)}"`,
+          }),
+        });
+        if (window.showNotification) window.showNotification('🚀 Cloned voice shared to #lounge!');
+      } catch (err) {
+        alert('Failed to share to lounge: ' + err.message);
+      }
+    });
+  }
+
+  if (btnF5LoadToSampler) {
+    btnF5LoadToSampler.addEventListener('click', async () => {
+      if (!lastF5ClonedAudioUrl) return;
+      try {
+        const resp = await fetch(lastF5ClonedAudioUrl);
+        const arrayBuf = await resp.arrayBuffer();
+        const ctx = getAudioCtx();
+        ctx.decodeAudioData(arrayBuf, (audioBuf) => {
+          loadVocalAudioBuffer(audioBuf, 'F5 Cloned Voice');
+          if (window.showNotification) window.showNotification('🎹 Cloned voice loaded into Virtual Keyboard!');
+        });
+      } catch (err) {
+        alert('Failed to load cloned voice into sampler: ' + err.message);
+      }
+    });
+  }
+
+  // Autotune Scale Degree Quantizer
+  const SCALE_DEGREES = {
+    chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    major: [0, 2, 4, 5, 7, 9, 11],
+    natural_minor: [0, 2, 3, 5, 7, 8, 10],
+    harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
+    pentatonic: [0, 2, 4, 7, 9],
+    blues: [0, 3, 5, 6, 7, 10],
+  };
+
+  function quantizeToScale(targetMidi, scaleKey) {
+    const scale = SCALE_DEGREES[scaleKey] || SCALE_DEGREES.chromatic;
+    if (scale.length === 12) return targetMidi;
+
+    const octave = Math.floor(targetMidi / 12);
+    const pitchClass = targetMidi % 12;
+
+    let closest = scale[0];
+    let minDiff = 999;
+    for (const deg of scale) {
+      const diff = Math.abs(deg - pitchClass);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = deg;
+      }
+    }
+    return octave * 12 + closest;
+  }
+
+  // Active Voices Tracker
+  const activeVoices = new Map();
+
+  // Play Vocal Note on Virtual Keyboard
+  function playVocalNote(targetFreq, keyElement) {
+    if (!vocalSampleBuffer) return;
+    const ctx = getAudioCtx();
+
+    // Scale Quantization
+    const targetMidi = Math.round(69 + 12 * Math.log2(targetFreq / 440));
+    const currentScale = scaleSelect ? scaleSelect.value : 'chromatic';
+    const quantizedMidi = quantizeToScale(targetMidi, currentScale);
+    const finalFreq = 440 * Math.pow(2, (quantizedMidi - 69) / 12);
+
+    // Resampling playbackRate ratio
+    const playbackRate = finalFreq / (rootPitchHz || 220);
+
+    // Source Node
+    const srcNode = ctx.createBufferSource();
+    srcNode.buffer = vocalSampleBuffer;
+    srcNode.playbackRate.value = playbackRate;
+
+    // Gain Envelope
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(0.001, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.85, ctx.currentTime + 0.02);
+
+    // Formant Shift Filter Bank
+    const formantShiftST = formantSlider ? parseInt(formantSlider.value, 10) : 0;
+    const formantFactor = Math.pow(2, formantShiftST / 12);
+
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'peaking';
+    f1.frequency.value = Math.min(18000, 800 * formantFactor);
+    f1.Q.value = 4.0;
+    f1.gain.value = 6.0;
+
+    const f2 = ctx.createBiquadFilter();
+    f2.type = 'peaking';
+    f2.frequency.value = Math.min(18000, 2200 * formantFactor);
+    f2.Q.value = 4.5;
+    f2.gain.value = 5.0;
+
+    // Vocoder / Carrier Effect
+    let chainNode = srcNode;
+    if (vocoderToggle && vocoderToggle.checked) {
+      const carrier = ctx.createOscillator();
+      const carrierGain = ctx.createGain();
+      carrier.type = carrierSelect ? carrierSelect.value : 'sawtooth';
+      carrier.frequency.value = finalFreq;
+      carrier.start();
+
+      // Ring Modulator / Vocoder Simulation
+      const modGain = ctx.createGain();
+      modGain.gain.value = 0;
+      srcNode.connect(modGain.gain);
+      carrier.connect(modGain);
+      chainNode = modGain;
+    }
+
+    chainNode.connect(f1);
+    f1.connect(f2);
+    f2.connect(gainNode);
+
+    // Reverb / Master Output
+    const masterGain = ctx.createGain();
+    const reverbAmt = (reverbSlider ? parseInt(reverbSlider.value, 10) : 35) / 100;
+    masterGain.gain.value = 0.9;
+    gainNode.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    srcNode.start(0);
+
+    if (keyElement) {
+      keyElement.classList.add('pressed');
+    }
+
+    const voiceObj = { srcNode, gainNode, keyElement };
+    activeVoices.set(targetFreq, voiceObj);
+
+    // Auto-release when buffer ends
+    srcNode.onended = () => {
+      if (keyElement) keyElement.classList.remove('pressed');
+      activeVoices.delete(targetFreq);
+    };
+
+    return voiceObj;
+  }
+
+  function releaseVocalNote(targetFreq) {
+    const voice = activeVoices.get(targetFreq);
+    if (!voice) return;
+    const ctx = getAudioCtx();
+    try {
+      voice.gainNode.gain.cancelScheduledValues(ctx.currentTime);
+      voice.gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      setTimeout(() => {
+        try { voice.srcNode.stop(); } catch {}
+      }, 160);
+    } catch {}
+    if (voice.keyElement) voice.keyElement.classList.remove('pressed');
+    activeVoices.delete(targetFreq);
+  }
+
+  // Piano Keys Bindings (Click & Touch)
+  if (pianoKeyboard) {
+    const keys = pianoKeyboard.querySelectorAll('.piano-key');
+    keys.forEach(key => {
+      const freq = parseFloat(key.getAttribute('data-freq'));
+      key.addEventListener('mousedown', () => playVocalNote(freq, key));
+      key.addEventListener('mouseup', () => releaseVocalNote(freq));
+      key.addEventListener('mouseleave', () => releaseVocalNote(freq));
+
+      key.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        playVocalNote(freq, key);
+      });
+      key.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        releaseVocalNote(freq);
+      });
+    });
+  }
+
+  // PC Keyboard Mapping
+  const KEY_MAP = {
+    'z': 130.81, 's': 138.59, 'x': 146.83, 'd': 155.56, 'c': 164.81, 'v': 174.61, 'g': 185.00,
+    'b': 196.00, 'h': 207.65, 'n': 220.00, 'j': 233.08, 'm': 246.94,
+    'q': 261.63, '2': 277.18, 'w': 293.66, '3': 311.13, 'e': 329.63, 'r': 349.23, '5': 369.99,
+    't': 392.00, '6': 415.30, 'y': 440.00, '7': 466.16, 'u': 493.88, 'i': 523.25,
+  };
+
+  const pressedKeys = new Set();
+  window.addEventListener('keydown', (e) => {
+    if (studioModal.classList.contains('hidden')) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+    const char = e.key.toLowerCase();
+    if (KEY_MAP[char] && !pressedKeys.has(char)) {
+      pressedKeys.add(char);
+      const freq = KEY_MAP[char];
+      const keyEl = pianoKeyboard?.querySelector(`[data-freq="${freq.toFixed(2)}"]`);
+      playVocalNote(freq, keyEl);
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    const char = e.key.toLowerCase();
+    if (pressedKeys.has(char)) {
+      pressedKeys.delete(char);
+      const freq = KEY_MAP[char];
+      releaseVocalNote(freq);
+    }
+  });
+
+  // Real-Time Audio Spectrum Visualizer
+  function startVisualizerLoop() {
+    if (!visualizerCanvas) return;
+    const canvasCtx = visualizerCanvas.getContext('2d');
+    const width = visualizerCanvas.width;
+    const height = visualizerCanvas.height;
+
+    function draw() {
+      if (studioModal.classList.contains('hidden')) return;
+      requestAnimationFrame(draw);
+
+      canvasCtx.fillStyle = 'rgba(5, 10, 20, 0.3)';
+      canvasCtx.fillRect(0, 0, width, height);
+
+      // Draw active voice waveforms
+      if (activeVoices.size > 0 || isBackingPlaying) {
+        canvasCtx.lineWidth = 2;
+        canvasCtx.strokeStyle = '#38bdf8';
+        canvasCtx.beginPath();
+
+        const sliceWidth = width / 64;
+        let x = 0;
+        const now = performance.now() * 0.005;
+
+        for (let i = 0; i < 64; i++) {
+          const v = Math.sin(i * 0.3 + now) * 25 + Math.cos(i * 0.15 + now * 1.5) * 15;
+          const y = height / 2 + v;
+          if (i === 0) canvasCtx.moveTo(x, y);
+          else canvasCtx.lineTo(x, y);
+          x += sliceWidth;
+        }
+        canvasCtx.stroke();
+
+        // Neon Glow Line
+        canvasCtx.lineWidth = 1.5;
+        canvasCtx.strokeStyle = '#ec4899';
+        canvasCtx.beginPath();
+        x = 0;
+        for (let i = 0; i < 64; i++) {
+          const v = Math.sin(i * 0.2 + now * 0.8) * 18;
+          const y = height / 2 + v;
+          if (i === 0) canvasCtx.moveTo(x, y);
+          else canvasCtx.lineTo(x, y);
+          x += sliceWidth;
+        }
+        canvasCtx.stroke();
+      } else {
+        // Idle baseline pulse
+        canvasCtx.lineWidth = 1;
+        canvasCtx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(0, height / 2);
+        canvasCtx.lineTo(width, height / 2);
+        canvasCtx.stroke();
+      }
+    }
+    draw();
+  }
+
+  // ==========================================================================
+  // TAB 4: Desktop Maestro AI Outputs Crate & Backing Beats
+  // ==========================================================================
+  if (backingTempoSlider && backingTempoVal) {
+    backingTempoSlider.addEventListener('input', () => {
+      backingTempoVal.textContent = backingTempoSlider.value;
+    });
+  }
+
+  async function loadMaestroTracks() {
+    if (!maestroTracksList) return;
+    maestroTracksList.innerHTML = '<div style="text-align: center; padding: 25px; color: #94a3b8;">Scanning Maestro AI output directory...</div>';
+
+    try {
+      const resp = await fetch('/v1/studio/maestro/outputs');
+      const data = await resp.json();
+
+      if (!data.success || !data.tracks || data.tracks.length === 0) {
+        maestroTracksList.innerHTML = `
+          <div style="text-align: center; padding: 30px; color: #94a3b8;">
+            No Maestro audio outputs found in <code>${data.outputsDir || 'Desktop\\Maestro AI\\app\\outputs'}</code>.<br/>
+            Render a track in Maestro AI with YuE2 or ACE-Step to see it here!
+          </div>
+        `;
+        return;
+      }
+
+      maestroTracksList.innerHTML = '';
+      data.tracks.forEach((track, index) => {
+        const card = document.createElement('div');
+        card.className = 'maestro-track-card';
+        if (index === 0) card.classList.add('active');
+
+        const mins = Math.floor((track.durationSeconds || 120) / 60);
+        const secs = String((track.durationSeconds || 120) % 60).padStart(2, '0');
+        const durStr = `${mins}:${secs}`;
+        const mb = (track.fileSizeBytes / (1024 * 1024)).toFixed(1);
+
+        card.innerHTML = `
+          <div class="maestro-track-info">
+            <div class="maestro-track-title">${track.title}</div>
+            <div class="maestro-track-meta-row">
+              <span class="maestro-model-pill">${track.modelType.toUpperCase()}</span>
+              <span>${track.bpm} BPM</span>
+              <span>&bull;</span>
+              <span>Key: ${track.key}</span>
+              <span>&bull;</span>
+              <span>⏱️ ${durStr}</span>
+              <span>&bull;</span>
+              <span>${mb} MB</span>
+              ${track.seed ? `<span>&bull; Seed: ${track.seed}</span>` : ''}
+            </div>
+          </div>
+          <div class="maestro-track-actions">
+            <button type="button" class="studio-play-pause-btn btn-play-maestro" title="Play Track">
+              <span>▶️</span>
+            </button>
+            <button type="button" class="studio-share-btn btn-share-maestro" title="Share to #lounge Mesh Chat">
+              <span>💬</span> Share
+            </button>
+          </div>
+        `;
+
+        // Click to view metadata
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return;
+          selectMaestroTrack(track, card);
+        });
+
+        // Play Button
+        const playBtn = card.querySelector('.btn-play-maestro');
+        playBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectMaestroTrack(track, card);
+          loadTrackIntoStudioPlayer(track.streamUrl, track.title, `${track.modelType.toUpperCase()} • ${track.bpm} BPM • ${track.key}`);
+          studioAudio.play();
+        });
+
+        // Share to Lounge Button
+        const shareBtn = card.querySelector('.btn-share-maestro');
+        shareBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          shareBtn.disabled = true;
+          shareBtn.innerHTML = '<span>⏳</span> Sharing...';
+          try {
+            const sResp = await fetch('/v1/studio/maestro/share-to-lounge', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileName: track.fileName,
+                comment: `YuE2 generated music: "${track.title}" (${track.bpm} BPM, ${track.key})`,
+              }),
+            });
+            const sData = await sResp.json();
+            if (sData.success) {
+              shareBtn.innerHTML = '<span>✅</span> Shared!';
+              setTimeout(() => { shareBtn.innerHTML = '<span>💬</span> Share'; shareBtn.disabled = false; }, 2000);
+              if (window.showNotification) window.showNotification(`🎶 "${track.title}" shared to Lounge!`);
+            } else {
+              alert('Failed to share track: ' + sData.error);
+              shareBtn.disabled = false;
+            }
+          } catch (err) {
+            alert('Error sharing track: ' + err.message);
+            shareBtn.disabled = false;
+          }
+        });
+
+        maestroTracksList.appendChild(card);
+
+        if (index === 0) {
+          selectMaestroTrack(track, card);
+        }
+      });
+    } catch (err) {
+      maestroTracksList.innerHTML = `<div style="color: #ef4444; padding: 20px;">Failed to scan Maestro folder: ${err.message}</div>`;
+    }
+  }
+
+  function selectMaestroTrack(track, cardEl) {
+    document.querySelectorAll('.maestro-track-card').forEach(c => c.classList.remove('active'));
+    if (cardEl) cardEl.classList.add('active');
+
+    if (maestroActiveTrackMeta) {
+      maestroActiveTrackMeta.innerHTML = `
+        <div style="font-weight: 700; color: #f8fafc; font-size: 13px; margin-bottom: 6px;">${track.title}</div>
+        <div style="margin-bottom: 6px;"><strong>File:</strong> <code>${track.fileName}</code></div>
+        <div style="margin-bottom: 6px;"><strong>Prompt Description:</strong> ${track.altPrompt || track.musicDescription || 'No prompt info'}</div>
+        ${track.jobElapsedTime ? `<div style="margin-bottom: 6px;"><strong>Generation Time:</strong> ${Math.round(track.jobElapsedTime / 60)} mins (${track.jobElapsedTime}s)</div>` : ''}
+        ${track.abcSnippet ? `
+          <div style="margin-top: 8px;">
+            <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">ABC Notation Score:</div>
+            <pre style="background: rgba(0,0,0,0.6); padding: 8px; border-radius: 6px; font-size: 11px; max-height: 120px; overflow-y: auto; color: #cbd5e1; font-family: monospace;">${track.abcSnippet}</pre>
+          </div>
+        ` : ''}
+      `;
+    }
+  }
+
+  if (btnRescanMaestro) {
+    btnRescanMaestro.addEventListener('click', loadMaestroTracks);
+  }
+
+  // Procedural Live Rhythm & Groove Synthesizer (Synthwave, Cyberpunk, LoFi, Acid)
+  function playProceduralDrum(type) {
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+
+    if (type === 'kick') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(38, now + 0.12);
+      gain.gain.setValueAtTime(1.0, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } else if (type === 'snare') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      gain.gain.setValueAtTime(0.6, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } else if (type === 'hat') {
+      const bufferSize = ctx.sampleRate * 0.05;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 7000;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+    } else if (type === 'bass') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      const bassNotes = [55, 55, 65.41, 55, 73.42, 65.41, 55, 82.41]; // A1, C2, D2, E2 groove
+      const freq = bassNotes[backingStep % bassNotes.length];
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.18);
+    }
+  }
+
+  function startBackingBeat() {
+    stopBackingBeat();
+    isBackingPlaying = true;
+    const bpm = parseInt(backingTempoSlider ? backingTempoSlider.value : 120, 10);
+    const stepMs = (60 / bpm / 4) * 1000; // 16th notes
+    backingStep = 0;
+
+    backingInterval = setInterval(() => {
+      // 16-step beat patterns
+      const s = backingStep % 16;
+      // Kick on 0, 4, 8, 12 (4-on-the-floor)
+      if (s % 4 === 0) playProceduralDrum('kick');
+      // Snare on 4, 12
+      if (s === 4 || s === 12) playProceduralDrum('snare');
+      // Hi-hat on every 8th note
+      if (s % 2 === 0) playProceduralDrum('hat');
+      // Driving bass on 16th offbeats
+      if (s % 2 === 1) playProceduralDrum('bass');
+
+      backingStep++;
+    }, stepMs);
+
+    if (btnPlayBacking) {
+      btnPlayBacking.innerHTML = '<span>⏸️</span> Backing Beat Active';
+      btnPlayBacking.style.background = '#22c55e';
+    }
+  }
+
+  function stopBackingBeat() {
+    isBackingPlaying = false;
+    if (backingInterval) {
+      clearInterval(backingInterval);
+      backingInterval = null;
+    }
+    if (btnPlayBacking) {
+      btnPlayBacking.innerHTML = '<span>▶️</span> Start Backing Beat';
+      btnPlayBacking.style.background = 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)';
+    }
+  }
+
+  if (btnPlayBacking) {
+    btnPlayBacking.addEventListener('click', () => {
+      if (isBackingPlaying) stopBackingBeat();
+      else startBackingBeat();
+    });
+  }
+  if (btnStopBacking) {
+    btnStopBacking.addEventListener('click', stopBackingBeat);
+  }
+
+  // ==========================================================================
+  // Docked Studio Persistent Audio Player Bar
+  // ==========================================================================
+  function formatTime(secs) {
+    if (isNaN(secs) || secs < 0) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  function loadTrackIntoStudioPlayer(url, title, subtitle) {
+    currentPlayingTrack = { url, title, subtitle };
+    studioAudio.src = url;
+    if (studioPlayerTrackTitle) studioPlayerTrackTitle.textContent = title;
+    if (studioPlayerTrackSub) studioPlayerTrackSub.textContent = subtitle || 'Nexus AI Music Studio';
+    studioAudio.play().then(() => {
+      if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '⏸️';
+    }).catch(() => {});
+  }
+
+  if (studioPlayerPlayBtn) {
+    studioPlayerPlayBtn.addEventListener('click', () => {
+      if (!studioAudio.src) return;
+      if (studioAudio.paused) {
+        studioAudio.play();
+        if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '⏸️';
+      } else {
+        studioAudio.pause();
+        if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '▶️';
+      }
+    });
+  }
+
+  studioAudio.addEventListener('timeupdate', () => {
+    if (!isNaN(studioAudio.duration) && studioAudio.duration > 0) {
+      const pct = (studioAudio.currentTime / studioAudio.duration) * 100;
+      if (studioPlayerSeekSlider) studioPlayerSeekSlider.value = pct;
+      if (studioPlayerCurrentTime) studioPlayerCurrentTime.textContent = formatTime(studioAudio.currentTime);
+      if (studioPlayerDuration) studioPlayerDuration.textContent = formatTime(studioAudio.duration);
+    }
+  });
+
+  studioAudio.addEventListener('ended', () => {
+    if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '▶️';
+  });
+
+  if (studioPlayerSeekSlider) {
+    studioPlayerSeekSlider.addEventListener('input', () => {
+      if (!isNaN(studioAudio.duration)) {
+        studioAudio.currentTime = (studioPlayerSeekSlider.value / 100) * studioAudio.duration;
+      }
+    });
+  }
+
+  if (studioPlayerVolumeSlider) {
+    studioPlayerVolumeSlider.addEventListener('input', () => {
+      studioAudio.volume = studioPlayerVolumeSlider.value / 100;
+    });
+  }
+
+  if (studioPlayerShareLoungeBtn) {
+    studioPlayerShareLoungeBtn.addEventListener('click', async () => {
+      if (!currentPlayingTrack) {
+        alert('No track currently loaded in the player to share!');
+        return;
+      }
+      studioPlayerShareLoungeBtn.disabled = true;
+      studioPlayerShareLoungeBtn.innerHTML = '<span>⏳</span> Sharing...';
+      try {
+        const resp = await fetch('/v1/studio/maestro/share-to-lounge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: currentPlayingTrack.url.split('file=')[1] ? decodeURIComponent(currentPlayingTrack.url.split('file=')[1]) : 'track.wav',
+            comment: `Listening in Studio: "${currentPlayingTrack.title}"`,
+          }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          studioPlayerShareLoungeBtn.innerHTML = '<span>✅</span> Shared!';
+          setTimeout(() => {
+            studioPlayerShareLoungeBtn.innerHTML = '<span>💬</span> Share to Lounge';
+            studioPlayerShareLoungeBtn.disabled = false;
+          }, 2000);
+          if (window.showNotification) window.showNotification(`🎶 "${currentPlayingTrack.title}" shared to Lounge!`);
+        } else {
+          alert('Failed to share track: ' + data.error);
+          studioPlayerShareLoungeBtn.disabled = false;
+        }
+      } catch (err) {
+        alert('Error sharing track: ' + err.message);
+        studioPlayerShareLoungeBtn.disabled = false;
+      }
+    });
+  }
+
+  // URL Hash & Param Handler (invoked after all studio handlers and elements are fully ready)
+  function checkStudioHash() {
+    if (window.location.hash === '#studio' || window.location.hash.startsWith('#studio-')) {
+      const tab = window.location.hash.replace('#studio-', '') || 'prompts';
+      openStudio(tab);
+    }
+  }
+  checkStudioHash();
+  window.addEventListener('hashchange', checkStudioHash);
+}
+
+// ==========================================================================
+// Nexus Global Radio Integration (3,000 Live Stations)
+// ==========================================================================
+initNexusRadio();
+
+function initNexusRadio() {
+  const radioModal = document.getElementById('radioModal');
+  const btnOpenRadio = document.getElementById('openRadioModalBtn');
+  const btnCloseRadio = document.getElementById('btnCloseRadioModal');
+  const btnDockMini = document.getElementById('radioDockMiniBtn');
+  const btnPopout = document.getElementById('radioPopoutBtn');
+  const btnToggleFullscreen = document.getElementById('radioToggleFullscreenBtn');
+  const studioQuickRadioBtn = document.getElementById('studioQuickRadioBtn');
+  const iframe = document.getElementById('nexusRadioIframe');
+
+  const miniPlayer = document.getElementById('nexusRadioMiniPlayer');
+  const miniClickTarget = document.getElementById('radioMiniClickTarget');
+  const miniTitle = document.getElementById('radioMiniTitle');
+  const miniSub = document.getElementById('radioMiniSub');
+  const miniPlayPauseBtn = document.getElementById('radioMiniPlayPauseBtn');
+  const miniNextBtn = document.getElementById('radioMiniNextBtn');
+  const miniExpandBtn = document.getElementById('radioMiniExpandBtn');
+  const miniCloseBtn = document.getElementById('radioMiniCloseBtn');
+
+  const headerStationText = document.getElementById('radioHeaderStationText');
+  const headerWaveBars = document.getElementById('radioHeaderWaveBars');
+  const navLiveBadge = document.getElementById('radioNavLiveBadge');
+
+  if (!radioModal || !iframe) return;
+
+  let currentRadioState = {
+    playing: false,
+    stationName: null,
+    country: null,
+    trackText: '',
+    volume: 0.8
+  };
+
+  function sendToRadioIframe(cmd) {
+    try {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'nexus_radio_cmd', ...cmd }, '*');
+      }
+    } catch (e) {
+      console.warn('[NexusRadio] Failed to postMessage to iframe:', e);
+    }
+  }
+
+  function openRadio(genre) {
+    radioModal.classList.remove('hidden');
+    if (!iframe.getAttribute('src')) {
+      iframe.setAttribute('src', 'radio.html');
+    }
+    if (genre && typeof genre === 'string') {
+      setTimeout(() => {
+        sendToRadioIframe({ action: 'tuneGenre', genre });
+      }, 500);
+    }
+  }
+
+  let miniRadioHideTimer = null;
+  function resetMiniRadioAutoHide(delayMs = 5000) {
+    if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+    if (!miniPlayer || miniPlayer.classList.contains('hidden')) return;
+    miniRadioHideTimer = setTimeout(() => {
+      if (miniPlayer && !miniPlayer.matches(':hover')) {
+        miniPlayer.classList.add('hidden');
+      }
+    }, delayMs);
+  }
+
+  function showMiniPlayerWithAutoHide(delayMs = 5000) {
+    if (!miniPlayer) return;
+    miniPlayer.classList.remove('hidden');
+    resetMiniRadioAutoHide(delayMs);
+  }
+
+  if (miniPlayer) {
+    miniPlayer.addEventListener('mouseenter', () => {
+      if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+    });
+    miniPlayer.addEventListener('mouseleave', () => {
+      resetMiniRadioAutoHide(3500);
+    });
+  }
+
+  function closeRadio() {
+    radioModal.classList.add('hidden');
+    if (currentRadioState.playing && miniPlayer) {
+      showMiniPlayerWithAutoHide(5000);
+    }
+  }
+
+  function dockToMiniPlayer() {
+    radioModal.classList.add('hidden');
+    if (miniPlayer) {
+      showMiniPlayerWithAutoHide(5000);
+    }
+  }
+
+  if (btnOpenRadio) {
+    btnOpenRadio.addEventListener('click', () => openRadio());
+  }
+
+  if (studioQuickRadioBtn) {
+    studioQuickRadioBtn.addEventListener('click', () => openRadio());
+  }
+
+  if (btnCloseRadio) {
+    btnCloseRadio.addEventListener('click', closeRadio);
+  }
+
+  if (btnDockMini) {
+    btnDockMini.addEventListener('click', dockToMiniPlayer);
+  }
+
+  if (btnPopout) {
+    btnPopout.addEventListener('click', () => {
+      window.open('/radio', 'NexusRadioPopout', 'width=1120,height=760,menubar=no,toolbar=no,location=no,status=no');
+    });
+  }
+
+  if (btnToggleFullscreen) {
+    btnToggleFullscreen.addEventListener('click', () => {
+      radioModal.classList.toggle('modal-maximized');
+      btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '⛶';
+    });
+  }
+
+  radioModal.addEventListener('click', (e) => {
+    if (e.target === radioModal) {
+      dockToMiniPlayer();
+    }
+  });
+
+  if (miniClickTarget) {
+    miniClickTarget.addEventListener('click', () => {
+      openRadio();
+      if (miniPlayer) miniPlayer.classList.add('hidden');
+    });
+  }
+
+  if (miniExpandBtn) {
+    miniExpandBtn.addEventListener('click', () => {
+      openRadio();
+      if (miniPlayer) miniPlayer.classList.add('hidden');
+    });
+  }
+
+  if (miniPlayPauseBtn) {
+    miniPlayPauseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendToRadioIframe({ action: 'toggle' });
+    });
+  }
+
+  if (miniNextBtn) {
+    miniNextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendToRadioIframe({ action: 'next' });
+    });
+  }
+
+  if (miniCloseBtn) {
+    miniCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (miniPlayer) miniPlayer.classList.add('hidden');
+    });
+  }
+
+  window.addEventListener('message', (e) => {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === 'nexus_radio_state') {
+      currentRadioState = { ...currentRadioState, ...e.data };
+      const { playing, stationName, country, trackText } = currentRadioState;
+
+      if (headerStationText) {
+        if (stationName) {
+          headerStationText.textContent = trackText 
+            ? `${stationName} • ${trackText}` 
+            : `${stationName} (${country || 'Live'})`;
+        } else {
+          headerStationText.textContent = 'Wavelength • Standby';
+        }
+      }
+
+      if (headerWaveBars) {
+        if (playing) {
+          headerWaveBars.classList.remove('paused');
+        } else {
+          headerWaveBars.classList.add('paused');
+        }
+      }
+
+      if (navLiveBadge) {
+        if (playing) {
+          navLiveBadge.textContent = 'ON AIR';
+          navLiveBadge.style.background = 'rgba(34, 197, 94, 0.25)';
+          navLiveBadge.style.color = '#22c55e';
+          navLiveBadge.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+        } else {
+          navLiveBadge.textContent = '3K';
+          navLiveBadge.style.background = 'rgba(37, 208, 255, 0.2)';
+          navLiveBadge.style.color = '#25d0ff';
+          navLiveBadge.style.borderColor = 'rgba(37, 208, 255, 0.4)';
+        }
+      }
+
+      if (miniTitle) {
+        miniTitle.textContent = stationName || 'Nexus Global Radio';
+      }
+      if (miniSub) {
+        miniSub.textContent = trackText || (country ? `${country} • Live` : '3,000 Live Stations');
+      }
+      if (miniPlayPauseBtn) {
+        miniPlayPauseBtn.textContent = playing ? '⏸' : '▶';
+        miniPlayPauseBtn.title = playing ? 'Pause Stream' : 'Play Stream';
+      }
+
+      if (playing && radioModal.classList.contains('hidden') && miniPlayer) {
+        showMiniPlayerWithAutoHide(5000);
+      }
+    }
+  });
+
+  window.openNexusRadio = openRadio;
+  window.tuneNexusRadio = (genre) => {
+    openRadio(genre);
+  };
+
+  function checkRadioHash() {
+    if (window.location.hash === '#radio' || window.location.hash.startsWith('#radio-')) {
+      const genre = window.location.hash.startsWith('#radio-') 
+        ? window.location.hash.replace('#radio-', '') 
+        : null;
+      openRadio(genre);
+    }
+  }
+  checkRadioHash();
+  window.addEventListener('hashchange', checkRadioHash);
+}
+
+// ==========================================================================
+// CivitAI Model Hub & NordVPN Privacy Gateway Controller
+// ==========================================================================
+function initCivitaiHub() {
+  const hubModal = document.getElementById('civitaiHubModal');
+  const openHubBtn = document.getElementById('openCivitaiHubModalBtn');
+  const closeHubBtn = document.getElementById('closeCivitaiHubModalBtn');
+  const openFolderBtn = document.getElementById('civitaiOpenFolderBtn');
+  const openVpnBtn = document.getElementById('civitaiOpenVpnBtn');
+  const vpnStatusBtn = document.getElementById('civitaiVpnStatusBtn');
+  const vpnStatusDot = document.getElementById('civitaiVpnStatusDot');
+  const vpnStatusText = document.getElementById('civitaiVpnStatusText');
+  const installedBadge = document.getElementById('civitaiInstalledBadge');
+  const installedCountLabel = document.getElementById('civitaiInstalledCountLabel');
+
+  const categoryTabs = document.getElementById('civitaiCategoryTabs');
+  const baseModelSelect = document.getElementById('civitaiBaseModelSelect');
+  const sortSelect = document.getElementById('civitaiSortSelect');
+  const periodSelect = document.getElementById('civitaiPeriodSelect');
+  const nsfwToggle = document.getElementById('civitaiNsfwToggle');
+  const refreshBtn = document.getElementById('civitaiRefreshBtn');
+  const searchInput = document.getElementById('civitaiSearchInput');
+  const searchBtn = document.getElementById('civitaiSearchBtn');
+  const quickPills = document.getElementById('civitaiQuickPills');
+
+  const viewport = document.getElementById('civitaiViewport');
+  const loadingSpinner = document.getElementById('civitaiLoadingSpinner');
+  const emptyState = document.getElementById('civitaiEmptyState');
+  const cardsGrid = document.getElementById('civitaiCardsGrid');
+  const paginationContainer = document.getElementById('civitaiPaginationContainer');
+  const loadMoreBtn = document.getElementById('civitaiLoadMoreBtn');
+  const pageIndicator = document.getElementById('civitaiPageIndicator');
+  const blockedBanner = document.getElementById('civitaiBlockedBanner');
+  const configureVpnFromBannerBtn = document.getElementById('civitaiConfigureVpnFromBannerBtn');
+
+  const downloadsBar = document.getElementById('civitaiDownloadsBar');
+  const downloadName = document.getElementById('civitaiDownloadName');
+  const downloadTypeBadge = document.getElementById('civitaiDownloadTypeBadge');
+  const downloadStatusMsg = document.getElementById('civitaiDownloadStatusMsg');
+  const downloadProgressPercent = document.getElementById('civitaiDownloadProgressPercent');
+  const downloadProgressBar = document.getElementById('civitaiDownloadProgressBar');
+  const downloadSpeedRate = document.getElementById('civitaiDownloadSpeedRate');
+  const cancelDownloadBtn = document.getElementById('civitaiCancelDownloadBtn');
+  const showFolderDownloadBtn = document.getElementById('civitaiShowFolderDownloadBtn');
+  const retryDownloadBtn = document.getElementById('civitaiRetryDownloadBtn');
+  const headerDownloadsIndicator = document.getElementById('civitaiHeaderDownloadsIndicator');
+  const headerDownloadsText = document.getElementById('civitaiHeaderDownloadsText');
+
+  const globalFloatingDock = document.getElementById('civitaiGlobalFloatingDock');
+  const globalDlTitle = document.getElementById('civitaiGlobalDlTitle');
+  const globalDlMeta = document.getElementById('civitaiGlobalDlMeta');
+  const globalDlProgressBar = document.getElementById('civitaiGlobalDlProgressBar');
+  const globalDlOpenBtn = document.getElementById('civitaiGlobalDlOpenBtn');
+  const globalDlCancelBtn = document.getElementById('civitaiGlobalDlCancelBtn');
+  const globalDlDismissBtn = document.getElementById('civitaiGlobalDlDismissBtn');
+
+  const vpnModal = document.getElementById('nordVpnModal');
+  const closeVpnBtn = document.getElementById('closeNordVpnModalBtn');
+  const closeVpnFooterBtn = document.getElementById('closeNordVpnFooterBtn');
+  const vpnTabProxy = document.getElementById('nordVpnTabProxy');
+  const vpnTabApp = document.getElementById('nordVpnTabApp');
+  const vpnTabDiag = document.getElementById('nordVpnTabDiag');
+  const vpnContentProxy = document.getElementById('nordVpnContentProxy');
+  const vpnContentApp = document.getElementById('nordVpnContentApp');
+  const vpnContentDiag = document.getElementById('nordVpnContentDiag');
+
+  const proxyEnabled = document.getElementById('nordVpnProxyEnabled');
+  const serverPreset = document.getElementById('nordVpnServerPreset');
+  const proxyHost = document.getElementById('nordVpnHost');
+  const proxyPort = document.getElementById('nordVpnPort');
+  const proxyUsername = document.getElementById('nordVpnUsername');
+  const proxyPassword = document.getElementById('nordVpnPassword');
+  const civitaiKey = document.getElementById('nordVpnCivitaiKey');
+  const saveConfigBtn = document.getElementById('nordVpnSaveConfigBtn');
+  const testProxyBtn = document.getElementById('nordVpnTestProxyBtn');
+  const testStatusText = document.getElementById('nordVpnTestStatusText');
+  const testFeedback = document.getElementById('nordVpnProxyTestFeedback');
+  const launchAppBtn = document.getElementById('nordVpnLaunchAppBtn');
+
+  const diagIp = document.getElementById('nordDiagIp');
+  const diagCountry = document.getElementById('nordDiagCountry');
+  const diagIsp = document.getElementById('nordDiagIsp');
+  const diagCivitai = document.getElementById('nordDiagCivitai');
+  const diagDetailsBox = document.getElementById('nordDiagDetailsBox');
+  const runDiagBtn = document.getElementById('nordVpnRunDiagBtn');
+
+  const detailsModal = document.getElementById('civitaiModelDetailsModal');
+  const closeDetailBtn = document.getElementById('closeCivitaiDetailModalBtn');
+  const detailTitle = document.getElementById('civitaiDetailTitle');
+  const detailAuthor = document.getElementById('civitaiDetailAuthor');
+  const detailTypeBadge = document.getElementById('civitaiDetailTypeBadge');
+  const detailBaseBadge = document.getElementById('civitaiDetailBaseBadge');
+  const detailMainImage = document.getElementById('civitaiDetailMainImage');
+  const detailThumbnails = document.getElementById('civitaiDetailThumbnails');
+  const detailVersionSelect = document.getElementById('civitaiDetailVersionSelect');
+  const detailTriggersContainer = document.getElementById('civitaiDetailTriggersContainer');
+  const detailCopyTriggersBtn = document.getElementById('civitaiDetailCopyTriggersBtn');
+  const detailSendStudioBtn = document.getElementById('civitaiDetailSendStudioBtn');
+  const detailFileMeta = document.getElementById('civitaiDetailFileMeta');
+  const detailDownloadBtn = document.getElementById('civitaiDetailDownloadBtn');
+  const detailDownloadStatus = document.getElementById('civitaiDetailDownloadStatus');
+  const detailDescription = document.getElementById('civitaiDetailDescription');
+
+  let currentTab = 'all';
+  let currentPage = 1;
+  let totalPages = 1;
+  let isLoading = false;
+  let activeTaskId = null;
+  let pollInterval = null;
+  let activeSelectedModel = null;
+  let activeSelectedVersion = null;
+  let installedModelsList = [];
+
+  function formatBytes(bytes) {
+    if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+  }
+
+  function showNotificationToast(msg, isSuccess = true) {
+    if (typeof showToast === 'function') {
+      showToast(msg, isSuccess ? 'success' : 'error');
+    } else {
+      console.log(`[CivitAI Toast] ${msg}`);
+    }
+  }
+
+  async function checkVpnStatus() {
+    try {
+      const res = await fetch('/v1/civitai/vpn/status');
+      const data = await res.json();
+      if (!data || !data.success) return;
+
+      const isOk = !!(data.civitaiOk || data.civitaiAccessible);
+      const { country, isp, ip, proxyConfig } = data;
+
+      if (vpnStatusDot && vpnStatusText) {
+        if (isOk) {
+          vpnStatusDot.className = 'vpn-status-dot connected';
+          vpnStatusText.textContent = country ? `CivitAI: Accessible (${country})` : 'CivitAI: Accessible';
+          if (blockedBanner) blockedBanner.style.display = 'none';
+        } else {
+          vpnStatusDot.className = 'vpn-status-dot blocked';
+          vpnStatusText.textContent = 'CivitAI: Blocked (HTTP 451)';
+          if (blockedBanner) blockedBanner.style.display = 'block';
+        }
+      }
+
+      if (diagIp) diagIp.textContent = ip || 'Unavailable';
+      if (diagCountry) diagCountry.textContent = country || 'Unknown';
+      if (diagIsp) diagIsp.textContent = isp || 'Unknown';
+      if (diagCivitai) {
+        if (isOk) {
+          diagCivitai.innerHTML = '<span style="color: #22c55e;">🟢 HTTP 200 OK (Unblocked)</span>';
+        } else {
+          diagCivitai.innerHTML = '<span style="color: #ef4444;">🔴 HTTP 451 Blocked (UK/Region)</span>';
+        }
+      }
+
+      if (proxyConfig) {
+        if (proxyEnabled) proxyEnabled.checked = !!proxyConfig.enabled;
+        if (proxyHost && proxyConfig.host) proxyHost.value = proxyConfig.host;
+        if (proxyPort && proxyConfig.port) proxyPort.value = proxyConfig.port;
+        if (proxyUsername && proxyConfig.username) proxyUsername.value = proxyConfig.username;
+        if (proxyPassword) {
+          if (proxyConfig.password) {
+            proxyPassword.placeholder = '•••••••• (Saved)';
+            if (!proxyPassword.value || proxyPassword.value.includes('•')) {
+              proxyPassword.value = '';
+            }
+          }
+        }
+        if (civitaiKey && proxyConfig.civitaiApiKey) civitaiKey.value = proxyConfig.civitaiApiKey;
+      }
+    } catch (err) {
+      console.warn('Failed to check CivitAI VPN status:', err);
+    }
+  }
+
+  async function updateInstalledCount() {
+    try {
+      const res = await fetch('/v1/civitai/installed');
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.models)) {
+        installedModelsList = data.models;
+        const count = data.models.length;
+        if (installedBadge) installedBadge.textContent = `${count} Installed`;
+        if (installedCountLabel) installedCountLabel.textContent = `${count}`;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch installed CivitAI models:', e);
+    }
+  }
+
+  function openHub() {
+    if (!hubModal) return;
+    hubModal.classList.remove('hidden');
+    checkVpnStatus();
+    updateInstalledCount();
+    if (!cardsGrid.children.length) {
+      fetchModels(1);
+    }
+    startDownloadPolling();
+  }
+
+  function closeHub() {
+    if (!hubModal) return;
+    hubModal.classList.add('hidden');
+    if (window.location.hash === '#civitai') {
+      history.pushState(null, '', window.location.pathname + window.location.search);
+    }
+  }
+
+  function openNordVpn() {
+    if (!vpnModal) return;
+    vpnModal.classList.remove('hidden');
+    checkVpnStatus();
+  }
+
+  function closeNordVpn() {
+    if (!vpnModal) return;
+    vpnModal.classList.add('hidden');
+  }
+
+  function switchNordTab(activeTab) {
+    [vpnTabProxy, vpnTabApp, vpnTabDiag].forEach(tab => {
+      if (tab) {
+        tab.classList.remove('active');
+        tab.style.color = '';
+        tab.style.borderColor = '';
+        tab.style.background = '';
+      }
+    });
+
+    if (vpnContentProxy) vpnContentProxy.style.display = 'none';
+    if (vpnContentApp) vpnContentApp.style.display = 'none';
+    if (vpnContentDiag) vpnContentDiag.style.display = 'none';
+
+    if (activeTab === 'proxy') {
+      if (vpnTabProxy) {
+        vpnTabProxy.classList.add('active');
+        vpnTabProxy.style.color = '#38bdf8';
+        vpnTabProxy.style.borderColor = '#38bdf8';
+        vpnTabProxy.style.background = 'rgba(56, 189, 248, 0.12)';
+      }
+      if (vpnContentProxy) vpnContentProxy.style.display = 'block';
+    } else if (activeTab === 'app') {
+      if (vpnTabApp) {
+        vpnTabApp.classList.add('active');
+        vpnTabApp.style.color = '#38bdf8';
+        vpnTabApp.style.borderColor = '#38bdf8';
+        vpnTabApp.style.background = 'rgba(56, 189, 248, 0.12)';
+      }
+      if (vpnContentApp) vpnContentApp.style.display = 'block';
+    } else if (activeTab === 'diag') {
+      if (vpnTabDiag) {
+        vpnTabDiag.classList.add('active');
+        vpnTabDiag.style.color = '#22c55e';
+        vpnTabDiag.style.borderColor = '#22c55e';
+        vpnTabDiag.style.background = 'rgba(34, 197, 94, 0.12)';
+      }
+      if (vpnContentDiag) vpnContentDiag.style.display = 'block';
+      checkVpnStatus();
+    }
+  }
+
+  async function saveProxySettings() {
+    if (!saveConfigBtn) return;
+    saveConfigBtn.disabled = true;
+    saveConfigBtn.textContent = 'Saving...';
+
+    const pwd = proxyPassword ? proxyPassword.value.trim() : '';
+    const payload = {
+      enabled: proxyEnabled ? proxyEnabled.checked : false,
+      type: 'socks5',
+      host: proxyHost ? proxyHost.value.trim() : 'amsterdam.nl.socks.nordhold.net',
+      port: proxyPort ? parseInt(proxyPort.value, 10) || 1080 : 1080,
+      username: proxyUsername ? proxyUsername.value.trim() : '',
+      ...(pwd && !pwd.includes('•') ? { password: pwd } : {}),
+      civitaiApiKey: civitaiKey ? civitaiKey.value.trim() : ''
+    };
+
+    try {
+      const res = await fetch('/v1/civitai/vpn/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        showNotificationToast('✅ NordVPN SOCKS5 configuration saved & applied!');
+        if (testFeedback) {
+          testFeedback.style.display = 'block';
+          testFeedback.style.background = 'rgba(34, 197, 94, 0.1)';
+          testFeedback.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+          testFeedback.style.color = '#86efac';
+          testFeedback.textContent = 'Configuration saved successfully. Now click "Test SOCKS5 Connection" to verify CivitAI access.';
+        }
+        checkVpnStatus();
+        fetchModels(1);
+      } else {
+        throw new Error(data?.error || 'Save failed');
+      }
+    } catch (err) {
+      if (testFeedback) {
+        testFeedback.style.display = 'block';
+        testFeedback.style.background = 'rgba(239, 68, 68, 0.1)';
+        testFeedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        testFeedback.style.color = '#fca5a5';
+        testFeedback.textContent = `Error saving settings: ${err.message}`;
+      }
+    } finally {
+      saveConfigBtn.disabled = false;
+      saveConfigBtn.textContent = '💾 Save & Apply Proxy';
+    }
+  }
+
+  async function testProxySettings() {
+    if (!testProxyBtn) return;
+
+    const u = proxyUsername ? proxyUsername.value.trim() : '';
+    const p = proxyPassword ? proxyPassword.value.trim() : '';
+    const hasSavedPwd = proxyPassword && proxyPassword.placeholder && proxyPassword.placeholder.includes('Saved');
+
+    if (testFeedback) {
+      testFeedback.style.display = 'block';
+    }
+
+    if (!u || (!p && !hasSavedPwd)) {
+      if (testFeedback) {
+        testFeedback.style.background = 'rgba(245, 158, 11, 0.15)';
+        testFeedback.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+        testFeedback.style.color = '#fde68a';
+        testFeedback.innerHTML = `🔑 <strong>NordVPN Service Credentials Required:</strong><br>NordVPN SOCKS5 servers require authentication. Enter your unique <strong>Service Username &amp; Password</strong> (found in your Nord Account Dashboard under <em>Services &gt; NordVPN &gt; Manual Setup</em>, NOT your Nord email) and click "Test SOCKS5 Connection" again.`;
+      }
+      return;
+    }
+
+    testProxyBtn.disabled = true;
+    if (testStatusText) testStatusText.textContent = 'Testing tunnel to NordVPN...';
+    if (testFeedback) {
+      testFeedback.style.background = 'rgba(56, 189, 248, 0.1)';
+      testFeedback.style.border = '1px solid rgba(56, 189, 248, 0.3)';
+      testFeedback.style.color = '#7dd3fc';
+      testFeedback.textContent = 'Opening SOCKS5 tunnel and probing CivitAI API...';
+    }
+
+    const payload = {
+      enabled: true,
+      type: 'socks5',
+      host: proxyHost ? proxyHost.value.trim() : 'amsterdam.nl.socks.nordhold.net',
+      port: proxyPort ? parseInt(proxyPort.value, 10) || 1080 : 1080,
+      username: u,
+      password: (p && !p.includes('•')) ? p : ''
+    };
+
+    try {
+      const res = await fetch('/v1/civitai/vpn/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (data.civitaiAccessible || data.civitaiOk) {
+          if (proxyEnabled) proxyEnabled.checked = true;
+          testFeedback.style.background = 'rgba(34, 197, 94, 0.15)';
+          testFeedback.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+          testFeedback.style.color = '#86efac';
+          testFeedback.innerHTML = `🎉 <strong>Test Succeeded!</strong> Connected via NordVPN SOCKS5.<br>Exit IP: <strong>${data.ip}</strong> (${data.country || 'Unknown'}, ${data.isp || 'NordVPN'}). CivitAI API returned <strong>HTTP 200 OK</strong>. Access is fully unblocked!`;
+          if (blockedBanner) blockedBanner.style.display = 'none';
+        } else {
+          testFeedback.style.background = 'rgba(245, 158, 11, 0.15)';
+          testFeedback.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+          testFeedback.style.color = '#fde68a';
+          testFeedback.innerHTML = `⚠️ <strong>Exit IP: ${data.ip} (${data.country})</strong><br>CivitAI still returned HTTP ${data.civitaiStatusCode || 451}. Please ensure you are using an unrestricted preset like <strong>Netherlands (amsterdam.nl.socks.nordhold.net)</strong> or <strong>United States</strong>.`;
+        }
+        checkVpnStatus();
+      } else {
+        throw new Error(data?.error || 'Test connection timed out');
+      }
+    } catch (err) {
+      if (testFeedback) {
+        testFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+        testFeedback.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        testFeedback.style.color = '#fca5a5';
+        testFeedback.innerHTML = `❌ <strong>Test Failed:</strong> ${err.message}<br><small>Double check your NordVPN Service Credentials (NOT your Nord email) in Nord Account &gt; Services &gt; NordVPN &gt; Manual Setup.</small>`;
+      }
+    } finally {
+      testProxyBtn.disabled = false;
+      if (testStatusText) testStatusText.textContent = '';
+    }
+  }
+
+  async function fetchModels(page = 1, append = false) {
+    if (isLoading) return;
+    isLoading = true;
+    currentPage = page;
+
+    if (loadingSpinner) loadingSpinner.style.display = 'flex';
+    if (emptyState) emptyState.style.display = 'none';
+
+    if (currentTab === 'installed') {
+      try {
+        const res = await fetch('/v1/civitai/installed');
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.models)) {
+          renderInstalledModels(data.models);
+        } else {
+          renderInstalledModels([]);
+        }
+      } catch (err) {
+        renderInstalledModels([]);
+      } finally {
+        if (loadingSpinner) loadingSpinner.style.display = 'none';
+        isLoading = false;
+      }
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', '24');
+
+    const q = searchInput ? searchInput.value.trim() : '';
+    if (q) params.set('q', q);
+
+    if (currentTab === 'LORA') {
+      params.set('type', 'LORA');
+    } else if (currentTab === 'Checkpoint') {
+      params.set('type', 'Checkpoint');
+    } else if (currentTab === 'pony') {
+      params.set('baseModel', 'Pony');
+    } else if (currentTab === 'flux') {
+      params.set('baseModel', 'Flux.1 D');
+    }
+
+    if (baseModelSelect && baseModelSelect.value && currentTab !== 'pony' && currentTab !== 'flux') {
+      params.set('baseModel', baseModelSelect.value);
+    }
+
+    if (sortSelect && sortSelect.value) {
+      params.set('sort', sortSelect.value);
+    }
+
+    if (periodSelect && periodSelect.value) {
+      params.set('period', periodSelect.value);
+    }
+
+    if (nsfwToggle && nsfwToggle.checked) {
+      params.set('nsfw', 'true');
+    }
+
+    try {
+      const res = await fetch(`/v1/civitai/models?${params.toString()}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        if (data.error && data.error.includes('451')) {
+          if (blockedBanner) blockedBanner.style.display = 'block';
+          if (vpnStatusDot) vpnStatusDot.className = 'vpn-status-dot blocked';
+          if (vpnStatusText) vpnStatusText.textContent = 'CivitAI: Blocked (HTTP 451)';
+        }
+        throw new Error(data.error || 'Failed to fetch models');
+      }
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      totalPages = data.metadata?.totalPages || 1;
+
+      renderModels(items, append);
+
+      if (paginationContainer) {
+        paginationContainer.style.display = items.length > 0 ? 'block' : 'none';
+      }
+      if (pageIndicator) {
+        pageIndicator.textContent = `Page ${currentPage} of ${totalPages} • Total ${data.metadata?.totalItems || items.length} models`;
+      }
+      if (loadMoreBtn) {
+        loadMoreBtn.style.display = currentPage < totalPages ? 'inline-block' : 'none';
+      }
+    } catch (err) {
+      console.warn('Failed to load CivitAI models:', err);
+      if (!append && cardsGrid) cardsGrid.innerHTML = '';
+      if (emptyState) emptyState.style.display = 'block';
+      if (paginationContainer) paginationContainer.style.display = 'none';
+    } finally {
+      if (loadingSpinner) loadingSpinner.style.display = 'none';
+      isLoading = false;
+    }
+  }
+
+  function renderModels(models, append = false) {
+    if (!cardsGrid) return;
+    if (!append) cardsGrid.innerHTML = '';
+
+    if (!models || models.length === 0) {
+      if (!append && emptyState) emptyState.style.display = 'block';
+      return;
+    }
+
+    models.forEach(model => {
+      const card = createModelCard(model);
+      cardsGrid.appendChild(card);
+    });
+  }
+
+  function createModelCard(model) {
+    const latestVersion = model.modelVersions?.[0] || {};
+    const primaryFile = latestVersion.files?.[0] || {};
+
+    const card = document.createElement('div');
+    card.className = 'civitai-card';
+    card.dataset.modelId = String(model.id);
+    card.dataset.modelName = model.name;
+    card.dataset.versionId = String(latestVersion.id || '');
+    const previewImg = latestVersion.images?.[0]?.url || model.images?.[0]?.url || '';
+    const baseModel = latestVersion.baseModel || 'SDXL 1.0';
+    const triggers = latestVersion.trainedWords || [];
+    const downloads = model.stats?.downloadCount ? Number(model.stats.downloadCount).toLocaleString() : '0';
+    const rating = model.stats?.rating ? Number(model.stats.rating).toFixed(1) : '5.0';
+
+    const media = document.createElement('div');
+    media.className = 'civitai-card-media';
+    media.onclick = () => openModelDetails(model);
+
+    if (previewImg) {
+      const img = document.createElement('img');
+      img.className = 'civitai-card-img';
+      img.src = previewImg;
+      img.alt = model.name;
+      img.loading = 'lazy';
+      media.appendChild(img);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--text-muted); background: #090d16;';
+      placeholder.textContent = '🖼️';
+      media.appendChild(placeholder);
+    }
+
+    const badgesTop = document.createElement('div');
+    badgesTop.className = 'civitai-card-badges-top';
+    badgesTop.innerHTML = `
+      <span class="badge" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">${model.type || 'LORA'}</span>
+      <span class="badge" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">${baseModel}</span>
+    `;
+    media.appendChild(badgesTop);
+    card.appendChild(media);
+
+    const body = document.createElement('div');
+    body.className = 'civitai-card-body';
+
+    const title = document.createElement('div');
+    title.className = 'civitai-card-title';
+    title.textContent = model.name;
+    title.title = model.name;
+    title.onclick = () => openModelDetails(model);
+    body.appendChild(title);
+
+    const author = document.createElement('div');
+    author.className = 'civitai-card-author';
+    author.innerHTML = `<span>By <strong style="color: #cbd5e1;">${model.creator?.username || 'CivitAI Creator'}</strong></span>`;
+    body.appendChild(author);
+
+    if (triggers.length > 0) {
+      const triggersBox = document.createElement('div');
+      triggersBox.style.cssText = 'display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-top: 2px;';
+      triggers.slice(0, 2).forEach(word => {
+        const chip = document.createElement('span');
+        chip.className = 'civitai-trigger-chip';
+        chip.textContent = word;
+        chip.title = `Click to copy "${word}"`;
+        chip.onclick = (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(word);
+          showNotificationToast(`Copied trigger: "${word}"`);
+        };
+        triggersBox.appendChild(chip);
+      });
+      body.appendChild(triggersBox);
+    }
+
+    const stats = document.createElement('div');
+    stats.className = 'civitai-card-stats';
+    stats.innerHTML = `
+      <span>⬇️ ${downloads}</span>
+      <span>⭐ ${rating}</span>
+      <span>💾 ${formatBytes((primaryFile.sizeKB || 0) * 1024)}</span>
+    `;
+    body.appendChild(stats);
+
+    const actions = document.createElement('div');
+    actions.className = 'civitai-card-actions';
+
+    const detailsBtn = document.createElement('button');
+    detailsBtn.type = 'button';
+    detailsBtn.className = 'action-tag-btn';
+    detailsBtn.style.cssText = 'flex: 1; padding: 5px; font-size: 11px; text-align: center; color: #94a3b8; border-color: rgba(255,255,255,0.1);';
+    detailsBtn.textContent = '🔍 Details';
+    detailsBtn.onclick = () => openModelDetails(model);
+
+    const dlBtn = document.createElement('button');
+    dlBtn.type = 'button';
+    dlBtn.className = 'action-tag-btn civitai-card-dl-btn';
+    dlBtn.dataset.modelId = String(model.id);
+    dlBtn.style.cssText = 'flex: 1; padding: 5px; font-size: 11px; text-align: center; font-weight: 700; color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);';
+    
+    // Check if model is already installed
+    const isInstalled = Array.isArray(installedModelsList) && installedModelsList.some(im => 
+      im.metadata?.modelId === model.id || 
+      (model.name && im.filename && im.filename.toLowerCase().includes(model.name.toLowerCase().slice(0, 15)))
+    );
+
+    if (isInstalled) {
+      dlBtn.className = 'action-tag-btn civitai-card-dl-btn civitai-card-btn-installed';
+      dlBtn.textContent = '✅ Installed';
+    } else {
+      dlBtn.textContent = '⬇️ Get';
+    }
+
+    dlBtn.onclick = (e) => {
+      e.stopPropagation();
+      startDownload(model, latestVersion);
+    };
+
+    actions.appendChild(detailsBtn);
+    actions.appendChild(dlBtn);
+    body.appendChild(actions);
+
+    // Visual card progress bar
+    const cardProgress = document.createElement('div');
+    cardProgress.className = 'civitai-card-dl-progress';
+    cardProgress.style.display = 'none';
+    cardProgress.innerHTML = '<div class="civitai-card-dl-progress-bar" style="width: 0%;"></div>';
+    card.appendChild(cardProgress);
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderInstalledModels(models) {
+    if (!cardsGrid) return;
+    cardsGrid.innerHTML = '';
+    if (paginationContainer) paginationContainer.style.display = 'none';
+
+    if (!models || models.length === 0) {
+      cardsGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--text-muted);">
+          <div style="font-size: 40px; margin-bottom: 12px;">💾</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">No Local Models Installed Yet</div>
+          <div style="font-size: 13px; max-width: 480px; margin: 0 auto;">Browse LoRAs or Checkpoints from the tabs above and click "Download" to install them directly to your local library.</div>
+        </div>
+      `;
+      return;
+    }
+
+    models.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'civitai-card';
+
+      const media = document.createElement('div');
+      media.className = 'civitai-card-media';
+      media.style.height = '140px';
+
+      const previewUrl = item.metadata?.previewUrl || item.previewUrl;
+      if (previewUrl) {
+        const img = document.createElement('img');
+        img.className = 'civitai-card-img';
+        img.src = previewUrl;
+        img.alt = item.filename;
+        media.appendChild(img);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--text-muted); background: #090d16;';
+        placeholder.textContent = '💾';
+        media.appendChild(placeholder);
+      }
+
+      const badgesTop = document.createElement('div');
+      badgesTop.className = 'civitai-card-badges-top';
+      badgesTop.innerHTML = `
+        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">INSTALLED</span>
+        <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">${item.type || 'LORA'}</span>
+      `;
+      media.appendChild(badgesTop);
+      card.appendChild(media);
+
+      const body = document.createElement('div');
+      body.className = 'civitai-card-body';
+
+      const title = document.createElement('div');
+      title.className = 'civitai-card-title';
+      title.textContent = item.metadata?.modelName || item.modelName || item.filename;
+      title.title = item.filename;
+      body.appendChild(title);
+
+      const meta = document.createElement('div');
+      meta.style.cssText = 'font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;';
+      meta.innerHTML = `
+        <span>${formatBytes(item.sizeBytes || item.size)}</span>
+        <span>${item.metadata?.baseModel || item.baseModel || 'SDXL'}</span>
+      `;
+      body.appendChild(meta);
+
+      const trainedWords = item.metadata?.trainedWords || item.trainedWords || [];
+      if (Array.isArray(trainedWords) && trainedWords.length > 0) {
+        const triggersBox = document.createElement('div');
+        triggersBox.style.cssText = 'display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-top: 4px;';
+        trainedWords.slice(0, 3).forEach(w => {
+          const chip = document.createElement('span');
+          chip.className = 'civitai-trigger-chip';
+          chip.textContent = w;
+          chip.title = `Click to copy "${w}"`;
+          chip.onclick = () => {
+            navigator.clipboard.writeText(w);
+            showNotificationToast(`Copied: "${w}"`);
+          };
+          triggersBox.appendChild(chip);
+        });
+        body.appendChild(triggersBox);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'civitai-card-actions';
+
+      const useInStudioBtn = document.createElement('button');
+      useInStudioBtn.type = 'button';
+      useInStudioBtn.className = 'action-tag-btn';
+      useInStudioBtn.style.cssText = 'flex: 2; padding: 6px; font-size: 11px; font-weight: 700; color: #c084fc; border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.08);';
+      useInStudioBtn.textContent = '🎨 Use in Studio';
+      useInStudioBtn.onclick = async () => {
+        await syncCivitaiInstalledToStudio();
+        
+        if (item.type === 'checkpoint') {
+          const modelSel = document.getElementById('studioModelSelect');
+          if (modelSel) {
+            modelSel.value = `local:checkpoints/${item.filename}`;
+            modelSel.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        } else {
+          const loraSel = document.getElementById('studioLoraSelect');
+          if (loraSel) {
+            loraSel.value = `local:loras/${item.filename}`;
+            loraSel.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+
+        if (Array.isArray(trainedWords) && trainedWords.length > 0) {
+          const words = trainedWords.join(', ');
+          const target = document.getElementById('studioArtPromptInput') || document.getElementById('promptInput');
+          if (target) {
+            const cur = target.value.trim();
+            target.value = cur ? `${cur}, ${words}` : words;
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+
+        // Close CivitAI Hub and open Studio
+        const hubModal = document.getElementById('civitaiHubModal');
+        if (hubModal) hubModal.classList.add('hidden');
+        
+        const openBtn = document.getElementById('openStudioBtn') || document.getElementById('promptForgeTabBtn');
+        if (openBtn) openBtn.click();
+
+        showNotificationToast(`🎨 Activated ${item.metadata?.modelName || item.filename} in Creative Studio!`);
+      };
+
+      const sendStudioBtn = document.createElement('button');
+      sendStudioBtn.type = 'button';
+      sendStudioBtn.className = 'action-tag-btn';
+      sendStudioBtn.style.cssText = 'flex: 2; padding: 6px; font-size: 11px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08);';
+      sendStudioBtn.textContent = '✨ Send Triggers';
+      sendStudioBtn.onclick = () => {
+        const words = trainedWords.join(', ');
+        const target = document.getElementById('studioArtPromptInput') || document.getElementById('promptInput');
+        if (target) {
+          const cur = target.value.trim();
+          target.value = cur ? `${cur}, ${words}` : words;
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        showNotificationToast('✨ Triggers sent to prompt!');
+      };
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'action-tag-btn';
+      delBtn.style.cssText = 'flex: 1; padding: 6px; font-size: 11px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);';
+      delBtn.textContent = '🗑️ Delete';
+      delBtn.onclick = async () => {
+        if (!confirm(`Are you sure you want to delete ${item.filename}?`)) return;
+        try {
+          const res = await fetch('/v1/civitai/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: item.filename })
+          });
+          const d = await res.json();
+          if (d.success) {
+            showNotificationToast(`Deleted ${item.filename}`);
+            fetchModels(1);
+            updateInstalledCount();
+          }
+        } catch (e) {
+          showNotificationToast(`Failed to delete: ${e.message}`, false);
+        }
+      };
+
+      actions.appendChild(sendStudioBtn);
+      actions.appendChild(delBtn);
+      body.appendChild(actions);
+
+      card.appendChild(body);
+      cardsGrid.appendChild(card);
+    });
+  }
+
+  function openModelDetails(model) {
+    if (!detailsModal) return;
+    activeSelectedModel = model;
+
+    const versions = model.modelVersions || [];
+    activeSelectedVersion = versions[0] || null;
+
+    if (detailTitle) detailTitle.textContent = model.name;
+    if (detailAuthor) detailAuthor.textContent = model.creator?.username || 'CivitAI Creator';
+    if (detailTypeBadge) detailTypeBadge.textContent = model.type || 'LORA';
+    if (detailBaseBadge) detailBaseBadge.textContent = activeSelectedVersion?.baseModel || 'SDXL 1.0';
+
+    if (detailDescription) {
+      detailDescription.innerHTML = model.description || 'No description provided by author.';
+    }
+
+    if (detailVersionSelect) {
+      detailVersionSelect.innerHTML = '';
+      versions.forEach((ver, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(ver.id);
+        opt.textContent = `${ver.name} (${ver.baseModel || 'SDXL'})`;
+        if (idx === 0) opt.selected = true;
+        detailVersionSelect.appendChild(opt);
+      });
+      detailVersionSelect.onchange = () => {
+        const verId = parseInt(detailVersionSelect.value, 10);
+        activeSelectedVersion = versions.find(v => v.id === verId) || versions[0];
+        updateDetailVersionView(activeSelectedVersion);
+      };
+    }
+
+    updateDetailVersionView(activeSelectedVersion);
+    detailsModal.classList.remove('hidden');
+  }
+
+  function updateDetailVersionView(version) {
+    if (!version) return;
+
+    if (detailBaseBadge) detailBaseBadge.textContent = version.baseModel || 'SDXL 1.0';
+
+    const images = version.images || [];
+    const primaryImg = images[0]?.url || activeSelectedModel?.images?.[0]?.url || '';
+
+    if (detailMainImage) {
+      if (primaryImg) {
+        detailMainImage.src = primaryImg;
+        detailMainImage.style.display = 'block';
+        const ph = document.getElementById('civitaiDetailImagePlaceholder');
+        if (ph) ph.style.display = 'none';
+      } else {
+        detailMainImage.style.display = 'none';
+        const ph = document.getElementById('civitaiDetailImagePlaceholder');
+        if (ph) ph.style.display = 'flex';
+      }
+    }
+
+    if (detailThumbnails) {
+      detailThumbnails.innerHTML = '';
+      images.slice(0, 8).forEach(imgObj => {
+        const thumb = document.createElement('img');
+        thumb.src = imgObj.url;
+        thumb.style.cssText = 'width: 50px; height: 50px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid rgba(255,255,255,0.15);';
+        thumb.onclick = () => {
+          if (detailMainImage) detailMainImage.src = imgObj.url;
+        };
+        detailThumbnails.appendChild(thumb);
+      });
+    }
+
+    const triggers = version.trainedWords || [];
+    if (detailTriggersContainer) {
+      detailTriggersContainer.innerHTML = '';
+      if (triggers.length === 0) {
+        detailTriggersContainer.innerHTML = '<span style="font-size: 12px; color: var(--text-muted); font-style: italic;">No specific trigger words declared.</span>';
+      } else {
+        triggers.forEach(word => {
+          const chip = document.createElement('span');
+          chip.className = 'civitai-trigger-chip';
+          chip.textContent = word;
+          chip.title = `Click to copy "${word}"`;
+          chip.onclick = () => {
+            navigator.clipboard.writeText(word);
+            showNotificationToast(`Copied trigger: "${word}"`);
+          };
+          detailTriggersContainer.appendChild(chip);
+        });
+      }
+    }
+
+    if (detailCopyTriggersBtn) {
+      detailCopyTriggersBtn.onclick = () => {
+        if (triggers.length === 0) return;
+        navigator.clipboard.writeText(triggers.join(', '));
+        showNotificationToast('✅ Copied trigger words to clipboard!');
+      };
+    }
+
+    if (detailSendStudioBtn) {
+      detailSendStudioBtn.onclick = () => {
+        const words = triggers.join(', ');
+        const target = document.getElementById('studioArtPromptInput') || document.getElementById('promptInput');
+        if (target) {
+          const cur = target.value.trim();
+          target.value = cur ? `${cur}, ${words}` : words;
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        showNotificationToast('✨ Triggers injected into Creative Studio prompt!');
+        detailsModal.classList.add('hidden');
+      };
+    }
+
+    const primaryFile = version.files?.[0] || {};
+    const sizeStr = formatBytes((primaryFile.sizeKB || 0) * 1024);
+    if (detailFileMeta) {
+      detailFileMeta.textContent = `${sizeStr} • ${primaryFile.format || 'Safetensors'}`;
+    }
+
+    if (detailDownloadBtn) {
+      const folderName = (activeSelectedModel?.type === 'Checkpoint') ? 'models/checkpoints/' : 'models/loras/';
+      detailDownloadBtn.textContent = `⬇️ Download Model to ${folderName}`;
+      detailDownloadBtn.onclick = () => {
+        startDownload(activeSelectedModel, version);
+        detailsModal.classList.add('hidden');
+      };
+    }
+  }
+
+  async function startDownload(model, version) {
+    if (!model || !version) return;
+
+    const payload = {
+      modelId: model.id,
+      versionId: version.id,
+      modelName: model.name,
+      type: model.type || 'LORA',
+      baseModel: version.baseModel,
+      trainedWords: version.trainedWords || [],
+      previewUrl: version.images?.[0]?.url || ''
+    };
+
+    // Immediate UI feedback on the card
+    const cardDlBtn = document.querySelector(`.civitai-card-dl-btn[data-model-id="${model.id}"]`);
+    const cardElem = document.querySelector(`.civitai-card[data-model-id="${model.id}"]`);
+    const cardProgress = cardElem ? cardElem.querySelector('.civitai-card-dl-progress') : null;
+    const cardProgressBar = cardElem ? cardElem.querySelector('.civitai-card-dl-progress-bar') : null;
+
+    if (cardDlBtn) {
+      cardDlBtn.disabled = true;
+      cardDlBtn.className = 'action-tag-btn civitai-card-dl-btn civitai-card-btn-downloading';
+      cardDlBtn.textContent = '⏳ Starting...';
+    }
+    if (cardProgress) {
+      cardProgress.style.display = 'block';
+      if (cardProgressBar) cardProgressBar.style.width = '0%';
+    }
+
+    // Immediate UI feedback on downloads bar
+    if (downloadsBar) {
+      downloadsBar.style.display = 'block';
+      if (downloadName) downloadName.textContent = model.name;
+      if (downloadTypeBadge) downloadTypeBadge.textContent = model.type || 'LORA';
+      if (downloadStatusMsg) downloadStatusMsg.textContent = 'Connecting to download server...';
+      if (downloadProgressPercent) downloadProgressPercent.textContent = '0%';
+      if (downloadProgressBar) downloadProgressBar.style.width = '0%';
+      if (downloadSpeedRate) downloadSpeedRate.textContent = 'Starting...';
+    }
+
+    if (headerDownloadsIndicator) {
+      headerDownloadsIndicator.style.display = 'inline-flex';
+      if (headerDownloadsText) headerDownloadsText.textContent = '1 Downloading (0%)';
+    }
+
+    try {
+      const res = await fetch('/v1/civitai/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        showNotificationToast(`📥 Started downloading ${model.name}...`);
+        activeTaskId = data.taskId;
+        startDownloadPolling();
+      } else {
+        throw new Error(data?.error || 'Download failed');
+      }
+    } catch (err) {
+      showNotificationToast(`Failed to start download: ${err.message}`, false);
+      if (cardDlBtn) {
+        cardDlBtn.disabled = false;
+        cardDlBtn.className = 'action-tag-btn civitai-card-dl-btn civitai-card-btn-error';
+        cardDlBtn.textContent = '⚠️ Retry';
+      }
+      if (cardProgress) cardProgress.style.display = 'none';
+    }
+  }
+
+  function startDownloadPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollDownloads();
+    pollInterval = setInterval(pollDownloads, 1000);
+  }
+
+  async function pollDownloads() {
+    try {
+      const res = await fetch('/v1/civitai/download/status');
+      const data = await res.json();
+      if (!data || !data.success) return;
+
+      const downloads = Array.isArray(data.downloads) ? data.downloads : [];
+      const activeDownloads = downloads.filter(d => d.status === 'downloading' || d.status === 'pending');
+      const primaryActive = activeDownloads[0];
+
+      // 1. Header downloads indicator in CivitAI Hub
+      if (headerDownloadsIndicator) {
+        if (activeDownloads.length > 0) {
+          headerDownloadsIndicator.style.display = 'inline-flex';
+          const pct = Math.min(100, Math.max(0, Math.round(primaryActive.percent ?? primaryActive.progress ?? 0)));
+          if (headerDownloadsText) {
+            headerDownloadsText.textContent = `${activeDownloads.length} Downloading (${pct}%)`;
+          }
+        } else {
+          headerDownloadsIndicator.style.display = 'none';
+        }
+      }
+
+      // 2. Sync all visible model cards in grid
+      if (cardsGrid) {
+        const renderedCards = cardsGrid.querySelectorAll('.civitai-card');
+        renderedCards.forEach(card => {
+          const modelId = Number(card.dataset.modelId);
+          if (!modelId) return;
+          const matchingDl = downloads.find(d => Number(d.modelId) === modelId);
+          const dlBtn = card.querySelector('.civitai-card-dl-btn');
+          const pBarWrap = card.querySelector('.civitai-card-dl-progress');
+          const pBar = card.querySelector('.civitai-card-dl-progress-bar');
+
+          if (matchingDl) {
+            const pct = Math.min(100, Math.max(0, Math.round(matchingDl.percent ?? matchingDl.progress ?? 0)));
+            const spd = matchingDl.speed || (matchingDl.speedMBps ? `${matchingDl.speedMBps.toFixed(1)} MB/s` : '');
+
+            if (matchingDl.status === 'downloading' || matchingDl.status === 'pending') {
+              if (dlBtn) {
+                dlBtn.disabled = true;
+                dlBtn.className = 'action-tag-btn civitai-card-dl-btn civitai-card-btn-downloading';
+                dlBtn.textContent = spd ? `⏳ ${pct}% (${spd})` : `⏳ ${pct}%`;
+              }
+              if (pBarWrap) pBarWrap.style.display = 'block';
+              if (pBar) pBar.style.width = `${pct}%`;
+            } else if (matchingDl.status === 'completed') {
+              if (dlBtn) {
+                dlBtn.disabled = true;
+                dlBtn.className = 'action-tag-btn civitai-card-dl-btn civitai-card-btn-installed';
+                dlBtn.textContent = '✅ Installed';
+              }
+              if (pBarWrap) pBarWrap.style.display = 'none';
+            } else if (matchingDl.status === 'error') {
+              if (dlBtn) {
+                dlBtn.disabled = false;
+                dlBtn.className = 'action-tag-btn civitai-card-dl-btn civitai-card-btn-error';
+                dlBtn.textContent = '⚠️ Retry';
+              }
+              if (pBarWrap) pBarWrap.style.display = 'none';
+            } else if (matchingDl.status === 'canceled' || matchingDl.status === 'cancelled') {
+              if (dlBtn) {
+                dlBtn.disabled = false;
+                dlBtn.className = 'action-tag-btn civitai-card-dl-btn';
+                dlBtn.textContent = '⬇️ Get';
+              }
+              if (pBarWrap) pBarWrap.style.display = 'none';
+            }
+          }
+        });
+      }
+
+      // 3. Modal Downloads Bar
+      if (downloadsBar) {
+        if (primaryActive) {
+          downloadsBar.style.display = 'block';
+          if (downloadName) downloadName.textContent = primaryActive.modelName || primaryActive.filename;
+          if (downloadTypeBadge) downloadTypeBadge.textContent = primaryActive.type || 'LORA';
+
+          const pct = Math.min(100, Math.max(0, Math.round(primaryActive.percent ?? primaryActive.progress ?? 0)));
+          if (downloadProgressBar) downloadProgressBar.style.width = `${pct}%`;
+          if (downloadProgressPercent) downloadProgressPercent.textContent = `${pct}%`;
+
+          const spd = primaryActive.speed || (primaryActive.speedMBps ? `${primaryActive.speedMBps.toFixed(2)} MB/s` : '');
+          if (downloadSpeedRate) downloadSpeedRate.textContent = spd || 'Connecting...';
+
+          const transferred = formatBytes(primaryActive.downloadedBytes || 0);
+          const total = primaryActive.totalBytes ? formatBytes(primaryActive.totalBytes) : 'Unknown';
+          if (downloadStatusMsg) {
+            downloadStatusMsg.textContent = `${transferred} / ${total} ${spd ? '• ' + spd : ''}`;
+          }
+
+          if (cancelDownloadBtn) {
+            cancelDownloadBtn.style.display = 'inline-block';
+            cancelDownloadBtn.onclick = async () => {
+              await fetch('/v1/civitai/download/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId: primaryActive.taskId || primaryActive.id })
+              });
+              showNotificationToast('Download cancelled.');
+              pollDownloads();
+            };
+          }
+          if (showFolderDownloadBtn) showFolderDownloadBtn.style.display = 'none';
+          if (retryDownloadBtn) retryDownloadBtn.style.display = 'none';
+        } else {
+          const completed = downloads.find(d => d.status === 'completed');
+          const errorTask = downloads.find(d => d.status === 'error');
+
+          if (completed && downloadStatusMsg && downloadsBar.style.display !== 'none') {
+            if (downloadProgressBar) downloadProgressBar.style.width = '100%';
+            if (downloadProgressPercent) downloadProgressPercent.textContent = '100%';
+            downloadStatusMsg.textContent = `✅ Installed: ${completed.modelName || completed.filename}`;
+            if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
+            if (showFolderDownloadBtn) {
+              showFolderDownloadBtn.style.display = 'inline-block';
+              showFolderDownloadBtn.onclick = () => {
+                if (openFolderBtn) openFolderBtn.click();
+              };
+            }
+            setTimeout(() => {
+              if (downloadsBar && activeDownloads.length === 0) downloadsBar.style.display = 'none';
+            }, 5000);
+          } else if (errorTask && downloadStatusMsg && downloadsBar.style.display !== 'none') {
+            downloadStatusMsg.textContent = `⚠️ Error: ${errorTask.error || 'Download failed'}`;
+            if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
+            if (retryDownloadBtn) {
+              retryDownloadBtn.style.display = 'inline-block';
+              retryDownloadBtn.onclick = () => {
+                pollDownloads();
+              };
+            }
+          } else {
+            downloadsBar.style.display = 'none';
+          }
+        }
+      }
+
+      // 4. Global Floating Dock (App-wide)
+      if (globalFloatingDock) {
+        if (primaryActive) {
+          globalFloatingDock.style.display = 'block';
+          const pct = Math.min(100, Math.max(0, Math.round(primaryActive.percent ?? primaryActive.progress ?? 0)));
+          const spd = primaryActive.speed || (primaryActive.speedMBps ? `${primaryActive.speedMBps.toFixed(1)} MB/s` : '');
+          const transferred = formatBytes(primaryActive.downloadedBytes || 0);
+          const total = primaryActive.totalBytes ? formatBytes(primaryActive.totalBytes) : 'Unknown';
+
+          if (globalDlTitle) globalDlTitle.textContent = primaryActive.modelName || primaryActive.filename;
+          if (globalDlMeta) globalDlMeta.textContent = `${pct}% • ${transferred} / ${total} ${spd ? '• ' + spd : ''}`;
+          if (globalDlProgressBar) globalDlProgressBar.style.width = `${pct}%`;
+
+          if (globalDlOpenBtn) {
+            globalDlOpenBtn.onclick = () => {
+              openHub();
+            };
+          }
+          if (globalDlDismissBtn) {
+            globalDlDismissBtn.onclick = () => {
+              globalFloatingDock.style.display = 'none';
+              globalFloatingDock.dataset.dismissed = 'true';
+            };
+          }
+        } else {
+          const completed = downloads.find(d => d.status === 'completed');
+          if (completed && globalFloatingDock.style.display !== 'none' && !globalFloatingDock.dataset.dismissed) {
+            if (globalDlTitle) globalDlTitle.textContent = `✅ ${completed.modelName || completed.filename}`;
+            if (globalDlMeta) globalDlMeta.textContent = 'Installed and ready to use';
+            if (globalDlProgressBar) globalDlProgressBar.style.width = '100%';
+            setTimeout(() => {
+              if (globalFloatingDock && activeDownloads.length === 0) globalFloatingDock.style.display = 'none';
+            }, 6000);
+          } else if (!primaryActive) {
+            globalFloatingDock.style.display = 'none';
+            delete globalFloatingDock.dataset.dismissed;
+          }
+        }
+      }
+
+      // 5. Update local installed counts and list when no active downloads
+      if (activeDownloads.length === 0) {
+        updateInstalledCount();
+      }
+    } catch (err) {
+      console.warn('Download status polling error:', err);
+    }
+  }
+
+  // Event Listeners Wiring
+  if (openHubBtn) openHubBtn.onclick = openHub;
+  if (closeHubBtn) closeHubBtn.onclick = closeHub;
+
+  if (openFolderBtn) {
+    openFolderBtn.onclick = async () => {
+      try {
+        await fetch('/v1/civitai/open-folder', { method: 'POST' });
+        showNotificationToast('📂 Opened models folder in Windows Explorer');
+      } catch (err) {
+        showNotificationToast('Failed to open models folder', false);
+      }
+    };
+  }
+
+  if (openVpnBtn) openVpnBtn.onclick = openNordVpn;
+  if (vpnStatusBtn) vpnStatusBtn.onclick = openNordVpn;
+  if (configureVpnFromBannerBtn) configureVpnFromBannerBtn.onclick = openNordVpn;
+  if (closeVpnBtn) closeVpnBtn.onclick = closeNordVpn;
+  if (closeVpnFooterBtn) closeVpnFooterBtn.onclick = closeNordVpn;
+
+  if (vpnTabProxy) vpnTabProxy.onclick = () => switchNordTab('proxy');
+  if (vpnTabApp) vpnTabApp.onclick = () => switchNordTab('app');
+  if (vpnTabDiag) vpnTabDiag.onclick = () => switchNordTab('diag');
+
+  if (serverPreset) {
+    serverPreset.onchange = () => {
+      const val = serverPreset.value;
+      if (val !== 'custom' && val.includes(':')) {
+        const [host, port] = val.split(':');
+        if (proxyHost) proxyHost.value = host;
+        if (proxyPort) proxyPort.value = port;
+      }
+    };
+  }
+
+  if (saveConfigBtn) saveConfigBtn.onclick = saveProxySettings;
+  if (testProxyBtn) testProxyBtn.onclick = testProxySettings;
+  if (runDiagBtn) runDiagBtn.onclick = checkVpnStatus;
+
+  if (launchAppBtn) {
+    launchAppBtn.onclick = () => {
+      window.location.href = 'nordvpn://';
+      showNotificationToast('Attempting to launch NordVPN app...');
+    };
+  }
+
+  if (closeDetailBtn) {
+    closeDetailBtn.onclick = () => {
+      if (detailsModal) detailsModal.classList.add('hidden');
+    };
+  }
+
+  // Category Tabs
+  if (categoryTabs) {
+    const tabBtns = categoryTabs.querySelectorAll('.civitai-tab-btn');
+    tabBtns.forEach(btn => {
+      btn.onclick = () => {
+        tabBtns.forEach(b => {
+          b.classList.remove('active');
+          b.style.color = '';
+          b.style.borderColor = '';
+          b.style.background = '';
+        });
+        btn.classList.add('active');
+        btn.style.color = '#60a5fa';
+        btn.style.borderColor = '#3b82f6';
+        btn.style.background = 'rgba(59, 130, 246, 0.15)';
+
+        currentTab = btn.getAttribute('data-type') || 'all';
+        isLoading = false;
+        fetchModels(1);
+      };
+    });
+  }
+
+  if (baseModelSelect) baseModelSelect.onchange = () => fetchModels(1);
+  if (sortSelect) sortSelect.onchange = () => fetchModels(1);
+  if (periodSelect) periodSelect.onchange = () => fetchModels(1);
+  if (nsfwToggle) nsfwToggle.onchange = () => fetchModels(1);
+  if (refreshBtn) refreshBtn.onclick = () => fetchModels(1);
+
+  if (searchBtn) searchBtn.onclick = () => fetchModels(1);
+  if (searchInput) {
+    searchInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        fetchModels(1);
+      }
+    };
+  }
+
+  if (quickPills) {
+    const pills = quickPills.querySelectorAll('.civitai-pill');
+    pills.forEach(pill => {
+      pill.onclick = () => {
+        const query = pill.getAttribute('data-query') || '';
+        if (searchInput) searchInput.value = query;
+        fetchModels(1);
+      };
+    });
+  }
+
+  if (loadMoreBtn) {
+    loadMoreBtn.onclick = () => {
+      if (currentPage < totalPages) {
+        fetchModels(currentPage + 1, true);
+      }
+    };
+  }
+
+  // Modal Backdrop Dismiss & Escape Key
+  [hubModal, vpnModal, detailsModal].forEach(modal => {
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          modal.classList.add('hidden');
+        }
+      };
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (detailsModal && !detailsModal.classList.contains('hidden')) {
+        detailsModal.classList.add('hidden');
+      } else if (vpnModal && !vpnModal.classList.contains('hidden')) {
+        vpnModal.classList.add('hidden');
+      } else if (hubModal && !hubModal.classList.contains('hidden')) {
+        hubModal.classList.add('hidden');
+      }
+    }
+  });
+
+  function checkCivitaiHash() {
+    if (window.location.hash === '#civitai') {
+      openHub();
+    }
+  }
+  checkCivitaiHash();
+  window.addEventListener('hashchange', checkCivitaiHash);
+
+  // Initial check of installed models, active downloads & VPN probe
+  updateInstalledCount();
+  checkVpnStatus();
+  startDownloadPolling();
+  if (typeof syncCivitaiInstalledToStudio === 'function') {
+    syncCivitaiInstalledToStudio();
+  }
+}
+
 

@@ -8,8 +8,21 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "art:server": "python scripts/local_art_server.py",
-    "build": "tsc && node -e \"fs.cpSync('src/web', 'dist/web', {recursive: true}); if (fs.existsSync('src/engine/gpu-art.py')) fs.cpSync('src/engine/gpu-art.py', 'dist/engine/gpu-art.py')\"",
-    "test": "vitest run"
+    "build": "tsc && node -e \"fs.cpSync('src/web', 'dist/web', {recursive: true}); if (fs.existsSync('src/engine')) fs.cpSync('src/engine', 'dist/engine', {recursive: true, filter: (s) => s.endsWith('.py') || fs.statSync(s).isDirectory()})\"",
+    "build:bundle": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.bundle.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "build:exe": "powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1",
+    "build:exe:quick": "powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1 -SkipTests",
+    "build:exe:selfcontained": "powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1 -SelfContained",
+    "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1 -SkipTests",
+    "test": "vitest run",
+    "test:chaos": "vitest run tests/chaos-resilience.test.ts",
+    "mock:upstream": "tsx src/testing/mock-upstream-server.ts",
+    "learning:benchmark": "tsx scripts/benchmark-suite.ts",
+    "learning:self-correct": "tsx scripts/self-correcting-benchmark.ts",
+    "learning:doctor": "tsx scripts/learning-doctor.ts",
+    "learning:refresh": "tsx scripts/refresh-learning-sources.ts",
+    "learning:maintain": "tsx scripts/learning-maintenance.ts",
+    "learning:evolve": "tsx scripts/autonomous-learning-lab.ts"
   },
   "keywords": [
     "ai",

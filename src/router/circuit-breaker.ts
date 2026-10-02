@@ -76,6 +76,10 @@ export class CircuitBreaker {
     return result;
   }
 
+  resetCircuit(provider: string, model: string) {
+    this.circuits.delete(this.getKey(provider, model));
+  }
+
   reset() {
     this.circuits.clear();
   }

@@ -1,11 +1,15 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 let token = process.env.PROMPTFORGE_TOKEN;
 if (!token) {
   try {
-    const cfg = JSON.parse(fs.readFileSync('C:\\Users\\adria\\AppData\\Local\\PromptForgeRTX\\config.json', 'utf8'));
-    token = cfg.api_token;
+    const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : path.join(require('os').homedir(), 'AppData', 'Local'));
+    const cfgPath = path.join(localAppData, 'PromptForgeRTX', 'config.json');
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      token = cfg.api_token;
+    }
   } catch(e){}
 }
 

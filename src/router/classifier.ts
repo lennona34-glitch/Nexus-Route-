@@ -22,16 +22,23 @@ export class IntentClassifier {
     const hasVision = messages.some(m => Array.isArray(m.content) && m.content.some(p => p.type === 'image_url'));
     const hasTools = Array.isArray(req.tools) && req.tools.length > 0;
 
-    // 1. Check for Trivial / Greetings / Short ping
-    const trivialWords = ['hi', 'hello', 'hey', 'ping', 'test', 'are you there', 'who are you', 'help', 'morning', 'thanks', 'thank you'];
-    const isTrivial = lastText.length < 35 && trivialWords.some(w => lastText.trim() === w || lastText.startsWith(w + ' ') || lastText.endsWith(' ' + w));
+    // 1. Check for Trivial / Greetings / Short ping / Acknowledgments
+    const trivialWords = [
+      'hi', 'hello', 'hey', 'ping', 'test', 'are you there', 'who are you', 'help',
+      'morning', 'good morning', 'evening', 'good evening', 'afternoon', 'good afternoon',
+      'thanks', 'thank you', 'cheers', 'howdy', 'yo', 'sup', "what's up", 'whats up',
+      'how are you', 'good day', 'ok', 'okay', 'cool', 'great', 'awesome', 'nice',
+      'sounds good', 'got it', 'understood', 'perfect', 'nice one', 'thank you so much'
+    ];
+    const cleanLast = lastText.trim().replace(/[!?.,;]+$/, '');
+    const isTrivial = cleanLast.length < 50 && trivialWords.some(w => cleanLast === w || cleanLast.startsWith(w + ' ') || cleanLast.endsWith(' ' + w));
     if (isTrivial) {
       return {
         category: 'TRIVIAL',
-        complexityScore: 0.1,
+        complexityScore: 0.05,
         recommendedTier: 'fast',
-        paretoExplanation: 'Low token count & conversational greeting detected. Routed to high-throughput, low-cost tier.',
-        hasTools,
+        paretoExplanation: 'Low token count & conversational greeting detected. Routed to high-throughput, zero-fluff tier.',
+        hasTools: false,
         hasVision,
       };
     }

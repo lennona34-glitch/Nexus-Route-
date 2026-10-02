@@ -29,6 +29,18 @@ function retryAfterMs(headers?: Headers): number | undefined {
   return Math.min(300_000, Math.max(1_000, date - Date.now()));
 }
 
+function extractRetryAfterFromBody(message: string): number | undefined {
+  if (!message) return undefined;
+  const match = message.match(/retry in\s+(\d+(?:\.\d+)?)\s*s/i) || message.match(/try again in\s+(\d+(?:\.\d+)?)\s*s/i);
+  if (match) {
+    const seconds = parseFloat(match[1]);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(300_000, Math.ceil(seconds * 1000));
+    }
+  }
+  return undefined;
+}
+
 function normalizeUpstreamError(payload: unknown, fallback: string, headers?: Headers): NormalizedUpstreamError {
   const root = payload && typeof payload === 'object' ? payload as Record<string, any> : {};
   const error = root.error && typeof root.error === 'object'
@@ -47,10 +59,12 @@ function normalizeUpstreamError(payload: unknown, fallback: string, headers?: He
       ? root.failed_generation
       : undefined;
 
+  const retryMs = retryAfterMs(headers) ?? extractRetryAfterFromBody(detailed || fallback);
+
   return {
     message: `${providerName ? `${providerName}: ` : ''}${detailed || fallback}`,
     code: error.code ?? root.code,
-    retryAfterMs: retryAfterMs(headers),
+    retryAfterMs: retryMs,
     failedGeneration,
   };
 }
@@ -86,6 +100,21 @@ function isToolUnsupportedError(status: number, message?: string): boolean {
   );
 }
 
+function isReasoningUnsupportedError(status: number, message?: string): boolean {
+  if (!message) return false;
+  return (
+    /reasoningEffort/i.test(message) ||
+    /reasoning_effort/i.test(message) ||
+    /does not support parameter reasoning/i.test(message) ||
+    /does not support reasoning/i.test(message) ||
+    /does not support thinking/i.test(message) ||
+    /unsupported parameter: ['"]?reasoning/i.test(message) ||
+    /unrecognized request argument: ['"]?reasoning/i.test(message) ||
+    /unknown parameter.*reasoning/i.test(message) ||
+    /extra fields not permitted.*reasoning/i.test(message)
+  );
+}
+
 function upstreamErrorMessage(provider: ProviderType, kind: 'request' | 'stream', status: number, error: NormalizedUpstreamError): string {
   const code = error.code !== undefined && String(error.code) !== String(status) ? `, code ${error.code}` : '';
   return `${provider} ${kind} error (${status}${code}): ${error.message}`;
@@ -103,20 +132,77 @@ function normalizeToolArgumentObject(value: unknown): string {
   }
 }
 
-function normalizeMessages(req: UniversalRequest): UniversalRequest['messages'] {
-  return req.messages.map(message => message.tool_calls?.length
-    ? {
-        ...message,
-        tool_calls: message.tool_calls.map((toolCall, index) => ({
-          id: toolCall.id || `call_${Date.now()}_${index}`,
-          type: 'function' as const,
-          function: {
-            name: String(toolCall.function?.name || ''),
-            arguments: normalizeToolArgumentObject((toolCall.function as any)?.arguments),
-          },
-        })),
+function isVisionModel(provider: ProviderType, model: string): boolean {
+  if (provider === 'deepseek') return false;
+  const m = model.toLowerCase();
+  if (m.includes('vision') || m.includes('-vl') || m.includes('4o') || m.includes('claude-3') || m.includes('pixtral') || m.includes('gemini') || m.includes('grok-2-vision')) {
+    return true;
+  }
+  if (provider === 'anthropic' || provider === 'gemini') return true;
+  return false;
+}
+
+function normalizeMessages(req: UniversalRequest, isVisionSupported = true, provider: ProviderType = 'openai'): UniversalRequest['messages'] {
+  return req.messages.map(message => {
+    let content = message.content;
+    if (!isVisionSupported) {
+      if (Array.isArray(content)) {
+        const textParts: string[] = [];
+        for (const part of content) {
+          if (part.type === 'text' && part.text) {
+            textParts.push(part.text);
+          } else if (part.type === 'image_url') {
+            textParts.push('[Attached image]');
+          }
+        }
+        content = textParts.join('\n').trim() || '[Attached image]';
+      } else if (typeof content === 'string') {
+        content = content.replace(/!\[.*?\]\(data:image\/[^;]+;base64,[^\)]+\)/g, '[Attached image]');
       }
-    : message);
+    }
+
+    if (message.role === 'assistant' && typeof content === 'string') {
+      const stripped = content
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+        .trim();
+      content = stripped.length > 0 ? stripped : (message.tool_calls?.length ? '' : content);
+    }
+
+    let reasoning_content = message.reasoning_content;
+    const supportsReasoningContentProperty = provider === 'deepseek' || provider === 'cheaperinference';
+
+    if (provider === 'deepseek' && message.role === 'assistant') {
+      // DeepSeek strictly requires reasoning_content on assistant messages in multi-turn tool calling
+      if (!reasoning_content && message.tool_calls?.length) {
+        reasoning_content = typeof content === 'string' && content.trim() ? content : 'Executing requested tool calls.';
+      }
+    }
+
+    const cleanedMsg: any = {
+      role: message.role,
+      content: content ?? '',
+    };
+    if (message.name) cleanedMsg.name = message.name;
+    if (message.tool_call_id) cleanedMsg.tool_call_id = message.tool_call_id;
+
+    if (supportsReasoningContentProperty && reasoning_content) {
+      cleanedMsg.reasoning_content = reasoning_content;
+    }
+
+    if (message.tool_calls?.length) {
+      cleanedMsg.tool_calls = message.tool_calls.map((toolCall, index) => ({
+        id: toolCall.id || `call_${Date.now()}_${index}`,
+        type: 'function' as const,
+        function: {
+          name: String(toolCall.function?.name || ''),
+          arguments: normalizeToolArgumentObject((toolCall.function as any)?.arguments),
+        },
+      }));
+    }
+    return cleanedMsg;
+  });
 }
 
 // Only Anthropic models need - and accept - an explicit cache breakpoint here.
@@ -128,13 +214,19 @@ function cachingSupported(model: string): boolean {
 
 export class OpenAIAdapter implements ProviderAdapter {
   readonly provider: ProviderType;
-  protected baseUrl: string;
-  protected apiKey?: string;
+  protected config?: { provider?: ProviderType; baseUrl?: string; apiKey?: string };
 
   constructor(config?: { provider?: ProviderType; baseUrl?: string; apiKey?: string }) {
     this.provider = config?.provider || 'openai';
-    this.baseUrl = config?.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-    this.apiKey = config?.apiKey || process.env.OPENAI_API_KEY;
+    this.config = config;
+  }
+
+  protected get baseUrl(): string {
+    return this.config?.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+  }
+
+  protected get apiKey(): string | undefined {
+    return this.config?.apiKey || process.env.OPENAI_API_KEY;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -144,6 +236,7 @@ export class OpenAIAdapter implements ProviderAdapter {
   private getHeaders(sessionId?: string): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'User-Agent': 'NexusRoute/1.3.0 (+https://github.com/nexusroute/nexus-route)',
     };
     if (this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
@@ -171,26 +264,53 @@ export class OpenAIAdapter implements ProviderAdapter {
     let m = targetModel;
     const discoveredPrefix = `${this.provider}::`;
     if (m.startsWith(discoveredPrefix)) return m.slice(discoveredPrefix.length);
+
     if (this.provider === 'openrouter') {
       if (m.startsWith('openrouter/') && (m === 'openrouter/free' || m === 'openrouter/auto' || m.startsWith('openrouter/flavor-'))) {
         return m;
       }
+      if (m.startsWith('openrouter/')) return m.slice(11);
+      return m;
     }
-    if (m.startsWith('openrouter/')) m = m.slice(11);
-    if (m.startsWith('groq/')) m = m.slice(5);
-    if (m.startsWith('together/')) m = m.slice(9);
-    if (m.startsWith('github/')) m = m.slice(7);
-    if (m.startsWith('deepseek/')) m = m.slice(9);
-    if (m.startsWith('mistral/')) m = m.slice(8);
-    if (m.startsWith('xai/')) m = m.slice(4);
-    if (m.startsWith('ollama/')) m = m.slice(7);
+
+    if (this.provider === 'ollama' || this.provider === 'local') {
+      while (m.startsWith('ollama/') || m.startsWith('local/')) {
+        if (m.startsWith('ollama/')) m = m.slice(7);
+        else if (m.startsWith('local/')) m = m.slice(6);
+      }
+      return m;
+    }
+
+    const slashPrefix = `${this.provider}/`;
+    if (m.startsWith(slashPrefix)) {
+      return m.slice(slashPrefix.length);
+    }
     return m;
   }
 
+  protected supportsReasoningEffort(targetModel: string): boolean {
+    const m = targetModel.toLowerCase();
+    if (this.provider === 'openai') {
+      return m.includes('o1') || m.includes('o3') || m.includes('o4') || m.includes('reasoner') || m.includes('reasoning');
+    }
+    if (this.provider === 'xai') {
+      return m.includes('reasoner') || (m.includes('grok-3') && m.includes('mini'));
+    }
+    if (this.provider === 'openrouter') {
+      return m.includes('o1') || m.includes('o3') || m.includes('o4') || m.includes('reasoner') || m.includes('r1') || m.includes('qwq');
+    }
+    if (this.provider === 'local') {
+      return m.includes('r1') || m.includes('deepseek-r1') || m.includes('qwq') || m.includes('reasoner') || m.includes('qwen3') || m.includes('brain');
+    }
+    return m.includes('reasoner') || m.includes('reasoning') || m.includes('o1') || m.includes('o3');
+  }
+
   protected buildPayload(req: UniversalRequest, targetModel: string, stream: boolean): Record<string, unknown> {
+    const cleanedModel = this.cleanModel(targetModel);
+    const visionSupported = isVisionModel(this.provider, cleanedModel);
     const payload: Record<string, unknown> = {
-      model: this.cleanModel(targetModel),
-      messages: normalizeMessages(req),
+      model: cleanedModel,
+      messages: normalizeMessages(req, visionSupported, this.provider),
       stream,
     };
     if (stream) {
@@ -199,6 +319,9 @@ export class OpenAIAdapter implements ProviderAdapter {
     if (req.temperature !== undefined) payload.temperature = req.temperature;
     if (req.top_p !== undefined) payload.top_p = req.top_p;
     if (req.user !== undefined) payload.user = req.user;
+    if (req.reasoning_effort !== undefined && req.reasoning_effort !== 'none' && this.supportsReasoningEffort(targetModel)) {
+      payload.reasoning_effort = req.reasoning_effort;
+    }
 
     if (this.provider === 'openrouter') {
       if (req.session_id) payload.session_id = req.session_id;
@@ -301,6 +424,13 @@ export class OpenAIAdapter implements ProviderAdapter {
       if ((res.status === 400 || res.status === 404 || res.status === 422) && isToolUnsupportedError(res.status, upstreamError.message) && payload.tools) {
         return this.chatCompletion({ ...req, tools: undefined, tool_choice: undefined }, targetModel);
       }
+      const hasReasoningParam = payload.reasoning_effort !== undefined || (payload as any).reasoningEffort !== undefined || (payload as any).thinking !== undefined || (payload as any).think !== undefined || req.reasoning_effort !== undefined;
+      if ((res.status === 400 || res.status === 404 || res.status === 422) && isReasoningUnsupportedError(res.status, upstreamError.message) && hasReasoningParam) {
+        const cleanedReq = { ...req, reasoning_effort: undefined };
+        delete (cleanedReq as any).thinking;
+        delete (cleanedReq as any).think;
+        return this.chatCompletion(cleanedReq, targetModel);
+      }
       if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
         return {
           id: `salvage-${Date.now()}`,
@@ -372,6 +502,14 @@ export class OpenAIAdapter implements ProviderAdapter {
       const upstreamError = await readUpstreamError(res);
       if ((res.status === 400 || res.status === 404 || res.status === 422) && isToolUnsupportedError(res.status, upstreamError.message) && payload.tools) {
         yield* this.streamChatCompletion({ ...req, tools: undefined, tool_choice: undefined }, targetModel);
+        return;
+      }
+      const hasReasoningParam = payload.reasoning_effort !== undefined || (payload as any).reasoningEffort !== undefined || (payload as any).thinking !== undefined || (payload as any).think !== undefined || req.reasoning_effort !== undefined;
+      if ((res.status === 400 || res.status === 404 || res.status === 422) && isReasoningUnsupportedError(res.status, upstreamError.message) && hasReasoningParam) {
+        const cleanedReq = { ...req, reasoning_effort: undefined };
+        delete (cleanedReq as any).thinking;
+        delete (cleanedReq as any).think;
+        yield* this.streamChatCompletion(cleanedReq, targetModel);
         return;
       }
       if (upstreamError.code === 'tool_use_failed' && upstreamError.failedGeneration) {
@@ -459,13 +597,11 @@ export class OpenAIAdapter implements ProviderAdapter {
               );
             }
             const chunk = this.attachOpenRouterUsageMetadata(parsed as any);
-            // Normalize DeepSeek reasoning_content into content / reasoning stream so UI never stalls
+            // Preserve DeepSeek reasoning_content as reasoning metadata without polluting user content
             if (chunk.choices?.[0]?.delta) {
               const delta = chunk.choices[0].delta;
-              if (delta.reasoning_content && !delta.content) {
+              if (delta.reasoning_content) {
                 delta.reasoning = delta.reasoning_content;
-                // If client only handles content, wrap or stream reasoning content
-                delta.content = delta.reasoning_content;
               }
             }
             yield chunk as UniversalStreamChunk;
