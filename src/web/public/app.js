@@ -12369,20 +12369,20 @@ function initHfHub() {
       const name = m.repoId.includes('/') ? m.repoId.split('/')[1] : m.repoId;
 
       const statusBadge = isIncomplete
-        ? `<span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">${badgeLabel}</span>`
-        : `<span class="badge ${badgeClass}" style="font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">${badgeLabel}</span>`;
+        ? `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(239, 68, 68, 0.45); color: #f87171; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;">${badgeLabel}</span>`
+        : `<span class="badge ${badgeClass}" style="background: rgba(10, 15, 29, 0.88); font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;">${badgeLabel}</span>`;
 
       let installedPill = '';
       if (isIncomplete) {
-        installedPill = `<span style="background: rgba(239, 68, 68, 0.1); color: #fca5a5; font-size: 11px; padding: 2px 8px; border-radius: 10px;">Missing Weights</span>`;
+        installedPill = `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(239, 68, 68, 0.45); color: #fca5a5; font-size: 10px; padding: 2px 8px; border-radius: 8px;">Missing Weights</span>`;
       } else if (isGguf) {
         if (m.isRegisteredInOllama) {
-          installedPill = `<span style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ Active in Chat</span>`;
+          installedPill = `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(168, 85, 247, 0.45); color: #c084fc; font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600;">✅ Active in Chat</span>`;
         } else {
-          installedPill = `<span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">⚡ Downloaded on Disk</span>`;
+          installedPill = `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600;">⚡ Downloaded</span>`;
         }
       } else {
-        installedPill = `<span style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ GPU Cached</span>`;
+        installedPill = `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600;">✅ GPU Cached</span>`;
       }
 
       let actionButtons = '';
@@ -12437,7 +12437,7 @@ function initHfHub() {
       cardsHtml += `
         <div class="hf-model-card ${isIncomplete ? '' : 'is-installed'}" data-model="${escapeHtml(m.repoId)}" style="${isIncomplete ? 'border-color: rgba(239, 68, 68, 0.35); background: rgba(25, 15, 20, 0.6);' : ''}">
           <div class="hf-card-media" data-model="${escapeHtml(m.repoId)}" title="Click to view full preview gallery & README">
-            <img class="hf-card-img" src="${escapeHtml(thumb)}" alt="${escapeHtml(name)}" loading="lazy" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+            <img class="hf-card-img" src="${escapeHtml(thumb)}" alt="${escapeHtml(name)}" loading="lazy" decoding="async" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
             <div class="hf-card-media-banner ${bannerClass}" style="display: none;">
               <span class="hf-banner-icon">${bannerIcon}</span>
               <div class="hf-banner-title">${escapeHtml(name)}</div>
@@ -12627,20 +12627,20 @@ function initHfHub() {
       }
 
       const vramBadge = m.is8GbSafe !== false
-        ? `<span style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.35); color: #22c55e; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;" title="Safe for 8GB RTX 4060 GPU">⚡ 8GB Safe</span>`
-        : `<span style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;" title="Exceeds 8GB VRAM">🔴 High VRAM (>10GB)</span>`;
+        ? `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;" title="Safe for 8GB RTX 4060 GPU">⚡ 8GB Safe</span>`
+        : `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(239, 68, 68, 0.45); color: #f87171; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700;" title="Exceeds 8GB VRAM">🔴 High VRAM (>10GB)</span>`;
 
       const gatedBadge = m.gated
-        ? `<a href="https://huggingface.co/${escapeHtml(m.id)}" target="_blank" rel="noopener noreferrer" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Gated model: Requires accepting author's license on Hugging Face & saving token below">🔒 Gated ↗</a>`
+        ? `<a href="https://huggingface.co/${escapeHtml(m.id)}" target="_blank" rel="noopener noreferrer" style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Gated model: Requires accepting author's license on Hugging Face & saving token below">🔒 Gated ↗</a>`
         : '';
 
       const triggerBadge = m.triggerWord
-        ? `<span style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700; white-space: nowrap;" title="Trigger Word: ${escapeHtml(m.triggerWord)}">🎯 ${escapeHtml(m.triggerWord)}</span>`
+        ? `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; font-size: 10px; padding: 2px 7px; border-radius: 8px; font-weight: 700; white-space: nowrap;" title="Trigger Word: ${escapeHtml(m.triggerWord)}">🎯 ${escapeHtml(m.triggerWord)}</span>`
         : '';
 
       const installedPill = m.isInstalled
-        ? `<span style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">✅ In GPU Cache</span>`
-        : `<span style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); font-size: 11px; padding: 2px 8px; border-radius: 10px;">Cloud</span>`;
+        ? `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(34, 197, 94, 0.45); color: #4ade80; font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600;">✅ GPU Cached</span>`
+        : `<span style="background: rgba(10, 15, 29, 0.88); border: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600;">Cloud</span>`;
 
       let actionRow = '';
       if (m.isInstalled) {
@@ -12664,10 +12664,10 @@ function initHfHub() {
       } else {
         const pullText = isGguf ? '📥 Pull' : '📥 Download';
         actionRow = `
-          <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="primary-btn hf-download-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" data-safe="${m.is8GbSafe !== false}" data-gated="${!!m.gated}" style="font-size: 11px; font-weight: 700; padding: 6px 11px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; cursor: pointer; border-radius: 6px;">${pullText}</button>
-            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="View sample output images, trigger words and README in-app">📖 Previews</button>
-            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="Inspect individual files & pick exact weights for 8GB GPU">📂 Files</button>
+          <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="primary-btn hf-download-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" data-safe="${m.is8GbSafe !== false}" data-gated="${!!m.gated}" style="font-size: 11px; font-weight: 700; padding: 5px 9px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; cursor: pointer; border-radius: 6px;">${pullText}</button>
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 5px 7px; cursor: pointer;" title="View sample output images, trigger words and README in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 5px 7px; cursor: pointer;" title="Inspect individual files & pick exact weights for 8GB GPU">📂 Files</button>
           </div>
         `;
       }
@@ -12692,7 +12692,7 @@ function initHfHub() {
 
       const mediaHtml = `
         <div class="hf-card-media" data-model="${escapeHtml(m.id)}" title="Click to view full preview gallery & README">
-          <img class="hf-card-img" src="${escapeHtml(thumb)}" alt="${escapeHtml(m.repoName || m.id)}" loading="lazy" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+          <img class="hf-card-img" src="${escapeHtml(thumb)}" alt="${escapeHtml(m.repoName || m.id)}" loading="lazy" decoding="async" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
           <div class="hf-card-media-banner ${bannerClass}" style="display: none;">
             <span class="hf-banner-icon">${bannerIcon}</span>
             <div class="hf-banner-title">${escapeHtml(m.repoName || m.id)}</div>

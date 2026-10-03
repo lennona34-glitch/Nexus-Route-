@@ -3246,27 +3246,70 @@ body.screen-disappearing {
 }
 
 /* ==========================================================================
-   Hugging Face Model Hub Workstation
+   Hugging Face Model Hub Workstation & Butter-Smooth Responsive Grid
    ========================================================================== */
+.hf-grid-container {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+  position: relative;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  contain: layout;
+}
+
+.hf-grid-container::-webkit-scrollbar,
+#hfModelGridContainer::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.hf-grid-container::-webkit-scrollbar-track,
+#hfModelGridContainer::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.hf-grid-container::-webkit-scrollbar-thumb,
+#hfModelGridContainer::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.35);
+  border-radius: 4px;
+}
+
+.hf-grid-container::-webkit-scrollbar-thumb:hover,
+#hfModelGridContainer::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.6);
+}
+
+.hf-models-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
 .hf-model-card {
   background: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 0;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   position: relative;
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: 260px 320px;
 }
 
 .hf-model-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   border-color: rgba(245, 158, 11, 0.55);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65), 0 0 20px rgba(245, 158, 11, 0.2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.18);
 }
 
 .hf-model-card.is-installed {
@@ -3275,14 +3318,14 @@ body.screen-disappearing {
 
 .hf-model-card.is-installed:hover {
   border-color: rgba(34, 197, 94, 0.65);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65), 0 0 20px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(34, 197, 94, 0.2);
 }
 
 /* Card Visual Media & Thumbnail Area */
 .hf-card-media {
   position: relative;
   width: 100%;
-  height: 180px;
+  height: 170px;
   background: #090d16;
   overflow: hidden;
   cursor: pointer;
@@ -3295,12 +3338,12 @@ body.screen-disappearing {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
+  transition: transform 0.3s ease;
   display: block;
 }
 
 .hf-model-card:hover .hf-card-img {
-  transform: scale(1.06);
+  transform: scale(1.05);
 }
 
 /* Procedural Aesthetic Fallback Banners for GGUFs, Text Models & Models without images */
@@ -3312,24 +3355,24 @@ body.screen-disappearing {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 16px;
+  padding: 14px;
   position: relative;
   box-sizing: border-box;
 }
 
 .hf-banner-icon {
-  font-size: 38px;
-  margin-bottom: 6px;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  font-size: 34px;
+  margin-bottom: 5px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
   transition: transform 0.3s ease;
 }
 
 .hf-model-card:hover .hf-banner-icon {
-  transform: scale(1.15) rotate(4deg);
+  transform: scale(1.12) rotate(3deg);
 }
 
 .hf-banner-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: #fff;
@@ -3341,12 +3384,12 @@ body.screen-disappearing {
 }
 
 .hf-banner-subtitle {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   opacity: 0.85;
-  margin-top: 4px;
+  margin-top: 3px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
 }
 
 /* Architecture Gradient Themes */
@@ -3378,9 +3421,9 @@ body.screen-disappearing {
 /* Badges floating over top of media */
 .hf-card-badges-top {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
+  top: 7px;
+  left: 7px;
+  right: 7px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -3391,7 +3434,7 @@ body.screen-disappearing {
 .hf-card-badges-left {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex-wrap: wrap;
   pointer-events: auto;
 }
@@ -3403,15 +3446,14 @@ body.screen-disappearing {
 .hf-card-badges-top .badge,
 .hf-card-badges-top span,
 .hf-card-badge-bottom span {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
 }
 
 .hf-card-badge-bottom {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 7px;
+  left: 7px;
   z-index: 2;
   pointer-events: auto;
 }
@@ -3421,12 +3463,11 @@ body.screen-disappearing {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
   pointer-events: none;
   z-index: 3;
 }
@@ -3436,16 +3477,16 @@ body.screen-disappearing {
 }
 
 .hf-card-hover-overlay span {
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(15, 23, 42, 0.92);
   border: 1px solid rgba(245, 158, 11, 0.6);
   color: #fbbf24;
   font-weight: 700;
-  font-size: 11.5px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  transform: translateY(4px);
-  transition: transform 0.25s ease;
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: translateY(3px);
+  transition: transform 0.2s ease;
 }
 
 .hf-model-card:hover .hf-card-hover-overlay span {
@@ -3454,17 +3495,17 @@ body.screen-disappearing {
 
 /* Card Body Section */
 .hf-card-body {
-  padding: 12px 14px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   flex: 1;
   justify-content: space-between;
   background: #0f172a;
 }
 
 .hf-card-author {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-muted);
   font-weight: 500;
   display: flex;
@@ -3474,8 +3515,9 @@ body.screen-disappearing {
 
 .hf-card-title {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13.5px;
   color: #f8fafc;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3491,28 +3533,28 @@ body.screen-disappearing {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 11px;
   color: #94a3b8;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .hf-pipeline-badge {
   background: rgba(255, 255, 255, 0.06);
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--text-muted);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .hf-card-actions {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
-  margin-top: 6px;
+  padding-top: 8px;
+  margin-top: 4px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .hf-link-btn {
@@ -3537,6 +3579,7 @@ body.screen-disappearing {
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.45);
 }
+
 
 .hf-card-type-lora {
   background: rgba(192, 132, 252, 0.2);
@@ -5575,6 +5618,8 @@ body.modal-zen-active {
 .modal-overlay.modal-maximized .studio-body,
 .modal-overlay.modal-maximized .pf-body,
 .modal-overlay.modal-maximized .modal-body,
+.modal-overlay.modal-maximized #hfModelGridContainer,
+.modal-overlay.modal-maximized .hf-grid-container,
 .modal-overlay.modal-maximized #hfModelGrid,
 .modal-overlay.modal-maximized #civitaiViewport,
 .modal-overlay.modal-maximized #civitaiCardsGrid,
