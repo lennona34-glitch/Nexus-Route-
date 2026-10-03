@@ -208,10 +208,7 @@ const providerModelDiscovery = new ProviderModelDiscovery(router.getConnectionMa
 const keyManager = new KeyManager();
 
 // Nexus Mesh: P2P & Hub Sharing Engine
-const meshShareManager = new ShareManager([
-  path.resolve(process.cwd(), 'shared'),
-  path.resolve(process.cwd(), 'workspace')
-]);
+const meshShareManager = new ShareManager();
 const meshHub = new MeshHub(meshShareManager, {
   handle: process.env.NEXUS_HANDLE || 'NexusHost',
   avatar: '⚡',

@@ -38,18 +38,16 @@ export class NexusStudioEngine {
   private static cachedVoices: TtsVoiceInfo[] | null = null;
   private static voicesCacheTime = 0;
 
+  public static getStudioAudioDir(): string {
+    const audioDir = path.resolve(process.cwd(), 'shared', 'audio');
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+    }
+    return audioDir;
+  }
+
   public static getMaestroOutputsDir(): string {
-    const userProfile = process.env.USERPROFILE || os.homedir();
-    const defaultPath = process.env.MAESTRO_OUTPUTS_DIR || path.join(userProfile, 'Desktop', 'Maestro AI', 'app', 'outputs');
-    if (fs.existsSync(defaultPath)) {
-      return defaultPath;
-    }
-    // Fallback to shared/audio/maestro
-    const fallbackPath = path.resolve(process.cwd(), 'shared', 'audio', 'maestro');
-    if (!fs.existsSync(fallbackPath)) {
-      fs.mkdirSync(fallbackPath, { recursive: true });
-    }
-    return fallbackPath;
+    return this.getStudioAudioDir();
   }
 
   /**
@@ -167,40 +165,307 @@ $synth.Dispose()
   }
 
   /**
-   * Generate structured lyrics using local Ollama model or procedural lyrical fallbacks
+   * Procedural lyrical generator tailored to musical structure and genre
+   */
+  public static buildProceduralLyrics(
+    prompt: string,
+    genre: string,
+    mood: string,
+    vocalStyle: string,
+    structureType = 'pop',
+    rhymeScheme = 'aabb',
+    vocalCues = true
+  ): string {
+    const cue = (text: string) => vocalCues ? `(${text})\n` : '';
+
+    if (structureType === 'edm') {
+      return `[Intro - Atmospheric Filter Sweep]
+${cue('Soft filtered arpeggio, sub-bass pulse rises')}
+Drifting through the digital deep
+Signals running while the cities sleep
+Lost inside the neon light
+Chasing frequencies tonight
+
+[Buildup - Accelerating Percussion]
+${cue('Snare roll begins, rising cutoff filter')}
+Feel the pressure starting to climb
+Leaving the weight of the world behind
+Three, two, one — ignite!
+
+[Main Drop - Heavy Bass & Lead Hook]
+${cue('Full dynamic drop, sidechained synth leads')}
+Hold the line! Ride the sound!
+We are the pulse running through this ground!
+Echoes shatter, sparks ignite!
+Lost in the rhythm of the neon night!
+
+[Verse - Rhythmic Vocal Breakdown]
+${cue('Half-time groove, filtered lead vocals')}
+Binary code in an analog stream
+Waking up inside an electric dream
+Wires hum with a velvet glow
+Nowhere else we need to go
+
+[Buildup - Rising Energy]
+${cue('Double-time snare roll, soaring riser sweep')}
+Hear the frequency start to break
+Feel the ground beneath us shake!
+Drop it!
+
+[Peak Drop - Maximum Euphoria]
+${cue('Maximum stereo width, soaring lead synth')}
+Hold the line! Ride the sound!
+Feet never touching the solid ground!
+Through the lightning, through the spark
+We are the fire inside the dark!
+
+[Breakdown - Atmospheric Chill]
+${cue('Reverb-drenched vocal delays, gentle pad')}
+When the morning steals the glow
+We'll still be where the currents flow...
+
+[Outro - Fading Pulse]
+${cue('Sub-bass fades out with distant echoes')}
+Electric dream...
+Fading to light...
+Static remains.`;
+    }
+
+    if (structureType === 'hiphop') {
+      return `[Intro - Ambient Loop & DJ Tag]
+${cue('Vinyl crackle, muted 808 sub and ambient piano loop')}
+Yeah, check the frequencies.
+Nexus in the cut.
+Turn the headphones up.
+
+[Verse 1 - 16 Bars]
+${cue('Crisp boom-bap kick and snap snare hit')}
+Writing formulas in notebooks under amber street lamps
+Stamping cold reality on digital timestamps
+Step into the cipher with the mindset of an architect
+Every sentence calibrated, cause and effect
+Spitting ironclad truths that the algorithm misses
+Turning quiet midnight visions into catalyst hits
+From the basement to the cloud, uninterrupted flow
+Setting fires in the winter where the roses won't grow
+Keep the blueprint sacred, never surrender the sound
+Build a sonic fortress while the city's breaking down
+Two turntables and an interface connected to space
+Leaving permanent footprints in this cybernetic race.
+
+[Hook / Chorus - Infectious Melody]
+${cue('Layered baritone harmony with punchy 808 slide')}
+We ride the rhythm when the skyline falls
+Echoing our names through the concrete halls
+Hold the vision in the darkest place
+Ain't no barrier we cannot erase!
+
+[Verse 2 - 16 Bars]
+${cue('Rapid-fire delivery, tight hi-hat rolls')}
+Clock ticks twelve, but the studio doesn't sleep
+Stacking audio tracks that the memory will keep
+Filter out the fake chatter, tune into the frequency
+Mastering the artistry and elevating decency
+Every kick drum resonates like thunder in the street
+Merging analog heartbeats with a sovereign beat.
+
+[Hook / Chorus - Double Harmonies]
+${cue('Double vocal track, rising hype ad-libs')}
+We ride the rhythm when the skyline falls
+Echoing our names through the concrete halls
+Hold the vision in the darkest place
+Ain't no barrier we cannot erase!
+
+[Outro - Fadeout & Ad-libs]
+${cue('Piano fades with low-pass filter')}
+Nexus sound.
+Yeah. Fade it out.`;
+    }
+
+    // Default Pop/Rock/Folk structure
+    return `[Intro - Atmospheric ${genre} Arpeggios]
+${cue('Soft guitar and vintage synth sweep')}
+
+[Verse 1]
+The neon skyline starts to blur and fade
+Lost in the echoes of decisions made
+Static is whispering across the wire
+Spark in the dark that ignites the fire
+
+[Pre-Chorus]
+${cue('Rising drums and swelling organ')}
+Can you feel the frequency pull us in?
+Where the signals stop and the dreams begin!
+
+[Chorus]
+${cue('Full band, powerful soaring delivery')}
+Hold on to the high-wire sound!
+Feet off the pavement, we're leaving the ground!
+Through the frequency and through the light
+We ride the sonic wave tonight!
+
+[Verse 2]
+Analog memories on a digital screen
+Living a life that was once unseen
+The clock is ticking but the tape won't slow
+Caught in the current and the afterglow
+
+[Chorus]
+${cue('Layered backing harmonies, wide stereo chorus')}
+Hold on to the high-wire sound!
+Feet off the pavement, we're leaving the ground!
+Through the frequency and through the light
+We ride the sonic wave tonight!
+
+[Bridge]
+${cue('Dynamic breakdown, intimate close-mic vocal')}
+And if the silence comes to take it all away
+We'll build an empire out of what we play...
+
+[Guitar / Synth Solo]
+${cue('16-bar melodic soaring solo with heavy reverb')}
+
+[Chorus - Final Climax]
+${cue('Maximum vocal power, key modulation')}
+Hold on to the high-wire sound!
+Feet off the pavement, we're leaving the ground!
+Through the frequency and through the light
+We ride the sonic wave tonight!
+
+[Outro]
+${cue('Gentle acoustic finish, trailing echoes')}
+Ride the sonic wave...
+Ride into the light...
+Fade to black.`;
+  }
+
+  /**
+   * Generate structured lyrics using local Ollama model, online gateway, or procedural lyrical fallbacks
    */
   public static async generateLyrics(params: {
     prompt: string;
     genre?: string;
     mood?: string;
     vocalStyle?: string;
+    structureType?: string;
+    rhymeScheme?: string;
+    vocalCues?: boolean;
+    provider?: 'offline' | 'online';
     model?: string;
-  }): Promise<{ lyrics: string; modelUsed: string; structure: string[] }> {
-    const { prompt, genre = 'Synthwave', mood = 'Energetic', vocalStyle = 'Melodic Baritone', model } = params;
-    const cleanPrompt = prompt.trim() || `Song about ${mood} vibes in ${genre}`;
+  }): Promise<{ lyrics: string; modelUsed: string; structure: string[]; provider: string }> {
+    const {
+      prompt,
+      genre = '80s Synthwave',
+      mood = 'Energetic',
+      vocalStyle = 'Melodic Baritone',
+      structureType = 'pop',
+      rhymeScheme = 'aabb',
+      vocalCues = true,
+      provider = 'offline',
+      model,
+    } = params;
+    const cleanPrompt = prompt?.trim() || `Song about ${mood} vibes in ${genre}`;
 
-    const systemPrompt = `You are a master AI lyricist and hit songwriter for modern music generators like YuE2, Suno, Udio, and ACE-Step.
-Write complete, high-impact song lyrics with explicit structural tags:
-[Intro]
-[Verse 1]
-[Pre-Chorus]
-[Chorus]
-[Verse 2]
-[Chorus]
-[Bridge]
-[Guitar / Synth Solo]
-[Chorus]
-[Outro]
+    let structureSections: string[];
+    switch (structureType) {
+      case 'edm':
+        structureSections = ['[Intro - Atmospheric Filter Sweep]', '[Buildup - Rising Energy]', '[Main Drop - Heavy Bass & Lead Hook]', '[Verse - Rhythmic Vocal Breakdown]', '[Buildup - Accelerating Percussion]', '[Peak Drop - Maximum Euphoria]', '[Breakdown - Atmospheric Chill]', '[Outro - Fading Pulse]'];
+        break;
+      case 'hiphop':
+        structureSections = ['[Intro - Ambient Loop & DJ Tag]', '[Verse 1 - 16 Bars]', '[Hook / Chorus - Infectious Melody]', '[Verse 2 - 16 Bars]', '[Hook / Chorus - Double Harmonies]', '[Bridge / Verse 3 - 8 Bars Rapid Delivery]', '[Outro - Fadeout & Ad-libs]'];
+        break;
+      case 'ballad':
+      case 'folk':
+        structureSections = ['[Verse 1 - Acoustic & Story Opening]', '[Verse 2 - Deepening Emotion]', '[Refrain - Melodic Core Theme]', '[Verse 3 - Building Intensity]', '[Chorus - Full Heartfelt Vocal Peak]', '[Verse 4 - Reflective Resolution]', '[Outro - Gentle Acoustic Decay]'];
+        break;
+      case 'rock':
+        structureSections = ['[Intro - Heavy Riff]', '[Verse 1 - Driving Rhythm]', '[Pre-Chorus - Rising Tension]', '[Chorus - Explosive Wall of Sound]', '[Verse 2 - Dynamic Restraint]', '[Chorus - Full Power]', '[Bridge / Breakdown]', '[Guitar Solo - Epic Melodic Shred]', '[Chorus - Climax]', '[Outro - Riff & Final Crash]'];
+        break;
+      case 'freeform':
+        structureSections = ['[Movement I - The Genesis]', '[Movement II - The Descent]', '[Movement III - The Climax]', '[Movement IV - The Resolution]'];
+        break;
+      case 'pop':
+      default:
+        structureSections = ['[Intro]', '[Verse 1]', '[Pre-Chorus]', '[Chorus]', '[Verse 2]', '[Chorus]', '[Bridge]', '[Solo / Breakdown]', '[Chorus]', '[Outro]'];
+        break;
+    }
 
-Guidelines:
-- Match the ${genre} genre and ${mood} mood with evocative lyrical imagery.
-- Ensure natural rhythm, cadence, and consistent rhyming schemes.
-- Add vocal cue annotations in parentheses where appropriate (e.g., (harmony), (whispered), (crescendo)).
-- Return ONLY the lyrics with the section headers.`;
+    let rhymeInstruction = '';
+    switch (rhymeScheme) {
+      case 'abab':
+        rhymeInstruction = 'Use strict ABAB alternating cross-rhyme schemes with consistent meter.';
+        break;
+      case 'multisyllable':
+        rhymeInstruction = 'Use dense internal rhymes, multi-syllabic end-rhymes, and rapid cadence.';
+        break;
+      case 'storytelling':
+        rhymeInstruction = 'Focus on rich narrative progression, vivid imagery, and organic folk/ballad rhyming couplets.';
+        break;
+      case 'freeform':
+        rhymeInstruction = 'Free verse poetry with artistic rhythm and occasional resonant slant rhymes.';
+        break;
+      case 'aabb':
+      default:
+        rhymeInstruction = 'Use clean, punchy AABB rhyming couplets with memorable hook phrases.';
+        break;
+    }
 
-    const chosenModel = model || 'gemma-4-e4b-uncensored-hauhaucs-aggressive-q4:latest';
+    const vocalCueText = vocalCues !== false
+      ? 'Include performance annotations in parentheses on appropriate lines (e.g., (harmony), (whispered), (belted), (synth solo), (falsetto)).'
+      : 'Do not include parenthetical vocal cue annotations.';
 
-    // Attempt generation via local Ollama
+    const systemPrompt = `You are a world-class AI lyricist and hit songwriter for modern music generators like YuE2, Suno, Udio, and ACE-Step.
+Write complete, high-impact song lyrics matching the following musical specifications:
+Genre: ${genre}
+Mood: ${mood}
+Vocal Style: ${vocalStyle}
+Song Structure: ${structureSections.join(' -> ')}
+Rhyme Scheme: ${rhymeInstruction}
+Vocal Cues: ${vocalCueText}
+
+Rules:
+- Write full, expressive verses and choruses for each section header: ${structureSections.join(', ')}.
+- Ensure natural rhythmic cadence and catchy singable phrasing.
+- Return ONLY the lyrics with the section headers. Do not include conversational commentary.`;
+
+    const chosenModel = model || (provider === 'online' ? 'deepseek-chat' : 'gemma-4-e4b-uncensored-hauhaucs-aggressive-q4:latest');
+
+    // 1. Attempt online generation via local chat endpoint if requested
+    if (provider === 'online') {
+      try {
+        const chatResp = await fetch('http://127.0.0.1:3000/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: chosenModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Write song lyrics about: ${cleanPrompt}` },
+            ],
+            temperature: 0.8,
+            max_tokens: 1500,
+          }),
+        });
+
+        if (chatResp.ok) {
+          const data = (await chatResp.json()) as any;
+          const lyrics = data.choices?.[0]?.message?.content?.trim();
+          if (lyrics) {
+            const structure = Array.from(lyrics.matchAll(/\[(.*?)\]/g)).map(m => (m as any)[1]);
+            return {
+              lyrics,
+              modelUsed: chosenModel,
+              provider: 'online',
+              structure: structure.length ? structure : structureSections.map(s => s.replace(/[[\]]/g, '')),
+            };
+          }
+        }
+      } catch (err: any) {
+        console.warn('[StudioEngine] Online lyric generation failed, attempting local Ollama:', err.message);
+      }
+    }
+
+    // 2. Attempt generation via local Ollama
     try {
       const ollamaResp = await fetch('http://127.0.0.1:11434/api/generate', {
         method: 'POST',
@@ -224,7 +489,8 @@ Guidelines:
           return {
             lyrics,
             modelUsed: chosenModel,
-            structure: structure.length ? structure : ['Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Outro'],
+            provider: 'offline',
+            structure: structure.length ? structure : structureSections.map(s => s.replace(/[[\]]/g, '')),
           };
         }
       }
@@ -232,59 +498,13 @@ Guidelines:
       console.warn('[StudioEngine] Local Ollama lyric generation failed, using procedural fallback:', err.message);
     }
 
-    // Procedural lyrical fallback if offline model isn't active
-    const fallbackLyrics = `[Intro - Atmospheric ${genre} Arpeggios]
-(Soft synth sweep, distant heartbeat beat)
-
-[Verse 1]
-The neon skyline starts to blur and fade
-Lost in the echoes of decisions made
-Static is whispering across the wire
-Spark in the dark that ignites the fire
-
-[Pre-Chorus]
-(Building rhythm, rising tension)
-Can you feel the frequency pull us in?
-Where the signals stop and the dreams begin!
-
-[Chorus]
-(Full energy, driving bassline)
-Hold on to the high-wire sound!
-Feet off the pavement, we're leaving the ground!
-Through the frequency and through the light
-We ride the sonic wave tonight!
-
-[Verse 2]
-Analog memories on a digital screen
-Living a life that was once unseen
-The clock is ticking but the tape won't slow
-Caught in the current and the afterglow
-
-[Chorus]
-(Harmonized vocals, soaring delivery)
-Hold on to the high-wire sound!
-Feet off the pavement, we're leaving the ground!
-Through the frequency and through the light
-We ride the sonic wave tonight!
-
-[Bridge]
-(Half-time groove, filtered vocals)
-And if the silence comes to take it all away
-We'll build an empire out of what we play...
-
-[Synth Solo / Breakdown]
-(16-bar melodic lead, wide chorus effect)
-
-[Outro]
-(Distant echoes, decaying reverb)
-Ride the sonic wave...
-Ride into the light...
-Fade to black.`;
-
+    // 3. Fallback to rich procedural lyricist
+    const fallbackLyrics = NexusStudioEngine.buildProceduralLyrics(cleanPrompt, genre, mood, vocalStyle, structureType, rhymeScheme, vocalCues);
     return {
       lyrics: fallbackLyrics,
-      modelUsed: 'procedural-lyricist-v1',
-      structure: ['Intro', 'Verse 1', 'Pre-Chorus', 'Chorus', 'Verse 2', 'Chorus', 'Bridge', 'Synth Solo', 'Outro'],
+      modelUsed: 'nexus-procedural-lyricist-v2',
+      provider: 'offline-procedural',
+      structure: structureSections.map(s => s.replace(/[[\]]/g, '')),
     };
   }
 
@@ -294,10 +514,13 @@ Fade to black.`;
   public static async craftGrandPrompt(params: {
     genre?: string;
     tempo?: number;
+    bpm?: number;
     key?: string;
+    scale?: string;
     mood?: string;
     vocalType?: string;
-    instruments?: string[];
+    instruments?: string[] | string;
+    productionTexture?: string;
     description?: string;
     generateWithAi?: boolean;
     model?: string;
@@ -307,16 +530,20 @@ Fade to black.`;
     structurePrompt: string;
     tempo: number;
     key: string;
+    scale: string;
     genre: string;
   }> {
     const genre = params.genre || '80s Synthwave / Dark Cyberpunk';
-    const tempo = params.tempo || 120;
-    const key = params.key || 'E Minor';
+    const tempo = params.tempo || params.bpm || 120;
+    const rawKey = params.key || 'E';
+    const scale = params.scale || 'Minor';
+    const fullKey = rawKey.includes('Major') || rawKey.includes('Minor') ? rawKey : `${rawKey} ${scale}`;
     const mood = params.mood || 'Nostalgic, high-energy, yearning';
     const vocalType = params.vocalType || 'Male mid-range baritone, smooth and passionate delivery';
-    const instruments = params.instruments?.length
+    const instruments = Array.isArray(params.instruments)
       ? params.instruments.join(', ')
-      : 'Analog Synthesizers, LinnDrum, tight driving bassline, twangy electric guitar with chorus';
+      : (params.instruments || 'Analog Synthesizers, LinnDrum, tight driving bassline, twangy electric guitar with chorus');
+    const productionTexture = params.productionTexture || 'Rich, slightly reverb-heavy, late 60s/80s analog warmth; layered backing harmonies during the chorus';
     const desc = params.description || 'late night highway drive through rain-slicked city streets';
 
     let artisticDesc = desc;
@@ -329,7 +556,7 @@ Fade to black.`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: chosenModel,
-            prompt: `Write a 2-sentence evocative musical atmosphere description for a ${genre} track at ${tempo} BPM in ${key} with ${mood} mood: "${desc}"`,
+            prompt: `Write a 2-sentence evocative musical atmosphere description for a ${genre} track at ${tempo} BPM in ${fullKey} with ${mood} mood: "${desc}"`,
             stream: false,
           }),
         });
@@ -342,26 +569,27 @@ Fade to black.`;
       } catch {}
     }
 
-    // Exact YuE2 alt_prompt standard as used in Maestro AI
-    const altPrompt = `Lead vocal: ${vocalType}. Genre: ${genre}. Lead instruments: ${instruments}. Mood: ${mood}. Production: Rich, slightly reverb-heavy, late 60s/80s analog warmth; layered backing harmonies during the chorus. Description: ${artisticDesc}. Tempo: Approx. ${tempo} BPM. Key: ${key}.`;
+    // Exact YuE2 alt_prompt standard as used in Maestro AI / local YuE2 models
+    const altPrompt = `Lead vocal: ${vocalType}. Genre: ${genre}. Lead instruments: ${instruments}. Mood: ${mood}. Production: ${productionTexture}. Description: ${artisticDesc}. Tempo: Approx. ${tempo} BPM. Key: ${fullKey}.`;
 
-    // Suno / Udio / ACE-Step style tags
+    // Suno / Udio / ACE-Step / MusicGen style tags
     const sunoTags = [
       genre.toLowerCase().replace(/\//g, ', '),
       `${tempo} bpm`,
-      key.toLowerCase(),
+      fullKey.toLowerCase(),
       mood.toLowerCase().replace(/,/g, ''),
       vocalType.toLowerCase().split(',')[0],
-      'analog warmth',
+      productionTexture.toLowerCase().split(',')[0],
       'studio master',
       'punchy drums',
     ]
       .filter(Boolean)
       .join(', ');
 
-    const structurePrompt = `[Genre: ${genre}] [Tempo: ${tempo} BPM] [Key: ${key}]
+    const structurePrompt = `[Genre: ${genre}] [Tempo: ${tempo} BPM] [Key: ${fullKey}]
 [Atmosphere: ${mood}]
 [Instrumentation: ${instruments}]
+[Production Texture: ${productionTexture}]
 [Vocal Style: ${vocalType}]
 
 [Intro - Synth & Rhythm Groove]
@@ -378,7 +606,8 @@ Fade to black.`;
       sunoTags,
       structurePrompt,
       tempo,
-      key,
+      key: fullKey,
+      scale,
       genre,
     };
   }
@@ -833,48 +1062,59 @@ export function registerStudioRoutes(
     }
   });
 
-  // 3. Generate Lyrics with local Ollama
-  app.post<{
+  // 3. Generate Lyrics with local Ollama, online gateway, or procedural fallback
+  const handleGenerateLyrics = async (req: FastifyRequest<{
     Body: {
       prompt: string;
       genre?: string;
       mood?: string;
       vocalStyle?: string;
+      structureType?: string;
+      rhymeScheme?: string;
+      vocalCues?: boolean;
+      provider?: 'offline' | 'online';
       model?: string;
     };
-  }>('/v1/studio/lyrics/generate', async (req, reply) => {
+  }>, reply: FastifyReply) => {
     try {
       const result = await NexusStudioEngine.generateLyrics(req.body || { prompt: 'Synthwave night drive' });
       return reply.send({ success: true, ...result });
     } catch (err: any) {
       return reply.status(500).send({ success: false, error: err.message });
     }
-  });
+  };
+  app.post('/v1/studio/lyrics/generate', handleGenerateLyrics);
+  app.post('/v1/studio/lyrics/write', handleGenerateLyrics);
 
-  // 4. Grand Prompt Crafter
-  app.post<{
+  // 4. GPU Music Prompt Crafter (YuE2, Suno, Udio, ACE-Step, MusicGen)
+  const handleCraftPrompts = async (req: FastifyRequest<{
     Body: {
       genre?: string;
       tempo?: number;
+      bpm?: number;
       key?: string;
+      scale?: string;
       mood?: string;
       vocalType?: string;
-      instruments?: string[];
+      instruments?: string[] | string;
+      productionTexture?: string;
       description?: string;
       generateWithAi?: boolean;
       model?: string;
     };
-  }>('/v1/studio/prompts/grand', async (req, reply) => {
+  }>, reply: FastifyReply) => {
     try {
       const result = await NexusStudioEngine.craftGrandPrompt(req.body || {});
       return reply.send({ success: true, ...result });
     } catch (err: any) {
       return reply.status(500).send({ success: false, error: err.message });
     }
-  });
+  };
+  app.post('/v1/studio/prompts/grand', handleCraftPrompts);
+  app.post('/v1/studio/music-prompts/craft', handleCraftPrompts);
 
-  // 5. Discover Maestro AI outputs
-  app.get('/v1/studio/maestro/outputs', async () => {
+  // 5. Discover Studio Audio Outputs & Library (shared/audio)
+  const handleAudioLibrary = async () => {
     const tracks = await NexusStudioEngine.getMaestroOutputs();
     return {
       success: true,
@@ -882,30 +1122,36 @@ export function registerStudioRoutes(
       outputsDir: NexusStudioEngine.getMaestroOutputsDir(),
       tracks,
     };
-  });
+  };
+  app.get('/v1/studio/maestro/outputs', handleAudioLibrary);
+  app.get('/v1/studio/audio/library', handleAudioLibrary);
 
-  // 6. Stream Maestro Audio
-  app.get<{
+  // 6. Stream Studio Audio with HTTP Byte-Range Seeking
+  const handleAudioStream = async (req: FastifyRequest<{
     Querystring: {
       file?: string;
     };
-  }>('/v1/studio/maestro/stream', async (req, reply) => {
+  }>, reply: FastifyReply) => {
     const fileName = req.query.file;
     if (!fileName) {
       return reply.status(400).send({ error: 'file query parameter is required.' });
     }
     return NexusStudioEngine.streamMaestroTrack(fileName, req, reply);
-  });
+  };
+  app.get('/v1/studio/maestro/stream', handleAudioStream);
+  app.get('/v1/studio/audio/stream', handleAudioStream);
 
-  // 7. Share Maestro Track to Lounge
-  app.post<{
+  // 7. Share Studio Track to Lounge
+  const handleShareToLounge = async (req: FastifyRequest<{
     Body: {
-      fileName: string;
+      fileName?: string;
+      file?: string;
       comment?: string;
     };
-  }>('/v1/studio/maestro/share-to-lounge', async (req, reply) => {
+  }>, reply: FastifyReply) => {
     try {
-      const { fileName, comment } = req.body || {};
+      const fileName = req.body?.fileName || req.body?.file;
+      const comment = req.body?.comment;
       if (!fileName) {
         return reply.status(400).send({ error: 'fileName is required.' });
       }
@@ -919,7 +1165,9 @@ export function registerStudioRoutes(
     } catch (err: any) {
       return reply.status(500).send({ success: false, error: err.message });
     }
-  });
+  };
+  app.post('/v1/studio/maestro/share-to-lounge', handleShareToLounge);
+  app.post('/v1/studio/audio/share-to-lounge', handleShareToLounge);
 
   // 8. Save Performance Track
   app.post<{

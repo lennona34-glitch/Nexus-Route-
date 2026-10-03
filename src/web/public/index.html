@@ -4951,10 +4951,10 @@ console.log(res.choices[0].message.content);</code></pre>
           <div class="studio-title-block">
             <div class="studio-main-title">
               Nexus AI Music &amp; Vocal Studio
-              <span class="studio-badge-pro">OFFLINE AI &bull; YUE2 &bull; SYSTEM.SPEECH</span>
+              <span class="studio-badge-pro">OFFLINE AI &bull; YUE2 MODELS &bull; F5-TTS &bull; SYSTEM.SPEECH</span>
             </div>
             <div class="studio-sub-title">
-              Desktop Maestro AI Crate &bull; Local Gemma/Qwen Lyricist &bull; One-Shot Vocal Synth &bull; Grand Prompts
+              GPU Music Prompts &bull; AI Lyrics Studio &bull; Text-to-Speech &amp; F5-TTS Voice Cloning &bull; Studio Library
             </div>
           </div>
         </div>
@@ -4971,40 +4971,38 @@ console.log(res.choices[0].message.content);</code></pre>
         </div>
       </div>
 
-      <!-- Studio Navigation Tabs -->
+      <!-- Studio Navigation Tabs (4 Dedicated Pages) -->
       <div class="studio-tabs-bar">
-        <button type="button" class="studio-tab-btn active" data-tab="prompts">
-          <span>✍️</span> Grand Prompts &amp; Lyrics
+        <button type="button" class="studio-tab-btn active" data-tab="music-prompts">
+          <span>🎼</span> GPU Music Prompts
+        </button>
+        <button type="button" class="studio-tab-btn" data-tab="lyrics">
+          <span>✍️</span> AI Lyrics Studio
         </button>
         <button type="button" class="studio-tab-btn" data-tab="tts">
-          <span>🗣️</span> Text-to-Speech (WAV)
-        </button>
-        <button type="button" class="studio-tab-btn" data-tab="vocal">
-          <span>🎙️</span> 1-Shot Vocal Lab
-        </button>
-        <button type="button" class="studio-tab-btn" data-tab="maestro">
-          <span>🎵</span> Maestro AI &amp; Backing
+          <span>🗣️</span> Text-to-Speech &amp; AI Vocals
         </button>
         <button type="button" class="studio-tab-btn" data-tab="export">
-          <span>🚀</span> Export &amp; Lounge Share
+          <span>🚀</span> Studio Library &amp; Lounge
         </button>
       </div>
 
       <!-- Studio Body / Panes Viewport -->
       <div class="studio-viewport">
-        <!-- PANE 1: Grand Prompts & AI Lyricist -->
-        <div class="studio-tab-pane active" id="studioPanePrompts">
+        <!-- PANE 1: GPU Music Prompts (YuE2, ACE-Step, Suno, Udio, MusicGen) -->
+        <div class="studio-tab-pane active" id="studioPaneMusicPrompts">
           <div class="studio-split-layout">
             <!-- Left: Crafter Controls -->
             <div class="studio-controls-col">
               <div class="studio-card">
-                <div class="studio-card-title"><span>🎼</span> Musical Style &amp; Key Settings</div>
+                <div class="studio-card-title"><span>🎼</span> Musical Style &amp; Production Architecture</div>
                 <div class="studio-form-grid">
                   <div class="studio-field">
                     <label>Genre / Aesthetic Preset</label>
                     <select id="studioGenreSelect" class="studio-input">
                       <option value="80s Synthwave / Dark Cyberpunk" selected>80s Synthwave / Dark Cyberpunk</option>
-                      <option value="60s Psychedelic Rock / Pop">60s Psychedelic Rock / Pop (Chris Evans / Love Soldiers)</option>
+                      <option value="60s Psychedelic Rock / Pop">60s Psychedelic Rock / Pop (Love Soldiers / Vintage)</option>
+                      <option value="Modern EDM / Progressive House">Modern EDM / Progressive House</option>
                       <option value="Darksynth / Industrial Electro">Darksynth / Industrial Electro</option>
                       <option value="Lo-Fi Chillhop / Nostalgic Beats">Lo-Fi Chillhop / Nostalgic Beats</option>
                       <option value="Heavy Metalcore / Melodic Rock">Heavy Metalcore / Melodic Rock</option>
@@ -5019,23 +5017,36 @@ console.log(res.choices[0].message.content);</code></pre>
                     <div class="studio-field" style="flex: 1;">
                       <label>Tempo (BPM): <span id="studioTempoDisplay" style="color: #38bdf8; font-weight: 700;">120</span></label>
                       <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="range" id="studioTempoSlider" min="60" max="190" value="120" class="studio-slider" style="flex: 1;" />
-                        <input type="number" id="studioTempoInput" min="60" max="190" value="120" class="studio-input" style="width: 65px; text-align: center;" />
+                        <input type="range" id="studioTempoSlider" min="50" max="220" value="120" class="studio-slider" style="flex: 1;" />
+                        <input type="number" id="studioTempoInput" min="50" max="220" value="120" class="studio-input" style="width: 65px; text-align: center;" />
                       </div>
                     </div>
                     <div class="studio-field" style="flex: 1;">
-                      <label>Root Musical Key</label>
-                      <select id="studioKeySelect" class="studio-input">
-                        <option value="E Minor">E Minor</option>
-                        <option value="E Major">E Major (Maestro 60s)</option>
-                        <option value="F# Minor">F# Minor</option>
-                        <option value="A Minor">A Minor</option>
-                        <option value="C Major">C Major</option>
-                        <option value="D Minor">D Minor</option>
-                        <option value="G Major">G Major</option>
-                        <option value="B Minor">B Minor</option>
-                        <option value="C# Minor">C# Minor</option>
-                      </select>
+                      <label>Root Musical Key &amp; Scale</label>
+                      <div style="display: flex; gap: 6px;">
+                        <select id="studioKeySelect" class="studio-input" style="flex: 1;">
+                          <option value="C">C</option>
+                          <option value="C#">C#</option>
+                          <option value="D">D</option>
+                          <option value="D#">D#</option>
+                          <option value="E" selected>E</option>
+                          <option value="F">F</option>
+                          <option value="F#">F#</option>
+                          <option value="G">G</option>
+                          <option value="G#">G#</option>
+                          <option value="A">A</option>
+                          <option value="A#">A#</option>
+                          <option value="B">B</option>
+                        </select>
+                        <select id="studioScaleSelect" class="studio-input" style="flex: 1.2;">
+                          <option value="Minor" selected>Minor</option>
+                          <option value="Major">Major</option>
+                          <option value="Dorian">Dorian</option>
+                          <option value="Mixolydian">Mixolydian</option>
+                          <option value="Harmonic Minor">Harmonic Minor</option>
+                          <option value="Blues">Blues</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -5044,19 +5055,21 @@ console.log(res.choices[0].message.content);</code></pre>
                       <label>Mood / Atmosphere</label>
                       <select id="studioMoodSelect" class="studio-input">
                         <option value="Nostalgic, romantic, yearning, late 60s warmth" selected>Nostalgic, romantic, yearning</option>
-                        <option value="High-energy, relentless, adrenaline rush">High-energy, relentless, adrenaline</option>
-                        <option value="Melancholic, atmospheric, rain-soaked">Melancholic, atmospheric, rain-soaked</option>
+                        <option value="High-energy, relentless, adrenaline rush">High-energy, adrenaline rush</option>
+                        <option value="Melancholic, atmospheric, rain-soaked">Melancholic, rain-soaked</option>
                         <option value="Euphoric, triumphant, soaring melodies">Euphoric, triumphant, soaring</option>
-                        <option value="Dark, aggressive, brooding cyberpunk">Dark, aggressive, brooding cyberpunk</option>
+                        <option value="Dark, aggressive, brooding cyberpunk">Dark, brooding cyberpunk</option>
+                        <option value="Dreamy, floating, celestial ambient">Dreamy, floating ambient</option>
                       </select>
                     </div>
                     <div class="studio-field" style="flex: 1;">
-                      <label>Vocal Timbre / Style</label>
+                      <label>Vocal Timbre / Arrangement</label>
                       <select id="studioVocalTypeSelect" class="studio-input">
                         <option value="Male, mid-range baritone, smooth and passionate delivery" selected>Male Mid-Range Baritone</option>
                         <option value="Female, ethereal soprano, soulful and soaring">Female Ethereal Soprano</option>
                         <option value="Gritty raspy rock vocalist with raw emotion">Gritty Raspy Rocker</option>
-                        <option value="Robotic vocoder / synthetic harmonized vocals">Robotic Vocoder / Synthetic</option>
+                        <option value="Layered male &amp; female vocal harmonies, duet">Layered Duet &amp; Harmonies</option>
+                        <option value="Robotic vocoder / synthetic harmonized vocals">Robotic Vocoder / Talkbox</option>
                         <option value="Soulful gospel / R&amp;B powerhouse vocal">Soulful R&amp;B Powerhouse</option>
                         <option value="Whispered close-mic intimate ASMR vocal">Whispered Close-Mic Intimate</option>
                         <option value="Instrumental only (No Vocals)">[Instrumental Only]</option>
@@ -5065,49 +5078,47 @@ console.log(res.choices[0].message.content);</code></pre>
                   </div>
 
                   <div class="studio-field">
-                    <label>Lead Instruments</label>
-                    <input type="text" id="studioInstrumentsInput" class="studio-input" value="Twangy electric guitar (with heavy vibrato), Hammond B3 organ, driving bass, tight drums" placeholder="e.g. Analog synthesizers, LinnDrum, 808 bass, piano" />
+                    <label>Lead Instruments &amp; Rhythm Section</label>
+                    <input type="text" id="studioInstrumentsInput" class="studio-input" value="Analog Synthesizers, LinnDrum, tight driving bassline, twangy electric guitar with chorus" placeholder="e.g. Twangy electric guitar, Hammond B3 organ, 808 sub, acoustic piano" />
                   </div>
 
                   <div class="studio-field">
-                    <label>Scene / Lyrical Inspiration</label>
-                    <textarea id="studioSceneDescInput" class="studio-textarea" rows="3" placeholder="e.g. 60's love soldiers fighting for love on a distant neon battlefield, rainy night drive, retro dream..."></textarea>
-                  </div>
-
-                  <div class="studio-field">
-                    <label>AI Model for Lyrics &amp; Inspiration</label>
-                    <select id="studioModelSelect" class="studio-input">
-                      <option value="gemma-4-e4b-uncensored-hauhaucs-aggressive-q4:latest" selected>Gemma 4 e4b Uncensored (Local GPU • Ultra Fast)</option>
-                      <option value="qwen3.6-35b-a3b-ud-q4_k_m:latest">Qwen 3.6 35B (Local GPU • Deep Creativity)</option>
-                      <option value="sovereign-coder:brain">Sovereign Coder Brain (Local GPU)</option>
-                      <option value="auto">Auto Router (Cloud &amp; Local Fallback)</option>
+                    <label>Production Texture &amp; Sonic Aesthetics</label>
+                    <select id="studioProductionTextureSelect" class="studio-input">
+                      <option value="Rich, slightly reverb-heavy, late 60s/80s analog warmth; layered backing harmonies during chorus" selected>80s/60s Analog Warmth &amp; Tape Saturation</option>
+                      <option value="Pristine modern club master, tight punchy 808s, wide stereo imaging, aggressive sidechain">Modern Crisp &amp; Punchy Master (EDM/Pop)</option>
+                      <option value="Lo-Fi vinyl crackle, warm cassette degradation, intimate room acoustics, relaxed dynamics">Lo-Fi Vintage Vinyl Crackle &amp; Cassette</option>
+                      <option value="Massive wall of sound, towering distortion, soaring cathedral reverb, cinematic dynamics">Wall of Sound &amp; Cathedral Reverb (Epic/Rock)</option>
+                      <option value="Dry intimate studio close-mic, natural transient punch, zero artificial reverb">Dry Intimate Acoustic Close-Mic</option>
                     </select>
+                  </div>
+
+                  <div class="studio-field">
+                    <label>Scene / Sonic Vision Inspiration</label>
+                    <textarea id="studioSceneDescInput" class="studio-textarea" rows="2" placeholder="e.g. Late night highway drive through rain-slicked city streets, distant neon skyline..."></textarea>
                   </div>
 
                   <div class="studio-btn-row">
                     <button type="button" id="btnStudioCraftPrompts" class="studio-primary-btn" style="background: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);">
-                      <span>✨</span> Craft Grand Prompts
-                    </button>
-                    <button type="button" id="btnStudioGenLyrics" class="studio-primary-btn" style="background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);">
-                      <span>🤖</span> Write Full Lyrics
+                      <span>✨</span> Craft GPU Music Prompts
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Right: Formatted Grand Prompts & Lyrics Results -->
+            <!-- Right: Formatted GPU Music Prompts -->
             <div class="studio-results-col">
-              <!-- YuE2 / Maestro Prompt Box -->
+              <!-- YuE2 / Local Audio Model Prompt Box -->
               <div class="studio-result-card">
                 <div class="studio-result-header">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="studio-model-tag yue">YuE2 / Maestro AI Format</span>
-                    <span style="font-size: 11px; color: #94a3b8;">Compatible with Desktop Maestro &amp; YuE2 AR/Acoustic</span>
+                    <span class="studio-model-tag yue">YuE2 / Local GPU Model Format</span>
+                    <span style="font-size: 11px; color: #94a3b8;">Formatted <code>alt_prompt</code> for YuE2 AR &amp; Acoustic checkpoints</span>
                   </div>
                   <button type="button" id="btnCopyAltPrompt" class="studio-copy-btn"><span>📋</span> Copy Prompt</button>
                 </div>
-                <textarea id="studioOutputAltPrompt" class="studio-code-box" readonly rows="5" placeholder="Click 'Craft Grand Prompts' to generate structured YuE2 alt_prompt..."></textarea>
+                <textarea id="studioOutputAltPrompt" class="studio-code-box" readonly rows="4" placeholder="Click 'Craft GPU Music Prompts' to generate structured YuE2 alt_prompt..."></textarea>
               </div>
 
               <!-- Suno / Udio / ACE-Step Tags Box -->
@@ -5115,47 +5126,143 @@ console.log(res.choices[0].message.content);</code></pre>
                 <div class="studio-result-header">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="studio-model-tag suno">Suno / Udio / ACE-Step Tags</span>
-                    <span style="font-size: 11px; color: #94a3b8;">High-efficiency tags &amp; BPM</span>
+                    <span style="font-size: 11px; color: #94a3b8;">High-efficiency genre &amp; style tags</span>
                   </div>
                   <button type="button" id="btnCopySunoTags" class="studio-copy-btn"><span>📋</span> Copy Tags</button>
                 </div>
                 <input type="text" id="studioOutputSunoTags" class="studio-input" readonly placeholder="Comma-separated style tags will appear here..." />
               </div>
 
-              <!-- Structured Lyrics Box -->
+              <!-- Song Arrangement Blueprint Box -->
               <div class="studio-result-card" style="flex: 1; display: flex; flex-direction: column;">
                 <div class="studio-result-header">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="studio-model-tag lyrics">Song Lyrics &amp; Structural Tags</span>
-                    <span style="font-size: 11px; color: #94a3b8;">[Intro], [Verse], [Chorus], [Bridge], [Outro]</span>
+                    <span class="studio-model-tag lyrics">Song Arrangement Blueprint</span>
+                    <span style="font-size: 11px; color: #94a3b8;">Structural markers &amp; dynamics</span>
                   </div>
                   <div style="display: flex; gap: 6px;">
-                    <button type="button" id="btnCopyLyrics" class="studio-copy-btn"><span>📋</span> Copy Lyrics</button>
-                    <button type="button" id="btnSendLyricsToTts" class="studio-action-btn" title="Send to TTS Engine to synthesize speech"><span>🗣️</span> Speak Lyrics</button>
+                    <button type="button" id="btnCopyStructurePrompt" class="studio-copy-btn"><span>📋</span> Copy Blueprint</button>
+                    <button type="button" id="btnSendStructureToLyrics" class="studio-action-btn" title="Open AI Lyrics Studio with this style &amp; tempo"><span>✍️</span> Open in Lyrics Studio</button>
                   </div>
                 </div>
-                <textarea id="studioOutputLyrics" class="studio-code-box" style="flex: 1; min-height: 200px;" placeholder="Full song lyrics crafted by offline AI will appear here..."></textarea>
+                <textarea id="studioOutputStructurePrompt" class="studio-code-box" readonly style="flex: 1; min-height: 160px;" placeholder="Song arrangement sections and tags will appear here..."></textarea>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- PANE 2: Text-to-Speech & Singing Synth -->
+        <!-- PANE 2: AI Lyrics Studio (Offline Model or Online Model) -->
+        <div class="studio-tab-pane" id="studioPaneLyrics">
+          <div class="studio-split-layout">
+            <!-- Left: Songwriting Architecture Controls -->
+            <div class="studio-controls-col">
+              <div class="studio-card">
+                <div class="studio-card-title"><span>✍️</span> AI Songwriter &amp; Lyrical Architect</div>
+                <div class="studio-form-grid">
+                  <div class="studio-field-row">
+                    <div class="studio-field" style="flex: 1;">
+                      <label>AI Model Engine</label>
+                      <select id="studioLyricProviderSelect" class="studio-input">
+                        <option value="offline" selected>Offline Model (Local Ollama / GPU)</option>
+                        <option value="online">Online Cloud Model (OpenAI / DeepSeek / Mistral)</option>
+                      </select>
+                    </div>
+                    <div class="studio-field" style="flex: 1.2;">
+                      <label>Specific Model</label>
+                      <select id="studioLyricModelSelect" class="studio-input">
+                        <option value="gemma-4-e4b-uncensored-hauhaucs-aggressive-q4:latest" selected>Gemma 4 e4b Uncensored (Local GPU • Ultra Fast)</option>
+                        <option value="qwen3.6-35b-a3b-ud-q4_k_m:latest">Qwen 3.6 35B (Local GPU • Deep Lyricism)</option>
+                        <option value="deepseek-chat">DeepSeek Chat (Online • High Coherence)</option>
+                        <option value="gpt-4o">OpenAI GPT-4o (Online)</option>
+                        <option value="auto">Auto Router (Smart Selection)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="studio-field">
+                    <label>Song Topic, Story or Narrative Core</label>
+                    <textarea id="studioLyricTopicInput" class="studio-textarea" rows="3" placeholder="e.g. A retro-futuristic racer pushing beyond the speed barrier into the dawn, searching for someone left behind..."></textarea>
+                  </div>
+
+                  <div class="studio-field-row">
+                    <div class="studio-field" style="flex: 1;">
+                      <label>Song Structure Blueprint</label>
+                      <select id="studioLyricStructureSelect" class="studio-input">
+                        <option value="pop" selected>Standard Pop/Rock (Verse, Chorus, Bridge, Solo)</option>
+                        <option value="edm">EDM / Dance (Buildup, Main Drop, Peak Drop)</option>
+                        <option value="hiphop">Hip-Hop / Rap (16-Bar Verses &amp; Hooks)</option>
+                        <option value="ballad">Ballad / Folk (Storytelling Stanzas &amp; Refrain)</option>
+                        <option value="freeform">Freeform / Cinematic Movements</option>
+                      </select>
+                    </div>
+                    <div class="studio-field" style="flex: 1;">
+                      <label>Rhyme Scheme &amp; Cadence</label>
+                      <select id="studioLyricRhymeSelect" class="studio-input">
+                        <option value="aabb" selected>AABB (Punchy Couplets)</option>
+                        <option value="abab">ABAB (Alternating Meter)</option>
+                        <option value="multisyllable">Multisyllabic / Dense Internal Rhymes</option>
+                        <option value="storytelling">Storytelling Narrative Progression</option>
+                        <option value="freeform">Free Verse &amp; Slant Rhymes</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="studio-field-row">
+                    <div class="studio-field" style="flex: 1;">
+                      <label>Genre Aesthetic Context</label>
+                      <input type="text" id="studioLyricGenreContext" class="studio-input" value="80s Synthwave / Dark Cyberpunk" placeholder="Genre context..." />
+                    </div>
+                    <div class="studio-field" style="flex: 1;">
+                      <label>Mood Context</label>
+                      <input type="text" id="studioLyricMoodContext" class="studio-input" value="Nostalgic, high-energy, yearning" placeholder="Mood context..." />
+                    </div>
+                  </div>
+
+                  <div class="studio-field" style="margin-top: 4px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #cbd5e1;">
+                      <input type="checkbox" id="studioLyricVocalCuesToggle" checked style="accent-color: #a855f7; cursor: pointer;" />
+                      Include vocal performance cues in parentheses e.g. <code>(harmony)</code>, <code>(whispered)</code>, <code>(belted)</code>
+                    </label>
+                  </div>
+
+                  <div class="studio-btn-row">
+                    <button type="button" id="btnStudioGenLyrics" class="studio-primary-btn" style="background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);">
+                      <span>🤖</span> Write Full AI Lyrics
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Formatted AI Lyrics Output -->
+            <div class="studio-results-col">
+              <div class="studio-result-card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="studio-result-header">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="studio-model-tag lyrics" id="studioLyricModelBadge">AI Lyricist</span>
+                    <span id="studioLyricStatsBadge" style="font-size: 11px; color: #94a3b8;">Structured Sections &bull; Ready for YuE2 or TTS</span>
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                    <button type="button" id="btnCopyLyrics" class="studio-copy-btn"><span>📋</span> Copy Lyrics</button>
+                    <button type="button" id="btnSendLyricsToTts" class="studio-action-btn" title="Send to TTS Engine to synthesize speech"><span>🗣️</span> Speak Lyrics with TTS</button>
+                    <button type="button" id="btnSendLyricsToF5" class="studio-action-btn" title="Send to F5-TTS to clone and sing in custom voice"><span>🧬</span> Clone Voice with Lyrics</button>
+                  </div>
+                </div>
+                <textarea id="studioOutputLyrics" class="studio-code-box" style="flex: 1; min-height: 280px; font-family: monospace; font-size: 12.5px; line-height: 1.6;" placeholder="Click 'Write Full AI Lyrics' to compose complete lyrics with explicit [Intro], [Verse], [Chorus], and [Outro] markers..."></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE 3: Text-to-Speech & AI Vocals (Windows System.Speech + F5-TTS Voice Cloning) -->
         <div class="studio-tab-pane" id="studioPaneTts">
           <div class="studio-split-layout">
             <!-- Left: TTS Engine & Voice Controls -->
             <div class="studio-controls-col">
+              <!-- System.Speech WAV Card -->
               <div class="studio-card">
-                <div class="studio-card-title"><span>🗣️</span> Offline TTS Synthesis Engine</div>
+                <div class="studio-card-title"><span>🗣️</span> Offline TTS Synthesis Engine (Windows System.Speech)</div>
                 <div class="studio-form-grid">
-                  <div class="studio-field">
-                    <label>Engine Provider</label>
-                    <select id="studioTtsEngineSelect" class="studio-input">
-                      <option value="system_speech" selected>Windows System.Speech (100% Offline WAV • Fast)</option>
-                      <option value="browser_speech">Browser Web Speech API (Neural / System)</option>
-                    </select>
-                  </div>
-
                   <div class="studio-field">
                     <label>System Voice</label>
                     <select id="studioTtsVoiceSelect" class="studio-input">
@@ -5177,7 +5284,7 @@ console.log(res.choices[0].message.content);</code></pre>
                   </div>
 
                   <div class="studio-field">
-                    <label>Quick Presets</label>
+                    <label>Voice Presets</label>
                     <div class="studio-preset-chips">
                       <button type="button" class="studio-chip-btn" data-voice="Microsoft Hazel Desktop" data-rate="0">🇬🇧 Hazel Natural</button>
                       <button type="button" class="studio-chip-btn" data-voice="Microsoft David Desktop" data-rate="-2">🎙️ David Deep Radio</button>
@@ -5190,318 +5297,165 @@ console.log(res.choices[0].message.content);</code></pre>
                     <button type="button" id="btnStudioSpeakTts" class="studio-primary-btn" style="background: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);">
                       <span>🔊</span> Synthesize Speech (WAV)
                     </button>
-                    <button type="button" id="btnStudioSendTtsToVocal" class="studio-primary-btn" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);">
-                      <span>🎙️</span> Load into 1-Shot Vocal Lab
+                    <button type="button" id="btnStudioSendTtsToF5Ref" class="studio-action-btn" title="Use synthesized TTS audio as reference voice for F5-TTS cloning">
+                      <span>🧬</span> Use as F5 Ref Voice
                     </button>
                   </div>
                 </div>
               </div>
+
+              <!-- Reference Voice Sample Card for F5-TTS -->
+              <div class="studio-card" style="margin-top: 10px;">
+                <div class="studio-card-title"><span>🎙️</span> F5-TTS Reference Voice Audio Source</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-bottom: 10px;">
+                  Provide a 3–10 second voice clip to clone. Speak into your microphone or upload a clear vocal WAV.
+                </div>
+                <div class="vocal-sample-left" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" id="btnStudioRecordMic" class="studio-record-btn">
+                    <span class="rec-dot"></span> <span id="studioRecordLabel">Record Mic Reference</span>
+                  </button>
+                  <input type="file" id="studioUploadVocalInput" accept="audio/*" style="display: none;" />
+                  <button type="button" id="btnStudioUploadVocal" class="studio-action-btn">
+                    <span>📁</span> Upload WAV Clip
+                  </button>
+                  <button type="button" id="btnStudioLoadPresetVocal" class="studio-action-btn">
+                    <span>✨</span> Load Sample Clip
+                  </button>
+                </div>
+                <div class="vocal-sample-meta" id="vocalSampleInfo" style="margin-top: 10px; font-size: 11.5px; color: #38bdf8;">
+                  <span class="sample-tag">VOICE REF</span>
+                  <span id="vocalSampleText">No reference audio loaded yet. Record with mic or upload a sample.</span>
+                </div>
+              </div>
             </div>
 
-            <!-- Right: Text Input & Audio Output -->
+            <!-- Right: Text Input & F5-TTS Voice Cloning Lab -->
             <div class="studio-results-col">
-              <div class="studio-card" style="flex: 1; display: flex; flex-direction: column;">
-                <div class="studio-card-title"><span>📝</span> Script / Lyrics to Synthesize</div>
-                <textarea id="studioTtsTextInput" class="studio-textarea" style="flex: 1; min-height: 180px;" placeholder="Type words, phrases, or lyrics to turn into speech or melodic vocal sample...&#10;&#10;Try: 'Welcome to the Nexus AI Sound Lab. YuE2 models and one-shot vocal sampling are now online.'"></textarea>
-
-                <div class="studio-tts-output-bar" style="margin-top: 14px; padding: 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 12px; font-weight: 700; color: #f8fafc;">Generated WAV Audio</span>
+              <!-- Standard TTS Text Input & Audio Output Bar -->
+              <div class="studio-card">
+                <div class="studio-card-title"><span>📝</span> Script / Text to Synthesize</div>
+                <textarea id="studioTtsTextInput" class="studio-textarea" rows="4" placeholder="Type words, phrases, or lyrics to synthesize with System.Speech..."></textarea>
+                <div class="studio-tts-output-bar" style="margin-top: 10px; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 12px; font-weight: 700; color: #f8fafc;">System TTS Audio</span>
                     <button type="button" id="btnStudioDownloadTts" class="studio-copy-btn" disabled><span>⬇️</span> Download WAV</button>
                   </div>
-                  <audio id="studioTtsAudioPlayer" controls style="width: 100%; height: 38px;"></audio>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- PANE 3: One-Shot Vocal Lab (Sampler, Pitch Detector, Virtual Keyboard, F5-TTS Flow Matching) -->
-        <div class="studio-tab-pane" id="studioPaneVocal">
-          <div class="vocal-lab-container">
-            <!-- F5-TTS Flow Matching Zero-Shot Voice Cloning Card -->
-            <div class="f5-vocal-card" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.8)); border: 1px solid rgba(192, 132, 252, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 20px;">🧬</span>
-                  <div>
-                    <div style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: 0.02em;">F5-TTS Zero-Shot Flow Matching Voice Cloning</div>
-                    <div style="font-size: 11px; color: #94a3b8;">Clone any voice from a 3–10 second reference clip without fine-tuning weights · Accelerated by RTX 4060 GPU</div>
-                  </div>
-                </div>
-                <span class="sample-tag" style="background: rgba(168, 85, 247, 0.25); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);">FLOW MATCHING DIT</span>
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;" class="f5-inputs-grid">
-                <div>
-                  <label style="font-size: 11px; font-weight: 700; color: #38bdf8; display: block; margin-bottom: 4px;">1. Reference Audio Transcript (What does the clip say?)</label>
-                  <input type="text" id="f5RefTextInput" class="studio-input" placeholder="e.g. Hello this is my natural speaking voice." style="width: 100%; box-sizing: border-box;" />
-                </div>
-                <div>
-                  <label style="font-size: 11px; font-weight: 700; color: #4ade80; display: block; margin-bottom: 4px;">2. Target Text (What should the cloned voice say / sing?)</label>
-                  <input type="text" id="f5GenTextInput" class="studio-input" placeholder="e.g. Welcome to the Nexus Route and Mesh production studio." style="width: 100%; box-sizing: border-box;" />
+                  <audio id="studioTtsAudioPlayer" controls style="width: 100%; height: 34px;"></audio>
                 </div>
               </div>
 
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <button type="button" id="btnF5CloneVoice" class="primary-btn" style="background: linear-gradient(135deg, #a855f7, #ec4899); border: 1px solid #c084fc; color: #fff; font-weight: 800; padding: 7px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                    <span>🧬</span> <span id="f5CloneBtnText">Clone &amp; Synthesize with F5-TTS</span>
-                  </button>
-                  <button type="button" id="btnF5UseVocalSample" class="tab-btn" style="padding: 7px 12px; font-size: 11.5px;" title="Use current loaded sample as reference audio">
-                    <span>🎙️</span> Use Current Sample as Ref
-                  </button>
-                </div>
-
-                <div id="f5StatusNotice" style="font-size: 11px; color: #94a3b8; font-style: italic;">
-                  Ready. Record or upload a reference clip above, then click Clone.
-                </div>
-              </div>
-
-              <!-- Cloned Output Audio Bar (rendered when generated) -->
-              <div id="f5ResultContainer" class="hidden" style="margin-top: 14px; padding: 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+              <!-- F5-TTS Zero-Shot Flow Matching Voice Cloning Card -->
+              <div class="f5-vocal-card" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.8)); border: 1px solid rgba(192, 132, 252, 0.4); border-radius: 12px; padding: 16px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 18px;">✨</span>
+                    <span style="font-size: 20px;">🧬</span>
                     <div>
-                      <strong id="f5ResultTitle" style="color: #f8fafc; font-size: 12px;">Cloned Voice Track</strong>
-                      <div id="f5ResultMeta" style="font-size: 10.5px; color: #38bdf8;">F5-TTS Flow Matching · 24kHz PCM</div>
+                      <div style="font-size: 13.5px; font-weight: 800; color: #f8fafc;">F5-TTS Zero-Shot Flow Matching Voice Cloning</div>
+                      <div style="font-size: 11px; color: #94a3b8;">Clone any voice from a 3–10s reference clip · Accelerated by NVIDIA GPU</div>
                     </div>
                   </div>
-                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                    <button type="button" id="btnF5PlayResult" class="tab-btn" style="padding: 4px 10px; font-size: 11px; color: #4ade80; border-color: rgba(74, 222, 128, 0.4);">
-                      ▶️ Play Cloned Voice
-                    </button>
-                    <button type="button" id="btnF5ShareLounge" class="tab-btn" style="padding: 4px 10px; font-size: 11px; color: #ec4899; border-color: rgba(236, 72, 153, 0.4);">
-                      🚀 Share to Lounge
-                    </button>
-                    <button type="button" id="btnF5LoadToSampler" class="tab-btn" style="padding: 4px 10px; font-size: 11px; color: #c084fc; border-color: rgba(192, 132, 252, 0.4);">
-                      🎹 Load into Keyboard Sampler
-                    </button>
+                  <span class="sample-tag" style="background: rgba(168, 85, 247, 0.25); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);">FLOW MATCHING DIT</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                  <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #38bdf8; display: block; margin-bottom: 4px;">1. Reference Clip Transcript (What the sample says)</label>
+                    <input type="text" id="f5RefTextInput" class="studio-input" placeholder="e.g. Hello this is my natural speaking voice." style="width: 100%; box-sizing: border-box;" />
+                  </div>
+                  <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #4ade80; display: block; margin-bottom: 4px;">2. Target Text (What the cloned voice should say / sing)</label>
+                    <input type="text" id="f5GenTextInput" class="studio-input" placeholder="e.g. Welcome to the Nexus Route and Mesh production studio." style="width: 100%; box-sizing: border-box;" />
                   </div>
                 </div>
-                <audio id="f5ResultAudio" controls style="width: 100%; height: 32px; outline: none; border-radius: 4px;"></audio>
-              </div>
-            </div>
 
-            <!-- Sample Strip -->
-            <div class="vocal-sample-strip">
-              <div class="vocal-sample-left">
-                <button type="button" id="btnStudioRecordMic" class="studio-record-btn">
-                  <span class="rec-dot"></span> <span id="studioRecordLabel">Record 1-Shot Voice</span>
-                </button>
-                <input type="file" id="studioUploadVocalInput" accept="audio/*" style="display: none;" />
-                <button type="button" id="btnStudioUploadVocal" class="studio-action-btn">
-                  <span>📁</span> Upload Sample
-                </button>
-                <button type="button" id="btnStudioLoadPresetVocal" class="studio-action-btn">
-                  <span>✨</span> Load Default Vibe Sample
-                </button>
-              </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" id="btnF5CloneVoice" class="primary-btn" style="background: linear-gradient(135deg, #a855f7, #ec4899); border: 1px solid #c084fc; color: #fff; font-weight: 800; padding: 7px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                      <span>🧬</span> <span id="f5CloneBtnText">Clone &amp; Synthesize with F5-TTS</span>
+                    </button>
+                    <button type="button" id="btnF5UseVocalSample" class="tab-btn" style="padding: 7px 12px; font-size: 11.5px;" title="Link active reference sample">
+                      <span>🎙️</span> Sync Active Ref
+                    </button>
+                  </div>
 
-              <div class="vocal-sample-meta" id="vocalSampleInfo">
-                <span class="sample-tag">READY</span>
-                <span id="vocalSampleText">No vocal sample loaded. Record or upload a single note (say &quot;Ahhh&quot; or &quot;Ooo&quot;) to play as an instrument!</span>
-              </div>
-            </div>
-
-            <!-- Waveform & Realtime Audio Spectrum Canvas -->
-            <div class="vocal-canvas-wrap">
-              <canvas id="vocalVisualizerCanvas" width="900" height="130"></canvas>
-              <div class="vocal-canvas-overlay">
-                <div class="vocal-pitch-badge" id="vocalDetectedPitchBadge">
-                  Root: <strong id="vocalRootPitchText">A3 (220 Hz)</strong>
+                  <div id="f5StatusNotice" style="font-size: 11px; color: #94a3b8; font-style: italic;">
+                    Ready. Record or upload a reference clip on the left, then click Clone.
+                  </div>
                 </div>
-                <div class="vocal-scale-badge" id="vocalActiveScaleBadge">
-                  Scale: <strong id="vocalActiveScaleText">Chromatic (Free)</strong>
+
+                <!-- Cloned Output Audio Bar -->
+                <div id="f5ResultContainer" class="hidden" style="margin-top: 14px; padding: 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 18px;">✨</span>
+                      <div>
+                        <strong id="f5ResultTitle" style="color: #f8fafc; font-size: 12px;">Cloned Voice Track</strong>
+                        <div id="f5ResultMeta" style="font-size: 10.5px; color: #38bdf8;">F5-TTS Flow Matching · 24kHz PCM</div>
+                      </div>
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      <button type="button" id="btnF5PlayResult" class="tab-btn" style="padding: 4px 10px; font-size: 11px; color: #4ade80; border-color: rgba(74, 222, 128, 0.4);">
+                        ▶️ Play Cloned Voice
+                      </button>
+                      <button type="button" id="btnF5ShareLounge" class="tab-btn" style="padding: 4px 10px; font-size: 11px; color: #ec4899; border-color: rgba(236, 72, 153, 0.4);">
+                        🚀 Share to Lounge
+                      </button>
+                    </div>
+                  </div>
+                  <audio id="f5ResultAudio" controls style="width: 100%; height: 32px; outline: none; border-radius: 4px;"></audio>
                 </div>
-              </div>
-            </div>
-
-            <!-- Vocal Effects & Pitch Quantizer Bar -->
-            <div class="vocal-fx-grid">
-              <div class="vocal-fx-card">
-                <label>Autotune Scale Quantizer</label>
-                <select id="studioScaleSelect" class="studio-input">
-                  <option value="chromatic" selected>Chromatic (All 12 Semitones)</option>
-                  <option value="major">Major Scale (Happy / Uplifting)</option>
-                  <option value="natural_minor">Natural Minor (Emotional / Deep)</option>
-                  <option value="harmonic_minor">Harmonic Minor (Exotic / Cyberpunk)</option>
-                  <option value="pentatonic">Pentatonic (Never Hits a Wrong Note)</option>
-                  <option value="blues">Blues Scale (Soulful / Gritty)</option>
-                </select>
-              </div>
-
-              <div class="vocal-fx-card">
-                <label>Formant / Gender Shift: <span id="studioFormantVal" style="color: #38bdf8;">0 ST</span></label>
-                <input type="range" id="studioFormantSlider" min="-12" max="12" value="0" class="studio-slider" />
-                <div class="fx-range-labels">
-                  <span>Deep Titan</span>
-                  <span>Natural</span>
-                  <span>Feminine / Chipmunk</span>
-                </div>
-              </div>
-
-              <div class="vocal-fx-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label style="margin: 0;">16-Band Vocoder Effect</label>
-                  <input type="checkbox" id="studioVocoderToggle" style="cursor: pointer;" />
-                </div>
-                <select id="studioCarrierSelect" class="studio-input" style="font-size: 11px;">
-                  <option value="sawtooth">Sawtooth Synth (Classic Daft Punk)</option>
-                  <option value="square">Square Wave (Kraftwerk 8-Bit)</option>
-                  <option value="pulse">Pulse Lead (Cyberpunk Voice)</option>
-                </select>
-              </div>
-
-              <div class="vocal-fx-card">
-                <label>Studio Reverb &amp; Space: <span id="studioReverbVal" style="color: #c084fc;">35%</span></label>
-                <input type="range" id="studioReverbSlider" min="0" max="100" value="35" class="studio-slider" />
-                <div class="fx-range-labels">
-                  <span>Dry</span>
-                  <span>Studio Room</span>
-                  <span>Cathedral</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Virtual Vocal Piano Keyboard (2 Octaves: C3 to C5) -->
-            <div class="vocal-keyboard-card">
-              <div class="vocal-keyboard-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 18px;">🎹</span>
-                  <span style="font-weight: 700; color: #f8fafc; font-size: 13px;">Virtual Vocal Keyboard (Play 1-Shot Voice)</span>
-                  <span style="font-size: 11px; color: #94a3b8;">Click keys or use PC Keyboard [A, W, S, E, D, F, T, G, Y, H, U, J, K...]</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <button type="button" id="btnStudioRecordMelody" class="studio-action-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
-                    <span>⏺️</span> Record Performance
-                  </button>
-                  <button type="button" id="btnStudioStopMelody" class="studio-action-btn hidden" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.4);">
-                    <span>⏹️</span> Save Melodic Take
-                  </button>
-                </div>
-              </div>
-
-              <!-- Interactive Keys Container -->
-              <div class="piano-keys-wrapper" id="vocalPianoKeyboard">
-                <!-- White and black keys populated dynamically or statically in HTML -->
-                <div class="piano-key white" data-note="C3" data-freq="130.81" data-key="Z"><span class="key-label">C3</span><span class="key-bind">Z</span></div>
-                <div class="piano-key black" data-note="C#3" data-freq="138.59" data-key="S"><span class="key-label">C#</span><span class="key-bind">S</span></div>
-                <div class="piano-key white" data-note="D3" data-freq="146.83" data-key="X"><span class="key-label">D3</span><span class="key-bind">X</span></div>
-                <div class="piano-key black" data-note="D#3" data-freq="155.56" data-key="D"><span class="key-label">D#</span><span class="key-bind">D</span></div>
-                <div class="piano-key white" data-note="E3" data-freq="164.81" data-key="C"><span class="key-label">E3</span><span class="key-bind">C</span></div>
-                <div class="piano-key white" data-note="F3" data-freq="174.61" data-key="V"><span class="key-label">F3</span><span class="key-bind">V</span></div>
-                <div class="piano-key black" data-note="F#3" data-freq="185.00" data-key="G"><span class="key-label">F#</span><span class="key-bind">G</span></div>
-                <div class="piano-key white" data-note="G3" data-freq="196.00" data-key="B"><span class="key-label">G3</span><span class="key-bind">B</span></div>
-                <div class="piano-key black" data-note="G#3" data-freq="207.65" data-key="H"><span class="key-label">G#</span><span class="key-bind">H</span></div>
-                <div class="piano-key white" data-note="A3" data-freq="220.00" data-key="N"><span class="key-label">A3</span><span class="key-bind">N</span></div>
-                <div class="piano-key black" data-note="A#3" data-freq="233.08" data-key="J"><span class="key-label">A#</span><span class="key-bind">J</span></div>
-                <div class="piano-key white" data-note="B3" data-freq="246.94" data-key="M"><span class="key-label">B3</span><span class="key-bind">M</span></div>
-
-                <div class="piano-key white" data-note="C4" data-freq="261.63" data-key="Q"><span class="key-label">C4</span><span class="key-bind">Q</span></div>
-                <div class="piano-key black" data-note="C#4" data-freq="277.18" data-key="2"><span class="key-label">C#</span><span class="key-bind">2</span></div>
-                <div class="piano-key white" data-note="D4" data-freq="293.66" data-key="W"><span class="key-label">D4</span><span class="key-bind">W</span></div>
-                <div class="piano-key black" data-note="D#4" data-freq="311.13" data-key="3"><span class="key-label">D#</span><span class="key-bind">3</span></div>
-                <div class="piano-key white" data-note="E4" data-freq="329.63" data-key="E"><span class="key-label">E4</span><span class="key-bind">E</span></div>
-                <div class="piano-key white" data-note="F4" data-freq="349.23" data-key="R"><span class="key-label">F4</span><span class="key-bind">R</span></div>
-                <div class="piano-key black" data-note="F#4" data-freq="369.99" data-key="5"><span class="key-label">F#</span><span class="key-bind">5</span></div>
-                <div class="piano-key white" data-note="G4" data-freq="392.00" data-key="T"><span class="key-label">G4</span><span class="key-bind">T</span></div>
-                <div class="piano-key black" data-note="G#4" data-freq="415.30" data-key="6"><span class="key-label">G#</span><span class="key-bind">6</span></div>
-                <div class="piano-key white" data-note="A4" data-freq="440.00" data-key="Y"><span class="key-label">A4</span><span class="key-bind">Y</span></div>
-                <div class="piano-key black" data-note="A#4" data-freq="466.16" data-key="7"><span class="key-label">A#</span><span class="key-bind">7</span></div>
-                <div class="piano-key white" data-note="B4" data-freq="493.88" data-key="U"><span class="key-label">B4</span><span class="key-bind">U</span></div>
-                <div class="piano-key white" data-note="C5" data-freq="523.25" data-key="I"><span class="key-label">C5</span><span class="key-bind">I</span></div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- PANE 4: Maestro AI Outputs Crate & Backing Beats -->
-        <div class="studio-tab-pane" id="studioPaneMaestro">
+        <!-- PANE 4: Studio Library & Lounge Share (shared/audio) -->
+        <div class="studio-tab-pane" id="studioPaneExport">
           <div class="studio-split-layout">
-            <!-- Left: Maestro Outputs Vault -->
+            <!-- Left: Studio Audio Tracks Crate -->
             <div class="studio-controls-col" style="flex: 3;">
               <div class="studio-card" style="height: 100%; display: flex; flex-direction: column;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                   <div>
-                    <div class="studio-card-title" style="margin: 0;"><span>🎵</span> Desktop Maestro AI Outputs Crate</div>
+                    <div class="studio-card-title" style="margin: 0;"><span>🎵</span> Studio Audio Library &amp; Crate</div>
                     <div style="font-size: 11px; color: #94a3b8; font-family: monospace; margin-top: 3px;" id="maestroPathDisplay">
-                      Desktop\Maestro AI\app\outputs
+                      shared\audio
                     </div>
                   </div>
                   <button type="button" id="btnRescanMaestro" class="studio-action-btn">
-                    <span>🔄</span> Rescan Folder
+                    <span>🔄</span> Rescan Library
                   </button>
                 </div>
 
                 <!-- Tracks List Container -->
-                <div class="maestro-tracks-container" id="maestroTracksList">
+                <div class="maestro-tracks-container" id="maestroTracksList" style="flex: 1; overflow-y: auto;">
                   <div style="text-align: center; padding: 30px; color: #94a3b8;">
-                    Scanning Maestro AI output directory...
+                    Scanning studio audio library in shared/audio/...
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Right: Procedural Live Rhythm & Groove Generator -->
+            <!-- Right: Selected Track Details & Score Metadata -->
             <div class="studio-results-col" style="flex: 2;">
               <div class="studio-card">
-                <div class="studio-card-title"><span>🥁</span> Live Rhythm Backing Generator</div>
-                <div style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
-                  Real-time synthesized backing rhythms to jam, sing, or test your 1-shot vocal instruments over!
-                </div>
-
-                <div class="studio-form-grid">
-                  <div class="studio-field">
-                    <label>Rhythm Style</label>
-                    <select id="studioBackingPreset" class="studio-input">
-                      <option value="synthwave">80s Synthwave (Driving LinnDrum + Bass)</option>
-                      <option value="cyberpunk">Cyberpunk 4-on-the-Floor (128 BPM)</option>
-                      <option value="lofi">Lo-Fi Hip Hop Chill (85 BPM)</option>
-                      <option value="acid303">Acid 303 Groove (135 BPM)</option>
-                      <option value="rock60s">60s Rock Beat (120 BPM)</option>
-                    </select>
-                  </div>
-
-                  <div class="studio-field">
-                    <label>Backing BPM: <span id="studioBackingTempoVal" style="color: #38bdf8;">120</span></label>
-                    <input type="range" id="studioBackingTempo" min="70" max="160" value="120" class="studio-slider" />
-                  </div>
-
-                  <div class="studio-btn-row">
-                    <button type="button" id="btnStudioPlayBacking" class="studio-primary-btn" style="background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);">
-                      <span>▶️</span> Start Backing Beat
-                    </button>
-                    <button type="button" id="btnStudioStopBacking" class="studio-action-btn" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444;">
-                      <span>⏹️</span> Stop Beat
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Selected Track Details / ABC Score View -->
-              <div class="studio-card" style="margin-top: 12px;">
-                <div class="studio-card-title"><span>🎼</span> Track Score &amp; Prompt Metadata</div>
+                <div class="studio-card-title"><span>🎼</span> Track Metadata &amp; Generation Prompt</div>
                 <div id="maestroActiveTrackMeta" style="font-size: 12px; color: #94a3b8; line-height: 1.6;">
-                  Select any Maestro track on the left to inspect its ABC musical score, seed, and generation prompt details.
+                  Select any audio track on the left to inspect its BPM, musical key, model architecture, and prompt details.
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- PANE 5: Export & Mesh Lounge Share -->
-        <div class="studio-tab-pane" id="studioPaneExport">
-          <div class="studio-card">
-            <div class="studio-card-title"><span>🚀</span> Saved Studio Takes &amp; Mesh Lounge Broadcasting</div>
-            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">
-              Share your musical creations, synthesized speech, or 1-shot vocal recordings directly into the <strong>#lounge</strong> Mesh room.
-            </div>
-
-            <div class="studio-export-gallery" id="studioSavedTakesList">
-              <div style="text-align: center; padding: 40px; color: #64748b;">
-                No studio takes recorded yet. Record a performance in the Vocal Lab or save TTS audio to export here.
+              <div class="studio-card" style="margin-top: 12px;">
+                <div class="studio-card-title"><span>💬</span> Lounge Mesh Broadcasting</div>
+                <div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">
+                  Broadcast your generated music or cloned vocal tracks directly into the <strong>#lounge</strong> Mesh room for all connected peers!
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <input type="text" id="studioShareCommentInput" class="studio-input" placeholder="Optional message e.g. Check out my new YuE2 synthwave track!" />
+                  <button type="button" id="btnShareSelectedToLounge" class="studio-primary-btn" style="background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);">
+                    <span>🚀</span> Share Selected Track to #lounge
+                  </button>
+                </div>
               </div>
             </div>
           </div>

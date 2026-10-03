@@ -20139,29 +20139,45 @@ function initNexusStudio() {
   const tabs = document.querySelectorAll('.studio-tab-btn');
   const panes = document.querySelectorAll('.studio-tab-pane');
 
-  // Tab 1 Elements: Grand Prompts & AI Lyricist
+  // Tab 1 Elements: GPU Music Prompts
   const tempoSlider = document.getElementById('studioTempoSlider');
   const tempoInput = document.getElementById('studioTempoInput');
   const tempoDisplay = document.getElementById('studioTempoDisplay');
   const genreSelect = document.getElementById('studioGenreSelect');
   const keySelect = document.getElementById('studioKeySelect');
+  const scaleSelect = document.getElementById('studioScaleSelect');
   const moodSelect = document.getElementById('studioMoodSelect');
   const vocalTypeSelect = document.getElementById('studioVocalTypeSelect');
   const instrumentsInput = document.getElementById('studioInstrumentsInput');
+  const productionTextureSelect = document.getElementById('studioProductionTextureSelect');
   const sceneDescInput = document.getElementById('studioSceneDescInput');
-  const modelSelect = document.getElementById('studioModelSelect');
   const btnCraftPrompts = document.getElementById('btnStudioCraftPrompts');
-  const btnGenLyrics = document.getElementById('btnStudioGenLyrics');
   const outputAltPrompt = document.getElementById('studioOutputAltPrompt');
   const outputSunoTags = document.getElementById('studioOutputSunoTags');
-  const outputLyrics = document.getElementById('studioOutputLyrics');
+  const outputStructurePrompt = document.getElementById('studioOutputStructurePrompt');
   const btnCopyAltPrompt = document.getElementById('btnCopyAltPrompt');
   const btnCopySunoTags = document.getElementById('btnCopySunoTags');
+  const btnCopyStructurePrompt = document.getElementById('btnCopyStructurePrompt');
+  const btnSendStructureToLyrics = document.getElementById('btnSendStructureToLyrics');
+
+  // Tab 2 Elements: AI Lyrics Studio
+  const lyricProviderSelect = document.getElementById('studioLyricProviderSelect');
+  const lyricModelSelect = document.getElementById('studioLyricModelSelect');
+  const lyricTopicInput = document.getElementById('studioLyricTopicInput');
+  const lyricStructureSelect = document.getElementById('studioLyricStructureSelect');
+  const lyricRhymeSelect = document.getElementById('studioLyricRhymeSelect');
+  const lyricGenreContext = document.getElementById('studioLyricGenreContext');
+  const lyricMoodContext = document.getElementById('studioLyricMoodContext');
+  const lyricVocalCuesToggle = document.getElementById('studioLyricVocalCuesToggle');
+  const btnGenLyrics = document.getElementById('btnStudioGenLyrics');
+  const outputLyrics = document.getElementById('studioOutputLyrics');
+  const lyricModelBadge = document.getElementById('studioLyricModelBadge');
+  const lyricStatsBadge = document.getElementById('studioLyricStatsBadge');
   const btnCopyLyrics = document.getElementById('btnCopyLyrics');
   const btnSendLyricsToTts = document.getElementById('btnSendLyricsToTts');
+  const btnSendLyricsToF5 = document.getElementById('btnSendLyricsToF5');
 
-  // Tab 2 Elements: Text-to-Speech & Singing Synth
-  const ttsEngineSelect = document.getElementById('studioTtsEngineSelect');
+  // Tab 3 Elements: Text-to-Speech & AI Vocals
   const ttsVoiceSelect = document.getElementById('studioTtsVoiceSelect');
   const ttsRateSlider = document.getElementById('studioTtsRateSlider');
   const ttsRateVal = document.getElementById('studioTtsRateVal');
@@ -20170,41 +20186,40 @@ function initNexusStudio() {
   const ttsTextInput = document.getElementById('studioTtsTextInput');
   const btnSpeakTts = document.getElementById('btnStudioSpeakTts');
   const btnDownloadTts = document.getElementById('btnStudioDownloadTts');
-  const btnSendTtsToVocal = document.getElementById('btnStudioSendTtsToVocal');
+  const btnSendTtsToF5Ref = document.getElementById('btnStudioSendTtsToF5Ref');
   const ttsAudioPlayer = document.getElementById('studioTtsAudioPlayer');
   let currentTtsBlob = null;
   let currentTtsUrl = null;
 
-  // Tab 3 Elements: Vocal Lab & Virtual Keyboard
+  // Voice Reference & F5-TTS
   const btnRecordMic = document.getElementById('btnStudioRecordMic');
+  const studioRecordLabel = document.getElementById('studioRecordLabel');
   const uploadVocalInput = document.getElementById('studioUploadVocalInput');
   const btnUploadVocal = document.getElementById('btnStudioUploadVocal');
   const btnLoadPresetVocal = document.getElementById('btnStudioLoadPresetVocal');
-  const vocalSampleInfo = document.getElementById('vocalSampleInfo');
   const vocalSampleText = document.getElementById('vocalSampleText');
-  const vocalRootPitchText = document.getElementById('vocalRootPitchText');
-  const vocalActiveScaleText = document.getElementById('vocalActiveScaleText');
-  const scaleSelect = document.getElementById('studioScaleSelect');
-  const formantSlider = document.getElementById('studioFormantSlider');
-  const formantVal = document.getElementById('studioFormantVal');
-  const vocoderToggle = document.getElementById('studioVocoderToggle');
-  const carrierSelect = document.getElementById('studioCarrierSelect');
-  const reverbSlider = document.getElementById('studioReverbSlider');
-  const reverbVal = document.getElementById('studioReverbVal');
-  const btnRecordMelody = document.getElementById('btnStudioRecordMelody');
-  const btnStopMelody = document.getElementById('btnStudioStopMelody');
-  const pianoKeyboard = document.getElementById('vocalPianoKeyboard');
-  const visualizerCanvas = document.getElementById('vocalVisualizerCanvas');
 
-  // Tab 4 Elements: Desktop Maestro AI Outputs Crate & Backing Beats
+  const btnF5CloneVoice = document.getElementById('btnF5CloneVoice');
+  const f5CloneBtnText = document.getElementById('f5CloneBtnText');
+  const f5RefTextInput = document.getElementById('f5RefTextInput');
+  const f5GenTextInput = document.getElementById('f5GenTextInput');
+  const btnF5UseVocalSample = document.getElementById('btnF5UseVocalSample');
+  const f5StatusNotice = document.getElementById('f5StatusNotice');
+  const f5ResultContainer = document.getElementById('f5ResultContainer');
+  const f5ResultAudio = document.getElementById('f5ResultAudio');
+  const f5ResultTitle = document.getElementById('f5ResultTitle');
+  const f5ResultMeta = document.getElementById('f5ResultMeta');
+  const btnF5PlayResult = document.getElementById('btnF5PlayResult');
+  const btnF5ShareLounge = document.getElementById('btnF5ShareLounge');
+  let lastF5ClonedAudioUrl = '';
+
+  // Tab 4 Elements: Studio Audio Library & Lounge
   const maestroTracksList = document.getElementById('maestroTracksList');
   const btnRescanMaestro = document.getElementById('btnRescanMaestro');
   const maestroActiveTrackMeta = document.getElementById('maestroActiveTrackMeta');
-  const backingPresetSelect = document.getElementById('studioBackingPreset');
-  const backingTempoSlider = document.getElementById('studioBackingTempo');
-  const backingTempoVal = document.getElementById('studioBackingTempoVal');
-  const btnPlayBacking = document.getElementById('btnStudioPlayBacking');
-  const btnStopBacking = document.getElementById('btnStudioStopBacking');
+  const studioShareCommentInput = document.getElementById('studioShareCommentInput');
+  const btnShareSelectedToLounge = document.getElementById('btnShareSelectedToLounge');
+  let selectedStudioTrack = null;
 
   // Persistent Docked Player Bar Elements
   const studioPlayerPlayBtn = document.getElementById('studioPlayerPlayBtn');
@@ -20220,16 +20235,10 @@ function initNexusStudio() {
   // Audio Context & State
   let audioCtx = null;
   let vocalSampleBuffer = null;
-  let rootPitchHz = 220; // Default A3
   let isRecordingMic = false;
   let mediaRecorder = null;
   let recordedChunks = [];
   let currentPlayingTrack = null;
-  let backingInterval = null;
-  let backingStep = 0;
-  let isBackingPlaying = false;
-  let performanceRecorder = null;
-  let performanceChunks = [];
 
   // Core Audio Element for Docked Player
   let studioAudio = document.getElementById('studioCoreAudioPlayer');
@@ -20254,27 +20263,21 @@ function initNexusStudio() {
   function openStudio(initialTab) {
     studioModal.classList.remove('hidden');
     getAudioCtx();
-    if (initialTab) {
-      switchTab(initialTab);
-    }
+    const targetTab = initialTab || 'music-prompts';
+    switchTab(targetTab);
     loadTtsVoices();
-    loadMaestroTracks();
+    loadStudioAudioLibrary();
     if (!vocalSampleBuffer) {
       createDefaultVocalSample();
-    }
-    startVisualizerLoop();
-    if (typeof syncCivitaiInstalledToStudio === 'function') {
-      syncCivitaiInstalledToStudio();
     }
   }
 
   function closeStudio() {
     studioModal.classList.add('hidden');
-    stopBackingBeat();
   }
 
-  if (btnOpenStudio) btnOpenStudio.addEventListener('click', () => openStudio('prompts'));
-  if (heroOpenStudioBtn) heroOpenStudioBtn.addEventListener('click', () => openStudio('prompts'));
+  if (btnOpenStudio) btnOpenStudio.addEventListener('click', () => openStudio('music-prompts'));
+  if (heroOpenStudioBtn) heroOpenStudioBtn.addEventListener('click', () => openStudio('music-prompts'));
   if (btnCloseStudio) btnCloseStudio.addEventListener('click', closeStudio);
 
   studioModal.addEventListener('click', (e) => {
@@ -20293,35 +20296,43 @@ function initNexusStudio() {
     if (tile && tile.getAttribute('data-action') === 'studio') {
       const drawer = document.getElementById('mobileNavDrawer');
       if (drawer) drawer.classList.add('hidden');
-      openStudio('prompts');
+      openStudio('music-prompts');
     }
   });
 
   // Tab Switching
-  function switchTab(tabName) {
+  function switchTab(rawTabName) {
+    // Aliases
+    let tabName = rawTabName;
+    if (tabName === 'prompts') tabName = 'music-prompts';
+    if (tabName === 'maestro' || tabName === 'vocal') tabName = 'export';
+
     tabs.forEach(t => {
-      if (t.getAttribute('data-tab') === tabName) {
+      const tName = t.getAttribute('data-tab');
+      if (tName === tabName) {
         t.classList.add('active');
       } else {
         t.classList.remove('active');
       }
     });
+
     panes.forEach(p => {
       const id = p.id;
-      if (id === `studioPane${tabName.charAt(0).toUpperCase() + tabName.slice(1)}` ||
-          (tabName === 'prompts' && id === 'studioPanePrompts') ||
-          (tabName === 'tts' && id === 'studioPaneTts') ||
-          (tabName === 'vocal' && id === 'studioPaneVocal') ||
-          (tabName === 'maestro' && id === 'studioPaneMaestro') ||
-          (tabName === 'export' && id === 'studioPaneExport')) {
+      let matched = false;
+      if (tabName === 'music-prompts' && id === 'studioPaneMusicPrompts') matched = true;
+      else if (tabName === 'lyrics' && id === 'studioPaneLyrics') matched = true;
+      else if (tabName === 'tts' && id === 'studioPaneTts') matched = true;
+      else if (tabName === 'export' && id === 'studioPaneExport') matched = true;
+
+      if (matched) {
         p.classList.add('active');
       } else {
         p.classList.remove('active');
       }
     });
 
-    if (tabName === 'maestro') {
-      loadMaestroTracks();
+    if (tabName === 'export') {
+      loadStudioAudioLibrary();
     } else if (tabName === 'tts') {
       loadTtsVoices();
     }
@@ -20335,9 +20346,8 @@ function initNexusStudio() {
   });
 
   // ==========================================================================
-  // TAB 1: Grand Prompts & AI Lyricist
+  // TAB 1: GPU Music Prompts (YuE2, ACE-Step, Suno, Udio, MusicGen)
   // ==========================================================================
-
   if (tempoSlider && tempoInput && tempoDisplay) {
     tempoSlider.addEventListener('input', () => {
       tempoInput.value = tempoSlider.value;
@@ -20357,61 +20367,100 @@ function initNexusStudio() {
         tempoSlider.value = 120;
         tempoInput.value = 120;
         tempoDisplay.textContent = '120';
-        keySelect.value = 'E Major';
-        moodSelect.value = 'Nostalgic, romantic, yearning, late 60s warmth';
-        vocalTypeSelect.value = 'Male, mid-range baritone, smooth and passionate delivery';
-        instrumentsInput.value = 'Twangy electric guitar (with heavy vibrato), Hammond B3 organ, driving bass, tight drums';
-        sceneDescInput.value = "60's love soldiers fighting for love on a distant neon battlefield";
+        if (keySelect) keySelect.value = 'E';
+        if (scaleSelect) scaleSelect.value = 'Major';
+        if (moodSelect) moodSelect.value = 'Nostalgic, romantic, yearning, late 60s warmth';
+        if (vocalTypeSelect) vocalTypeSelect.value = 'Male, mid-range baritone, smooth and passionate delivery';
+        if (instrumentsInput) instrumentsInput.value = 'Twangy electric guitar (with heavy vibrato), Hammond B3 organ, driving bass, tight drums';
+        if (productionTextureSelect) productionTextureSelect.value = 'Rich, slightly reverb-heavy, late 60s/80s analog warmth; layered backing harmonies during chorus';
+        if (sceneDescInput) sceneDescInput.value = "60's love soldiers fighting for love on a distant battlefield, vintage tube amplifiers, heartfelt harmony";
       } else if (val.includes('Synthwave')) {
         tempoSlider.value = 124;
         tempoInput.value = 124;
         tempoDisplay.textContent = '124';
-        keySelect.value = 'F# Minor';
-        moodSelect.value = 'High-energy, relentless, adrenaline rush';
-        vocalTypeSelect.value = 'Robotic vocoder / synthetic harmonized vocals';
-        instrumentsInput.value = 'Analog Synthesizers, LinnDrum, tight driving bassline, twangy chorus guitar';
-        sceneDescInput.value = 'Late night rainy highway drive through towering cyberpunk neon skyscrapers';
+        if (keySelect) keySelect.value = 'E';
+        if (scaleSelect) scaleSelect.value = 'Minor';
+        if (moodSelect) moodSelect.value = 'High-energy, relentless, adrenaline rush';
+        if (vocalTypeSelect) vocalTypeSelect.value = 'Robotic vocoder / synthetic harmonized vocals';
+        if (instrumentsInput) instrumentsInput.value = 'Analog Synthesizers, LinnDrum, tight driving bassline, twangy electric guitar with chorus';
+        if (productionTextureSelect) productionTextureSelect.value = 'Rich, slightly reverb-heavy, late 60s/80s analog warmth; layered backing harmonies during chorus';
+        if (sceneDescInput) sceneDescInput.value = 'Late night rainy highway drive through towering cyberpunk neon skyscrapers';
+      } else if (val.includes('EDM')) {
+        tempoSlider.value = 128;
+        tempoInput.value = 128;
+        tempoDisplay.textContent = '128';
+        if (keySelect) keySelect.value = 'F#';
+        if (scaleSelect) scaleSelect.value = 'Minor';
+        if (moodSelect) moodSelect.value = 'Euphoric, triumphant, soaring melodies';
+        if (vocalTypeSelect) vocalTypeSelect.value = 'Female, ethereal soprano, soulful and soaring';
+        if (instrumentsInput) instrumentsInput.value = 'Super-saw leads, punchy 909 kick, sidechained sub-bass, white noise risers, pluck synth';
+        if (productionTextureSelect) productionTextureSelect.value = 'Pristine modern club master, tight punchy 808s, wide stereo imaging, aggressive sidechain';
+        if (sceneDescInput) sceneDescInput.value = 'Massive festival crowd at midnight, laser beams cutting through fog, exhilarating drop';
       } else if (val.includes('Lo-Fi')) {
         tempoSlider.value = 85;
         tempoInput.value = 85;
         tempoDisplay.textContent = '85';
-        keySelect.value = 'C Major';
-        moodSelect.value = 'Melancholic, atmospheric, rain-soaked';
-        vocalTypeSelect.value = 'Whispered close-mic intimate ASMR vocal';
-        instrumentsInput.value = 'Mellow Rhodes piano, vinyl crackle, warm upright bass, relaxed boom-bap drums';
-        sceneDescInput.value = 'Study session beside an open window with gentle thunder and rain';
+        if (keySelect) keySelect.value = 'C';
+        if (scaleSelect) scaleSelect.value = 'Major';
+        if (moodSelect) moodSelect.value = 'Melancholic, atmospheric, rain-soaked';
+        if (vocalTypeSelect) vocalTypeSelect.value = 'Whispered close-mic intimate ASMR vocal';
+        if (instrumentsInput) instrumentsInput.value = 'Mellow Rhodes piano, vinyl crackle, warm upright bass, relaxed boom-bap drums';
+        if (productionTextureSelect) productionTextureSelect.value = 'Lo-Fi vinyl crackle, warm cassette degradation, intimate room acoustics, relaxed dynamics';
+        if (sceneDescInput) sceneDescInput.value = 'Study session beside an open window with gentle thunder and rain';
+      } else if (val.includes('Acid Techno')) {
+        tempoSlider.value = 135;
+        tempoInput.value = 135;
+        tempoDisplay.textContent = '135';
+        if (keySelect) keySelect.value = 'A';
+        if (scaleSelect) scaleSelect.value = 'Minor';
+        if (moodSelect) moodSelect.value = 'Dark, aggressive, brooding cyberpunk';
+        if (vocalTypeSelect) vocalTypeSelect.value = 'Instrumental only (No Vocals)';
+        if (instrumentsInput) instrumentsInput.value = 'Roland TB-303 squelch acid lead with resonant filter sweeps, TR-909 kick, open hi-hats, distorted sub';
+        if (productionTextureSelect) productionTextureSelect.value = 'Pristine modern club master, tight punchy 808s, wide stereo imaging, aggressive sidechain';
+        if (sceneDescInput) sceneDescInput.value = 'Underground warehouse rave, strobe lights, relentless squelching 303 acid resonance';
       }
+
+      // Sync context to Lyrics Studio inputs as well
+      if (lyricGenreContext && genreSelect) lyricGenreContext.value = genreSelect.value;
+      if (lyricMoodContext && moodSelect) lyricMoodContext.value = moodSelect.value;
     });
   }
 
-  // Craft Grand Prompts
+  // Craft GPU Music Prompts
   if (btnCraftPrompts) {
     btnCraftPrompts.addEventListener('click', async () => {
       btnCraftPrompts.disabled = true;
-      btnCraftPrompts.innerHTML = '<span>⏳</span> Crafting Prompts...';
+      btnCraftPrompts.innerHTML = '<span>⏳</span> Crafting GPU Prompts...';
       try {
-        const resp = await fetch('/v1/studio/prompts/grand', {
+        const resp = await fetch('/v1/studio/music-prompts/craft', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            genre: genreSelect.value,
-            tempo: parseInt(tempoSlider.value, 10),
-            key: keySelect.value,
-            mood: moodSelect.value,
-            vocalType: vocalTypeSelect.value,
-            instruments: instrumentsInput.value ? [instrumentsInput.value] : [],
-            description: sceneDescInput.value || 'atmospheric journey',
-            model: modelSelect.value,
+            genre: genreSelect ? genreSelect.value : '80s Synthwave',
+            tempo: parseInt(tempoSlider ? tempoSlider.value : 120, 10),
+            key: keySelect ? keySelect.value : 'E',
+            scale: scaleSelect ? scaleSelect.value : 'Minor',
+            mood: moodSelect ? moodSelect.value : 'Nostalgic',
+            vocalType: vocalTypeSelect ? vocalTypeSelect.value : 'Male Baritone',
+            instruments: instrumentsInput ? [instrumentsInput.value] : [],
+            productionTexture: productionTextureSelect ? productionTextureSelect.value : '',
+            description: sceneDescInput ? sceneDescInput.value : '',
           }),
         });
         const data = await resp.json();
         if (data.success) {
-          outputAltPrompt.value = data.altPrompt;
-          outputSunoTags.value = data.sunoTags;
-          if (!outputLyrics.value.trim()) {
-            outputLyrics.value = data.structurePrompt;
+          if (outputAltPrompt) outputAltPrompt.value = data.altPrompt;
+          if (outputSunoTags) outputSunoTags.value = data.sunoTags;
+          if (outputStructurePrompt) outputStructurePrompt.value = data.structurePrompt;
+
+          // Sync context to Lyrics tab
+          if (lyricGenreContext && genreSelect) lyricGenreContext.value = genreSelect.value;
+          if (lyricMoodContext && moodSelect) lyricMoodContext.value = moodSelect.value;
+          if (lyricTopicInput && sceneDescInput && sceneDescInput.value && !lyricTopicInput.value) {
+            lyricTopicInput.value = sceneDescInput.value;
           }
-          if (window.showNotification) window.showNotification('✨ Grand Musical Prompts Crafted!');
+
+          if (window.showNotification) window.showNotification('✨ GPU Music Prompts Crafted!');
         } else {
           alert('Failed to craft prompts: ' + (data.error || 'Unknown error'));
         }
@@ -20419,45 +20468,12 @@ function initNexusStudio() {
         alert('Network error crafting prompts: ' + err.message);
       } finally {
         btnCraftPrompts.disabled = false;
-        btnCraftPrompts.innerHTML = '<span>✨</span> Craft Grand Prompts';
+        btnCraftPrompts.innerHTML = '<span>✨</span> Craft GPU Music Prompts';
       }
     });
   }
 
-  // Generate Full Lyrics with Ollama / Gemma
-  if (btnGenLyrics) {
-    btnGenLyrics.addEventListener('click', async () => {
-      btnGenLyrics.disabled = true;
-      btnGenLyrics.innerHTML = '<span>🧠</span> Writing Lyrics (Local AI)...';
-      try {
-        const resp = await fetch('/v1/studio/lyrics/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: sceneDescInput.value || `${genreSelect.value} track in ${keySelect.value}`,
-            genre: genreSelect.value,
-            mood: moodSelect.value,
-            vocalStyle: vocalTypeSelect.value,
-            model: modelSelect.value,
-          }),
-        });
-        const data = await resp.json();
-        if (data.success && data.lyrics) {
-          outputLyrics.value = data.lyrics;
-          if (window.showNotification) window.showNotification(`🎵 Lyrics generated with ${data.modelUsed || 'AI Lyricist'}!`);
-        } else {
-          alert('Failed to generate lyrics: ' + (data.error || 'Unknown error'));
-        }
-      } catch (err) {
-        alert('Network error generating lyrics: ' + err.message);
-      } finally {
-        btnGenLyrics.disabled = false;
-        btnGenLyrics.innerHTML = '<span>🤖</span> Write Full Lyrics';
-      }
-    });
-  }
-
-  // Copy Buttons
+  // Copy Buttons helper
   function setupCopyButton(btn, targetEl, label) {
     if (!btn || !targetEl) return;
     btn.addEventListener('click', async () => {
@@ -20477,26 +20493,135 @@ function initNexusStudio() {
   }
   setupCopyButton(btnCopyAltPrompt, outputAltPrompt, 'YuE2 Prompt');
   setupCopyButton(btnCopySunoTags, outputSunoTags, 'Tags');
+  setupCopyButton(btnCopyStructurePrompt, outputStructurePrompt, 'Blueprint');
+
+  // Send Blueprint to Lyrics Studio
+  if (btnSendStructureToLyrics) {
+    btnSendStructureToLyrics.addEventListener('click', () => {
+      if (sceneDescInput && lyricTopicInput && sceneDescInput.value) {
+        lyricTopicInput.value = sceneDescInput.value;
+      }
+      if (genreSelect && lyricGenreContext) lyricGenreContext.value = genreSelect.value;
+      if (moodSelect && lyricMoodContext) lyricMoodContext.value = moodSelect.value;
+      switchTab('lyrics');
+      if (window.showNotification) window.showNotification('✍️ Switched to AI Lyrics Studio with current musical context!');
+    });
+  }
+
+  // ==========================================================================
+  // TAB 2: AI Lyrics Studio (Offline Model or Online Model)
+  // ==========================================================================
+  if (lyricProviderSelect && lyricModelSelect) {
+    lyricProviderSelect.addEventListener('change', () => {
+      const prov = lyricProviderSelect.value;
+      if (prov === 'offline') {
+        lyricModelSelect.innerHTML = `
+          <option value="gemma-4-e4b-uncensored-hauhaucs-aggressive-q4:latest" selected>Gemma 4 e4b Uncensored (Local GPU • Ultra Fast)</option>
+          <option value="qwen3.6-35b-a3b-ud-q4_k_m:latest">Qwen 3.6 35B (Local GPU • Deep Lyricism)</option>
+          <option value="sovereign-coder:brain">Sovereign Coder Brain (Local GPU)</option>
+        `;
+      } else {
+        lyricModelSelect.innerHTML = `
+          <option value="deepseek-chat" selected>DeepSeek Chat (Online • High Coherence)</option>
+          <option value="gpt-4o">OpenAI GPT-4o (Online)</option>
+          <option value="claude-3-7-sonnet">Claude 3.7 Sonnet (Online)</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Online)</option>
+          <option value="auto">Auto Router (Smart Selection)</option>
+        `;
+      }
+    });
+  }
+
+  if (btnGenLyrics) {
+    btnGenLyrics.addEventListener('click', async () => {
+      const topic = lyricTopicInput ? lyricTopicInput.value.trim() : '';
+      const genre = lyricGenreContext ? lyricGenreContext.value.trim() : (genreSelect ? genreSelect.value : 'Synthwave');
+      const mood = lyricMoodContext ? lyricMoodContext.value.trim() : (moodSelect ? moodSelect.value : 'Energetic');
+      const vocalStyle = vocalTypeSelect ? vocalTypeSelect.value : 'Melodic Baritone';
+      const structureType = lyricStructureSelect ? lyricStructureSelect.value : 'pop';
+      const rhymeScheme = lyricRhymeSelect ? lyricRhymeSelect.value : 'aabb';
+      const vocalCues = lyricVocalCuesToggle ? lyricVocalCuesToggle.checked : true;
+      const provider = lyricProviderSelect ? lyricProviderSelect.value : 'offline';
+      const model = lyricModelSelect ? lyricModelSelect.value : '';
+
+      btnGenLyrics.disabled = true;
+      btnGenLyrics.innerHTML = `<span>⏳</span> Writing Lyrics (${provider === 'offline' ? 'Local GPU' : 'Online AI'})...`;
+
+      try {
+        const resp = await fetch('/v1/studio/lyrics/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: topic || `Song about ${mood} feelings in ${genre}`,
+            genre,
+            mood,
+            vocalStyle,
+            structureType,
+            rhymeScheme,
+            vocalCues,
+            provider,
+            model,
+          }),
+        });
+
+        const data = await resp.json();
+        if (data.success && data.lyrics) {
+          if (outputLyrics) outputLyrics.value = data.lyrics;
+          if (lyricModelBadge) lyricModelBadge.textContent = `${data.modelUsed || 'AI Lyricist'} (${data.provider || provider})`;
+
+          const lines = data.lyrics.split('\n').filter(l => l.trim().length > 0).length;
+          const sections = (data.structure || []).length;
+          if (lyricStatsBadge) lyricStatsBadge.textContent = `${sections} Sections • ${lines} Lines • Structured for YuE2 & Vocals`;
+
+          if (window.showNotification) window.showNotification(`🎵 Lyrics generated with ${data.modelUsed || 'AI Lyricist'}!`);
+        } else {
+          alert('Failed to generate lyrics: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error writing lyrics: ' + err.message);
+      } finally {
+        btnGenLyrics.disabled = false;
+        btnGenLyrics.innerHTML = '<span>🤖</span> Write Full AI Lyrics';
+      }
+    });
+  }
+
   setupCopyButton(btnCopyLyrics, outputLyrics, 'Lyrics');
 
   // Send Lyrics to TTS
   if (btnSendLyricsToTts) {
     btnSendLyricsToTts.addEventListener('click', () => {
-      const lyrics = outputLyrics.value;
+      const lyrics = outputLyrics ? outputLyrics.value : '';
       if (!lyrics.trim()) {
-        alert('Please write or craft lyrics first!');
+        alert('Please write or generate lyrics first!');
         return;
       }
-      const ttsInput = document.getElementById('studioTtsTextInput');
-      if (ttsInput) {
-        ttsInput.value = lyrics;
+      if (ttsTextInput) {
+        ttsTextInput.value = lyrics;
       }
       switchTab('tts');
+      if (window.showNotification) window.showNotification('🗣️ Lyrics transferred to Text-to-Speech!');
+    });
+  }
+
+  // Send Lyrics to F5-TTS
+  if (btnSendLyricsToF5) {
+    btnSendLyricsToF5.addEventListener('click', () => {
+      const lyrics = outputLyrics ? outputLyrics.value : '';
+      if (!lyrics.trim()) {
+        alert('Please write or generate lyrics first!');
+        return;
+      }
+      if (f5GenTextInput) {
+        f5GenTextInput.value = lyrics;
+      }
+      switchTab('tts');
+      if (window.showNotification) window.showNotification('🧬 Lyrics transferred to F5-TTS Target Text!');
     });
   }
 
   // ==========================================================================
-  // TAB 2: Text-to-Speech & Singing Synth
+  // TAB 3: Text-to-Speech & AI Vocals (Windows System.Speech + F5-TTS)
   // ==========================================================================
   if (ttsRateSlider && ttsRateVal) {
     ttsRateSlider.addEventListener('input', () => {
@@ -20509,7 +20634,6 @@ function initNexusStudio() {
     });
   }
 
-  // Load Voices from backend
   async function loadTtsVoices() {
     if (!ttsVoiceSelect) return;
     try {
@@ -20542,38 +20666,26 @@ function initNexusStudio() {
     });
   });
 
-  // Synthesize Speech
+  // Synthesize System TTS
   if (btnSpeakTts) {
     btnSpeakTts.addEventListener('click', async () => {
-      const text = ttsTextInput.value.trim();
+      const text = ttsTextInput ? ttsTextInput.value.trim() : '';
       if (!text) {
-        alert('Please enter text to synthesize!');
+        alert('Please enter text or lyrics to synthesize!');
         return;
       }
       btnSpeakTts.disabled = true;
       btnSpeakTts.innerHTML = '<span>⏳</span> Synthesizing WAV...';
 
       try {
-        const engine = ttsEngineSelect ? ttsEngineSelect.value : 'system_speech';
-
-        if (engine === 'browser_speech' && 'speechSynthesis' in window) {
-          const utter = new SpeechSynthesisUtterance(text);
-          utter.rate = 1 + (parseInt(ttsRateSlider.value, 10) / 10);
-          window.speechSynthesis.speak(utter);
-          btnSpeakTts.disabled = false;
-          btnSpeakTts.innerHTML = '<span>🔊</span> Synthesize Speech (WAV)';
-          return;
-        }
-
-        // Offline Windows System.Speech WAV Endpoint
         const resp = await fetch('/v1/studio/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text,
-            voice: ttsVoiceSelect.value,
-            rate: parseInt(ttsRateSlider.value, 10),
-            volume: parseInt(ttsVolSlider.value, 10),
+            voice: ttsVoiceSelect ? ttsVoiceSelect.value : 'Microsoft Hazel Desktop',
+            rate: parseInt(ttsRateSlider ? ttsRateSlider.value : 0, 10),
+            volume: parseInt(ttsVolSlider ? ttsVolSlider.value : 100, 10),
           }),
         });
 
@@ -20587,11 +20699,13 @@ function initNexusStudio() {
         if (currentTtsUrl) URL.revokeObjectURL(currentTtsUrl);
         currentTtsUrl = URL.createObjectURL(blob);
 
-        ttsAudioPlayer.src = currentTtsUrl;
-        ttsAudioPlayer.play();
+        if (ttsAudioPlayer) {
+          ttsAudioPlayer.src = currentTtsUrl;
+          ttsAudioPlayer.play().catch(() => {});
+        }
 
         if (btnDownloadTts) btnDownloadTts.disabled = false;
-        loadTrackIntoStudioPlayer(currentTtsUrl, `TTS - ${ttsVoiceSelect.value}`, 'Windows System.Speech Offline WAV');
+        loadTrackIntoStudioPlayer(currentTtsUrl, `TTS - ${ttsVoiceSelect ? ttsVoiceSelect.value : 'Voice'}`, 'Windows System.Speech Offline WAV');
         if (window.showNotification) window.showNotification('🔊 Speech synthesized in offline WAV!');
       } catch (err) {
         alert('TTS synthesis error: ' + err.message);
@@ -20602,145 +20716,64 @@ function initNexusStudio() {
     });
   }
 
-  // Download TTS WAV
   if (btnDownloadTts) {
     btnDownloadTts.addEventListener('click', () => {
       if (!currentTtsBlob) return;
       const a = document.createElement('a');
       a.href = currentTtsUrl;
-      a.download = `nexus_speech_${Date.now()}.wav`;
+      a.download = `nexus_tts_${Date.now()}.wav`;
       a.click();
     });
   }
 
-  // Load TTS WAV into Vocal Lab
-  if (btnSendTtsToVocal) {
-    btnSendTtsToVocal.addEventListener('click', async () => {
+  // Use synthesized TTS audio as F5 reference voice
+  if (btnSendTtsToF5Ref) {
+    btnSendTtsToF5Ref.addEventListener('click', async () => {
       if (!currentTtsBlob) {
-        // Synthesize first if not present
-        if (btnSpeakTts) await btnSpeakTts.click();
-        if (!currentTtsBlob) return;
+        alert('Please synthesize a TTS audio take first!');
+        return;
       }
-      const arrayBuf = await currentTtsBlob.arrayBuffer();
-      const ctx = getAudioCtx();
-      ctx.decodeAudioData(arrayBuf, (audioBuf) => {
-        loadVocalAudioBuffer(audioBuf, `TTS: ${ttsVoiceSelect.value}`);
-        switchTab('vocal');
-        if (window.showNotification) window.showNotification('🎙️ TTS voice loaded into 1-Shot Vocal Lab!');
-      }, (err) => {
-        alert('Failed to decode TTS audio buffer: ' + err);
-      });
-    });
-  }
-
-  // ==========================================================================
-  // TAB 3: One-Shot Vocal Lab (Sampler, Autotune, Virtual Piano Keyboard)
-  // ==========================================================================
-  if (formantSlider && formantVal) {
-    formantSlider.addEventListener('input', () => {
-      formantVal.textContent = `${formantSlider.value > 0 ? '+' : ''}${formantSlider.value} ST`;
-    });
-  }
-  if (reverbSlider && reverbVal) {
-    reverbSlider.addEventListener('input', () => {
-      reverbVal.textContent = `${reverbSlider.value}%`;
-    });
-  }
-  if (scaleSelect && vocalActiveScaleText) {
-    scaleSelect.addEventListener('change', () => {
-      vocalActiveScaleText.textContent = scaleSelect.options[scaleSelect.selectedIndex].text;
-    });
-  }
-
-  // Autocorrelation Pitch Detector (F0 estimation)
-  function detectRootPitch(buffer) {
-    const data = buffer.getChannelData(0);
-    const sampleRate = buffer.sampleRate;
-    const size = Math.min(data.length, 4096);
-    let rms = 0;
-    for (let i = 0; i < size; i++) {
-      rms += data[i] * data[i];
-    }
-    rms = Math.sqrt(rms / size);
-    if (rms < 0.01) return 220; // default A3 if silent
-
-    let r1 = 0, r2 = size - 1, thres = 0.2;
-    for (let i = 0; i < size / 2; i++) {
-      if (Math.abs(data[i]) < thres) { r1 = i; break; }
-    }
-    for (let i = 1; i < size / 2; i++) {
-      if (Math.abs(data[size - i]) < thres) { r2 = size - i; break; }
-    }
-
-    const trimmed = data.slice(r1, r2);
-    const trimmedSize = trimmed.length;
-    const c = new Float32Array(trimmedSize);
-
-    for (let i = 0; i < trimmedSize; i++) {
-      for (let j = 0; j < trimmedSize - i; j++) {
-        c[i] += trimmed[j] * trimmed[j + i];
+      try {
+        const arrayBuf = await currentTtsBlob.arrayBuffer();
+        const ctx = getAudioCtx();
+        ctx.decodeAudioData(arrayBuf, (audioBuf) => {
+          vocalSampleBuffer = audioBuf;
+          if (vocalSampleText) {
+            vocalSampleText.textContent = `TTS Reference: "${ttsVoiceSelect ? ttsVoiceSelect.value : 'Voice'}" (${audioBuf.duration.toFixed(1)}s) loaded!`;
+          }
+          if (f5RefTextInput && ttsTextInput && ttsTextInput.value) {
+            f5RefTextInput.value = ttsTextInput.value.slice(0, 100);
+          }
+          if (window.showNotification) window.showNotification('🧬 TTS take linked as F5-TTS reference voice!');
+        });
+      } catch (err) {
+        alert('Failed to load TTS audio as reference: ' + err.message);
       }
-    }
-
-    let d = 0;
-    while (c[d] > c[d + 1]) d++;
-    let maxval = -1, maxpos = -1;
-    for (let i = d; i < trimmedSize; i++) {
-      if (c[i] > maxval) {
-        maxval = c[i];
-        maxpos = i;
-      }
-    }
-
-    if (maxpos <= 0) return 220;
-    const detectedHz = sampleRate / maxpos;
-    return Math.max(55, Math.min(880, detectedHz)); // Bound between A1 and A5
+    });
   }
 
-  function freqToNoteName(freq) {
-    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const midi = Math.round(69 + 12 * Math.log2(freq / 440));
-    const name = names[(midi % 12 + 12) % 12];
-    const oct = Math.floor(midi / 12) - 1;
-    return `${name}${oct}`;
-  }
-
-  function loadVocalAudioBuffer(audioBuf, label) {
-    vocalSampleBuffer = audioBuf;
-    rootPitchHz = detectRootPitch(audioBuf);
-    const noteName = freqToNoteName(rootPitchHz);
-    const dur = audioBuf.duration.toFixed(1);
-
-    if (vocalRootPitchText) {
-      vocalRootPitchText.textContent = `${noteName} (${Math.round(rootPitchHz)} Hz)`;
-    }
-    if (vocalSampleText) {
-      vocalSampleText.textContent = `Sample: "${label}" (${dur}s) • Root Pitch: ${noteName} (${Math.round(rootPitchHz)} Hz) • Playable across keyboard!`;
-    }
-  }
-
-  // Create Default Synthetic Voice Sample (Warm Vowel Vibe)
+  // --- Voice Reference Audio Sources for F5-TTS ---
   function createDefaultVocalSample() {
     const ctx = getAudioCtx();
-    const duration = 2.0;
+    const duration = 2.5;
     const sampleRate = ctx.sampleRate;
-    const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
+    const buffer = ctx.createBuffer(1, Math.round(sampleRate * duration), sampleRate);
     const data = buffer.getChannelData(0);
     const f0 = 220; // A3
 
     for (let i = 0; i < data.length; i++) {
       const t = i / sampleRate;
-      // Vowel harmonics: F0, 2*F0, 3*F0, 4*F0, 5*F0 with formant peaks
-      const vibrato = 1 + 0.015 * Math.sin(2 * Math.PI * 5.2 * t);
+      const vibrato = 1 + 0.012 * Math.sin(2 * Math.PI * 5.0 * t);
       const s1 = 0.5 * Math.sin(2 * Math.PI * f0 * vibrato * t);
-      const s2 = 0.35 * Math.sin(2 * Math.PI * 2 * f0 * vibrato * t);
+      const s2 = 0.3 * Math.sin(2 * Math.PI * 2 * f0 * vibrato * t);
       const s3 = 0.2 * Math.sin(2 * Math.PI * 3 * f0 * vibrato * t);
-      const s4 = 0.15 * Math.sin(2 * Math.PI * 4 * f0 * vibrato * t);
-      // Gentle attack and decay envelope
-      const env = Math.min(1, t / 0.05) * Math.max(0, 1 - (t - 0.5) / 1.5);
-      data[i] = (s1 + s2 + s3 + s4) * env * 0.8;
+      const env = Math.min(1, t / 0.08) * Math.max(0, 1 - (t - 0.4) / 2.1);
+      data[i] = (s1 + s2 + s3) * env * 0.8;
     }
-    loadVocalAudioBuffer(buffer, 'Default Analog Vowel Vibe');
+    vocalSampleBuffer = buffer;
+    if (vocalSampleText) {
+      vocalSampleText.textContent = 'Default Warm Vocal Reference loaded (2.5s).';
+    }
   }
 
   if (btnLoadPresetVocal) {
@@ -20750,11 +20783,10 @@ function initNexusStudio() {
     });
   }
 
-  // Microphone Recording
+  // Record Mic Reference Take
   if (btnRecordMic) {
     btnRecordMic.addEventListener('click', async () => {
       if (isRecordingMic) {
-        // Stop recording
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           mediaRecorder.stop();
         }
@@ -20774,33 +20806,35 @@ function initNexusStudio() {
         mediaRecorder.onstop = async () => {
           isRecordingMic = false;
           btnRecordMic.classList.remove('recording');
-          btnRecordMic.querySelector('#studioRecordLabel').textContent = 'Record 1-Shot Voice';
+          if (studioRecordLabel) studioRecordLabel.textContent = 'Record Mic Reference';
           stream.getTracks().forEach(t => t.stop());
 
           const blob = new Blob(recordedChunks, { type: 'audio/webm' });
           const arrayBuf = await blob.arrayBuffer();
           ctx.decodeAudioData(arrayBuf, (audioBuf) => {
-            loadVocalAudioBuffer(audioBuf, 'Live Mic Vocal Take');
-            if (window.showNotification) window.showNotification('🎙️ Voice recorded and tuned to keyboard!');
+            vocalSampleBuffer = audioBuf;
+            if (vocalSampleText) {
+              vocalSampleText.textContent = `Mic Take recorded (${audioBuf.duration.toFixed(1)}s) · Ready for F5-TTS!`;
+            }
+            if (window.showNotification) window.showNotification('🎙️ Voice recorded as F5-TTS reference clip!');
           });
         };
 
         mediaRecorder.start();
         isRecordingMic = true;
         btnRecordMic.classList.add('recording');
-        btnRecordMic.querySelector('#studioRecordLabel').textContent = 'Stop Recording (Sing a note!)';
+        if (studioRecordLabel) studioRecordLabel.textContent = 'Stop Recording (Speak/Sing)...';
 
-        // Auto-stop after 3 seconds for 1-shot note
         setTimeout(() => {
           if (isRecordingMic) mediaRecorder.stop();
-        }, 3200);
+        }, 5000); // 5 seconds max for reference clip
       } catch (err) {
         alert('Microphone access error: ' + err.message);
       }
     });
   }
 
-  // File Upload
+  // Upload WAV Reference File
   if (btnUploadVocal && uploadVocalInput) {
     btnUploadVocal.addEventListener('click', () => uploadVocalInput.click());
     uploadVocalInput.addEventListener('change', async (e) => {
@@ -20809,15 +20843,18 @@ function initNexusStudio() {
       const ctx = getAudioCtx();
       const arrayBuf = await file.arrayBuffer();
       ctx.decodeAudioData(arrayBuf, (audioBuf) => {
-        loadVocalAudioBuffer(audioBuf, file.name);
-        if (window.showNotification) window.showNotification(`📁 Sample "${file.name}" loaded!`);
+        vocalSampleBuffer = audioBuf;
+        if (vocalSampleText) {
+          vocalSampleText.textContent = `Sample: "${file.name}" (${audioBuf.duration.toFixed(1)}s) loaded!`;
+        }
+        if (window.showNotification) window.showNotification(`📁 Voice reference "${file.name}" loaded!`);
       }, (err) => {
         alert('Error decoding audio file: ' + err);
       });
     });
   }
 
-  // Convert Web Audio AudioBuffer to 16-bit PCM WAV Data URL
+  // Convert Web Audio buffer to WAV Data URL
   function audioBufferToWavDataUrl(buffer) {
     const numChannels = buffer.numberOfChannels || 1;
     const sampleRate = buffer.sampleRate || 24000;
@@ -20871,22 +20908,7 @@ function initNexusStudio() {
     return 'data:audio/wav;base64,' + btoa(binary);
   }
 
-  // --- F5-TTS Flow Matching 1-Shot Voice Cloning UI Handlers ---
-  const btnF5CloneVoice = document.getElementById('btnF5CloneVoice');
-  const f5CloneBtnText = document.getElementById('f5CloneBtnText');
-  const f5RefTextInput = document.getElementById('f5RefTextInput');
-  const f5GenTextInput = document.getElementById('f5GenTextInput');
-  const btnF5UseVocalSample = document.getElementById('btnF5UseVocalSample');
-  const f5StatusNotice = document.getElementById('f5StatusNotice');
-  const f5ResultContainer = document.getElementById('f5ResultContainer');
-  const f5ResultAudio = document.getElementById('f5ResultAudio');
-  const f5ResultTitle = document.getElementById('f5ResultTitle');
-  const f5ResultMeta = document.getElementById('f5ResultMeta');
-  const btnF5PlayResult = document.getElementById('btnF5PlayResult');
-  const btnF5ShareLounge = document.getElementById('btnF5ShareLounge');
-  const btnF5LoadToSampler = document.getElementById('btnF5LoadToSampler');
-  let lastF5ClonedAudioUrl = '';
-
+  // --- F5-TTS Flow Matching Voice Cloning Action ---
   if (btnF5UseVocalSample) {
     btnF5UseVocalSample.addEventListener('click', () => {
       if (!vocalSampleBuffer) {
@@ -20926,9 +20948,9 @@ function initNexusStudio() {
       const refAudioDataUrl = audioBufferToWavDataUrl(vocalSampleBuffer);
 
       if (f5CloneBtnText) f5CloneBtnText.textContent = 'Cloning with F5-TTS...';
-      if (btnF5CloneVoice) btnF5CloneVoice.disabled = true;
+      btnF5CloneVoice.disabled = true;
       if (f5StatusNotice) {
-        f5StatusNotice.textContent = '🧬 Running Flow Matching DiT inference on NVIDIA RTX 4060...';
+        f5StatusNotice.textContent = '🧬 Running Flow Matching DiT inference on NVIDIA RTX GPU...';
         f5StatusNotice.style.color = '#c084fc';
       }
 
@@ -20962,6 +20984,7 @@ function initNexusStudio() {
             f5StatusNotice.textContent = `✅ Voice cloned successfully! (${data.engine || 'F5-TTS'})`;
             f5StatusNotice.style.color = '#4ade80';
           }
+          loadTrackIntoStudioPlayer(data.audioUrl, `F5 Cloned - ${genText.slice(0, 30)}...`, 'F5-TTS Flow Matching Audio');
           if (window.showNotification) window.showNotification('🧬 Voice cloned and synthesized with F5-TTS!');
         } else {
           throw new Error(data.error || 'Failed to clone voice');
@@ -20973,7 +20996,7 @@ function initNexusStudio() {
         }
       } finally {
         if (f5CloneBtnText) f5CloneBtnText.textContent = 'Clone & Synthesize with F5-TTS';
-        if (btnF5CloneVoice) btnF5CloneVoice.disabled = false;
+        btnF5CloneVoice.disabled = false;
       }
     });
   }
@@ -20991,11 +21014,11 @@ function initNexusStudio() {
         const fileParam = lastF5ClonedAudioUrl.includes('file=')
           ? decodeURIComponent(lastF5ClonedAudioUrl.split('file=')[1].split('&')[0])
           : (lastF5ClonedAudioUrl.includes('path=') ? decodeURIComponent(lastF5ClonedAudioUrl.split('path=')[1].split('&')[0]) : 'cloned_voice.wav');
-        await fetch('/v1/studio/maestro/share-to-lounge', {
+        await fetch('/v1/studio/audio/share-to-lounge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            file: fileParam,
+            fileName: fileParam,
             comment: `🧬 Cloned Voice Take: "${(f5GenTextInput ? f5GenTextInput.value : 'F5 Take').slice(0, 60)}"`,
           }),
         });
@@ -21006,288 +21029,22 @@ function initNexusStudio() {
     });
   }
 
-  if (btnF5LoadToSampler) {
-    btnF5LoadToSampler.addEventListener('click', async () => {
-      if (!lastF5ClonedAudioUrl) return;
-      try {
-        const resp = await fetch(lastF5ClonedAudioUrl);
-        const arrayBuf = await resp.arrayBuffer();
-        const ctx = getAudioCtx();
-        ctx.decodeAudioData(arrayBuf, (audioBuf) => {
-          loadVocalAudioBuffer(audioBuf, 'F5 Cloned Voice');
-          if (window.showNotification) window.showNotification('🎹 Cloned voice loaded into Virtual Keyboard!');
-        });
-      } catch (err) {
-        alert('Failed to load cloned voice into sampler: ' + err.message);
-      }
-    });
-  }
-
-  // Autotune Scale Degree Quantizer
-  const SCALE_DEGREES = {
-    chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-    major: [0, 2, 4, 5, 7, 9, 11],
-    natural_minor: [0, 2, 3, 5, 7, 8, 10],
-    harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
-    pentatonic: [0, 2, 4, 7, 9],
-    blues: [0, 3, 5, 6, 7, 10],
-  };
-
-  function quantizeToScale(targetMidi, scaleKey) {
-    const scale = SCALE_DEGREES[scaleKey] || SCALE_DEGREES.chromatic;
-    if (scale.length === 12) return targetMidi;
-
-    const octave = Math.floor(targetMidi / 12);
-    const pitchClass = targetMidi % 12;
-
-    let closest = scale[0];
-    let minDiff = 999;
-    for (const deg of scale) {
-      const diff = Math.abs(deg - pitchClass);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = deg;
-      }
-    }
-    return octave * 12 + closest;
-  }
-
-  // Active Voices Tracker
-  const activeVoices = new Map();
-
-  // Play Vocal Note on Virtual Keyboard
-  function playVocalNote(targetFreq, keyElement) {
-    if (!vocalSampleBuffer) return;
-    const ctx = getAudioCtx();
-
-    // Scale Quantization
-    const targetMidi = Math.round(69 + 12 * Math.log2(targetFreq / 440));
-    const currentScale = scaleSelect ? scaleSelect.value : 'chromatic';
-    const quantizedMidi = quantizeToScale(targetMidi, currentScale);
-    const finalFreq = 440 * Math.pow(2, (quantizedMidi - 69) / 12);
-
-    // Resampling playbackRate ratio
-    const playbackRate = finalFreq / (rootPitchHz || 220);
-
-    // Source Node
-    const srcNode = ctx.createBufferSource();
-    srcNode.buffer = vocalSampleBuffer;
-    srcNode.playbackRate.value = playbackRate;
-
-    // Gain Envelope
-    const gainNode = ctx.createGain();
-    gainNode.gain.setValueAtTime(0.001, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.85, ctx.currentTime + 0.02);
-
-    // Formant Shift Filter Bank
-    const formantShiftST = formantSlider ? parseInt(formantSlider.value, 10) : 0;
-    const formantFactor = Math.pow(2, formantShiftST / 12);
-
-    const f1 = ctx.createBiquadFilter();
-    f1.type = 'peaking';
-    f1.frequency.value = Math.min(18000, 800 * formantFactor);
-    f1.Q.value = 4.0;
-    f1.gain.value = 6.0;
-
-    const f2 = ctx.createBiquadFilter();
-    f2.type = 'peaking';
-    f2.frequency.value = Math.min(18000, 2200 * formantFactor);
-    f2.Q.value = 4.5;
-    f2.gain.value = 5.0;
-
-    // Vocoder / Carrier Effect
-    let chainNode = srcNode;
-    if (vocoderToggle && vocoderToggle.checked) {
-      const carrier = ctx.createOscillator();
-      const carrierGain = ctx.createGain();
-      carrier.type = carrierSelect ? carrierSelect.value : 'sawtooth';
-      carrier.frequency.value = finalFreq;
-      carrier.start();
-
-      // Ring Modulator / Vocoder Simulation
-      const modGain = ctx.createGain();
-      modGain.gain.value = 0;
-      srcNode.connect(modGain.gain);
-      carrier.connect(modGain);
-      chainNode = modGain;
-    }
-
-    chainNode.connect(f1);
-    f1.connect(f2);
-    f2.connect(gainNode);
-
-    // Reverb / Master Output
-    const masterGain = ctx.createGain();
-    const reverbAmt = (reverbSlider ? parseInt(reverbSlider.value, 10) : 35) / 100;
-    masterGain.gain.value = 0.9;
-    gainNode.connect(masterGain);
-    masterGain.connect(ctx.destination);
-
-    srcNode.start(0);
-
-    if (keyElement) {
-      keyElement.classList.add('pressed');
-    }
-
-    const voiceObj = { srcNode, gainNode, keyElement };
-    activeVoices.set(targetFreq, voiceObj);
-
-    // Auto-release when buffer ends
-    srcNode.onended = () => {
-      if (keyElement) keyElement.classList.remove('pressed');
-      activeVoices.delete(targetFreq);
-    };
-
-    return voiceObj;
-  }
-
-  function releaseVocalNote(targetFreq) {
-    const voice = activeVoices.get(targetFreq);
-    if (!voice) return;
-    const ctx = getAudioCtx();
-    try {
-      voice.gainNode.gain.cancelScheduledValues(ctx.currentTime);
-      voice.gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      setTimeout(() => {
-        try { voice.srcNode.stop(); } catch {}
-      }, 160);
-    } catch {}
-    if (voice.keyElement) voice.keyElement.classList.remove('pressed');
-    activeVoices.delete(targetFreq);
-  }
-
-  // Piano Keys Bindings (Click & Touch)
-  if (pianoKeyboard) {
-    const keys = pianoKeyboard.querySelectorAll('.piano-key');
-    keys.forEach(key => {
-      const freq = parseFloat(key.getAttribute('data-freq'));
-      key.addEventListener('mousedown', () => playVocalNote(freq, key));
-      key.addEventListener('mouseup', () => releaseVocalNote(freq));
-      key.addEventListener('mouseleave', () => releaseVocalNote(freq));
-
-      key.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        playVocalNote(freq, key);
-      });
-      key.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        releaseVocalNote(freq);
-      });
-    });
-  }
-
-  // PC Keyboard Mapping
-  const KEY_MAP = {
-    'z': 130.81, 's': 138.59, 'x': 146.83, 'd': 155.56, 'c': 164.81, 'v': 174.61, 'g': 185.00,
-    'b': 196.00, 'h': 207.65, 'n': 220.00, 'j': 233.08, 'm': 246.94,
-    'q': 261.63, '2': 277.18, 'w': 293.66, '3': 311.13, 'e': 329.63, 'r': 349.23, '5': 369.99,
-    't': 392.00, '6': 415.30, 'y': 440.00, '7': 466.16, 'u': 493.88, 'i': 523.25,
-  };
-
-  const pressedKeys = new Set();
-  window.addEventListener('keydown', (e) => {
-    if (studioModal.classList.contains('hidden')) return;
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-
-    const char = e.key.toLowerCase();
-    if (KEY_MAP[char] && !pressedKeys.has(char)) {
-      pressedKeys.add(char);
-      const freq = KEY_MAP[char];
-      const keyEl = pianoKeyboard?.querySelector(`[data-freq="${freq.toFixed(2)}"]`);
-      playVocalNote(freq, keyEl);
-    }
-  });
-
-  window.addEventListener('keyup', (e) => {
-    const char = e.key.toLowerCase();
-    if (pressedKeys.has(char)) {
-      pressedKeys.delete(char);
-      const freq = KEY_MAP[char];
-      releaseVocalNote(freq);
-    }
-  });
-
-  // Real-Time Audio Spectrum Visualizer
-  function startVisualizerLoop() {
-    if (!visualizerCanvas) return;
-    const canvasCtx = visualizerCanvas.getContext('2d');
-    const width = visualizerCanvas.width;
-    const height = visualizerCanvas.height;
-
-    function draw() {
-      if (studioModal.classList.contains('hidden')) return;
-      requestAnimationFrame(draw);
-
-      canvasCtx.fillStyle = 'rgba(5, 10, 20, 0.3)';
-      canvasCtx.fillRect(0, 0, width, height);
-
-      // Draw active voice waveforms
-      if (activeVoices.size > 0 || isBackingPlaying) {
-        canvasCtx.lineWidth = 2;
-        canvasCtx.strokeStyle = '#38bdf8';
-        canvasCtx.beginPath();
-
-        const sliceWidth = width / 64;
-        let x = 0;
-        const now = performance.now() * 0.005;
-
-        for (let i = 0; i < 64; i++) {
-          const v = Math.sin(i * 0.3 + now) * 25 + Math.cos(i * 0.15 + now * 1.5) * 15;
-          const y = height / 2 + v;
-          if (i === 0) canvasCtx.moveTo(x, y);
-          else canvasCtx.lineTo(x, y);
-          x += sliceWidth;
-        }
-        canvasCtx.stroke();
-
-        // Neon Glow Line
-        canvasCtx.lineWidth = 1.5;
-        canvasCtx.strokeStyle = '#ec4899';
-        canvasCtx.beginPath();
-        x = 0;
-        for (let i = 0; i < 64; i++) {
-          const v = Math.sin(i * 0.2 + now * 0.8) * 18;
-          const y = height / 2 + v;
-          if (i === 0) canvasCtx.moveTo(x, y);
-          else canvasCtx.lineTo(x, y);
-          x += sliceWidth;
-        }
-        canvasCtx.stroke();
-      } else {
-        // Idle baseline pulse
-        canvasCtx.lineWidth = 1;
-        canvasCtx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(0, height / 2);
-        canvasCtx.lineTo(width, height / 2);
-        canvasCtx.stroke();
-      }
-    }
-    draw();
-  }
-
   // ==========================================================================
-  // TAB 4: Desktop Maestro AI Outputs Crate & Backing Beats
+  // TAB 4: Studio Audio Library & Lounge (shared/audio)
   // ==========================================================================
-  if (backingTempoSlider && backingTempoVal) {
-    backingTempoSlider.addEventListener('input', () => {
-      backingTempoVal.textContent = backingTempoSlider.value;
-    });
-  }
-
-  async function loadMaestroTracks() {
+  async function loadStudioAudioLibrary() {
     if (!maestroTracksList) return;
-    maestroTracksList.innerHTML = '<div style="text-align: center; padding: 25px; color: #94a3b8;">Scanning Maestro AI output directory...</div>';
+    maestroTracksList.innerHTML = '<div style="text-align: center; padding: 25px; color: #94a3b8;">Scanning studio audio library in shared/audio/...</div>';
 
     try {
-      const resp = await fetch('/v1/studio/maestro/outputs');
+      const resp = await fetch('/v1/studio/audio/library');
       const data = await resp.json();
 
       if (!data.success || !data.tracks || data.tracks.length === 0) {
         maestroTracksList.innerHTML = `
           <div style="text-align: center; padding: 30px; color: #94a3b8;">
-            No Maestro audio outputs found in <code>${data.outputsDir || 'Desktop\\Maestro AI\\app\\outputs'}</code>.<br/>
-            Render a track in Maestro AI with YuE2 or ACE-Step to see it here!
+            No audio tracks found in <code>shared\\audio</code>.<br/>
+            Render music with local YuE2 models, synthesize speech, or clone vocals to see tracks here!
           </div>
         `;
         return;
@@ -21297,7 +21054,11 @@ function initNexusStudio() {
       data.tracks.forEach((track, index) => {
         const card = document.createElement('div');
         card.className = 'maestro-track-card';
-        if (index === 0) card.classList.add('active');
+        if (index === 0) {
+          card.classList.add('active');
+          selectedStudioTrack = track;
+          renderSelectedTrackMeta(track);
+        }
 
         const mins = Math.floor((track.durationSeconds || 120) / 60);
         const secs = String((track.durationSeconds || 120) % 60).padStart(2, '0');
@@ -21308,10 +21069,10 @@ function initNexusStudio() {
           <div class="maestro-track-info">
             <div class="maestro-track-title">${track.title}</div>
             <div class="maestro-track-meta-row">
-              <span class="maestro-model-pill">${track.modelType.toUpperCase()}</span>
-              <span>${track.bpm} BPM</span>
+              <span class="maestro-model-pill">${(track.modelType || 'AUDIO').toUpperCase()}</span>
+              <span>${track.bpm || 120} BPM</span>
               <span>&bull;</span>
-              <span>Key: ${track.key}</span>
+              <span>Key: ${track.key || 'C Major'}</span>
               <span>&bull;</span>
               <span>⏱️ ${durStr}</span>
               <span>&bull;</span>
@@ -21332,31 +21093,36 @@ function initNexusStudio() {
         // Click to view metadata
         card.addEventListener('click', (e) => {
           if (e.target.closest('button')) return;
-          selectMaestroTrack(track, card);
+          document.querySelectorAll('.maestro-track-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          selectedStudioTrack = track;
+          renderSelectedTrackMeta(track);
         });
 
         // Play Button
         const playBtn = card.querySelector('.btn-play-maestro');
         playBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          selectMaestroTrack(track, card);
-          loadTrackIntoStudioPlayer(track.streamUrl, track.title, `${track.modelType.toUpperCase()} • ${track.bpm} BPM • ${track.key}`);
-          studioAudio.play();
+          document.querySelectorAll('.maestro-track-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          selectedStudioTrack = track;
+          renderSelectedTrackMeta(track);
+          loadTrackIntoStudioPlayer(track.streamUrl, track.title, `${(track.modelType || 'AUDIO').toUpperCase()} • ${track.bpm || 120} BPM • ${track.key || 'C'}`);
         });
 
-        // Share to Lounge Button
+        // Share Button
         const shareBtn = card.querySelector('.btn-share-maestro');
         shareBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           shareBtn.disabled = true;
           shareBtn.innerHTML = '<span>⏳</span> Sharing...';
           try {
-            const sResp = await fetch('/v1/studio/maestro/share-to-lounge', {
+            const sResp = await fetch('/v1/studio/audio/share-to-lounge', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 fileName: track.fileName,
-                comment: `YuE2 generated music: "${track.title}" (${track.bpm} BPM, ${track.key})`,
+                comment: `Studio Track: "${track.title}" (${track.bpm || 120} BPM, ${track.key || 'C'})`,
               }),
             });
             const sData = await sResp.json();
@@ -21375,148 +21141,69 @@ function initNexusStudio() {
         });
 
         maestroTracksList.appendChild(card);
-
-        if (index === 0) {
-          selectMaestroTrack(track, card);
-        }
       });
     } catch (err) {
-      maestroTracksList.innerHTML = `<div style="color: #ef4444; padding: 20px;">Failed to scan Maestro folder: ${err.message}</div>`;
+      maestroTracksList.innerHTML = `<div style="color: #ef4444; padding: 20px;">Failed to scan audio library: ${err.message}</div>`;
     }
   }
 
-  function selectMaestroTrack(track, cardEl) {
-    document.querySelectorAll('.maestro-track-card').forEach(c => c.classList.remove('active'));
-    if (cardEl) cardEl.classList.add('active');
-
-    if (maestroActiveTrackMeta) {
-      maestroActiveTrackMeta.innerHTML = `
-        <div style="font-weight: 700; color: #f8fafc; font-size: 13px; margin-bottom: 6px;">${track.title}</div>
-        <div style="margin-bottom: 6px;"><strong>File:</strong> <code>${track.fileName}</code></div>
-        <div style="margin-bottom: 6px;"><strong>Prompt Description:</strong> ${track.altPrompt || track.musicDescription || 'No prompt info'}</div>
-        ${track.jobElapsedTime ? `<div style="margin-bottom: 6px;"><strong>Generation Time:</strong> ${Math.round(track.jobElapsedTime / 60)} mins (${track.jobElapsedTime}s)</div>` : ''}
-        ${track.abcSnippet ? `
-          <div style="margin-top: 8px;">
-            <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">ABC Notation Score:</div>
-            <pre style="background: rgba(0,0,0,0.6); padding: 8px; border-radius: 6px; font-size: 11px; max-height: 120px; overflow-y: auto; color: #cbd5e1; font-family: monospace;">${track.abcSnippet}</pre>
-          </div>
-        ` : ''}
-      `;
-    }
+  function renderSelectedTrackMeta(track) {
+    if (!maestroActiveTrackMeta) return;
+    maestroActiveTrackMeta.innerHTML = `
+      <div style="font-weight: 700; color: #f8fafc; font-size: 13.5px; margin-bottom: 6px;">${track.title}</div>
+      <div style="margin-bottom: 5px;"><strong>File:</strong> <code>${track.fileName}</code></div>
+      <div style="margin-bottom: 5px;"><strong>Prompt Description:</strong> ${track.altPrompt || track.musicDescription || 'Audio file in shared library'}</div>
+      <div style="margin-bottom: 5px;"><strong>BPM:</strong> ${track.bpm || 120} &bull; <strong>Key:</strong> ${track.key || 'C Major'} &bull; <strong>Model:</strong> ${(track.modelType || 'YuE2').toUpperCase()}</div>
+      ${track.jobElapsedTime ? `<div style="margin-bottom: 5px;"><strong>Render Time:</strong> ${Math.round(track.jobElapsedTime / 60)} mins (${track.jobElapsedTime}s)</div>` : ''}
+      ${track.abcSnippet ? `
+        <div style="margin-top: 8px;">
+          <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">ABC Notation Score:</div>
+          <pre style="background: rgba(0,0,0,0.6); padding: 8px; border-radius: 6px; font-size: 11px; max-height: 120px; overflow-y: auto; color: #cbd5e1; font-family: monospace;">${track.abcSnippet}</pre>
+        </div>
+      ` : ''}
+    `;
   }
 
   if (btnRescanMaestro) {
-    btnRescanMaestro.addEventListener('click', loadMaestroTracks);
+    btnRescanMaestro.addEventListener('click', loadStudioAudioLibrary);
   }
 
-  // Procedural Live Rhythm & Groove Synthesizer (Synthwave, Cyberpunk, LoFi, Acid)
-  function playProceduralDrum(type) {
-    const ctx = getAudioCtx();
-    const now = ctx.currentTime;
-
-    if (type === 'kick') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.setValueAtTime(140, now);
-      osc.frequency.exponentialRampToValueAtTime(38, now + 0.12);
-      gain.gain.setValueAtTime(1.0, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.25);
-    } else if (type === 'snare') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(180, now);
-      gain.gain.setValueAtTime(0.6, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    } else if (type === 'hat') {
-      const bufferSize = ctx.sampleRate * 0.05;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 7000;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      noise.start(now);
-    } else if (type === 'bass') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sawtooth';
-      const bassNotes = [55, 55, 65.41, 55, 73.42, 65.41, 55, 82.41]; // A1, C2, D2, E2 groove
-      const freq = bassNotes[backingStep % bassNotes.length];
-      osc.frequency.setValueAtTime(freq, now);
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.18);
-    }
-  }
-
-  function startBackingBeat() {
-    stopBackingBeat();
-    isBackingPlaying = true;
-    const bpm = parseInt(backingTempoSlider ? backingTempoSlider.value : 120, 10);
-    const stepMs = (60 / bpm / 4) * 1000; // 16th notes
-    backingStep = 0;
-
-    backingInterval = setInterval(() => {
-      // 16-step beat patterns
-      const s = backingStep % 16;
-      // Kick on 0, 4, 8, 12 (4-on-the-floor)
-      if (s % 4 === 0) playProceduralDrum('kick');
-      // Snare on 4, 12
-      if (s === 4 || s === 12) playProceduralDrum('snare');
-      // Hi-hat on every 8th note
-      if (s % 2 === 0) playProceduralDrum('hat');
-      // Driving bass on 16th offbeats
-      if (s % 2 === 1) playProceduralDrum('bass');
-
-      backingStep++;
-    }, stepMs);
-
-    if (btnPlayBacking) {
-      btnPlayBacking.innerHTML = '<span>⏸️</span> Backing Beat Active';
-      btnPlayBacking.style.background = '#22c55e';
-    }
-  }
-
-  function stopBackingBeat() {
-    isBackingPlaying = false;
-    if (backingInterval) {
-      clearInterval(backingInterval);
-      backingInterval = null;
-    }
-    if (btnPlayBacking) {
-      btnPlayBacking.innerHTML = '<span>▶️</span> Start Backing Beat';
-      btnPlayBacking.style.background = 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)';
-    }
-  }
-
-  if (btnPlayBacking) {
-    btnPlayBacking.addEventListener('click', () => {
-      if (isBackingPlaying) stopBackingBeat();
-      else startBackingBeat();
+  if (btnShareSelectedToLounge) {
+    btnShareSelectedToLounge.addEventListener('click', async () => {
+      if (!selectedStudioTrack) {
+        alert('Please select an audio track first!');
+        return;
+      }
+      btnShareSelectedToLounge.disabled = true;
+      btnShareSelectedToLounge.innerHTML = '<span>⏳</span> Sharing to #lounge...';
+      try {
+        const comment = studioShareCommentInput ? studioShareCommentInput.value.trim() : '';
+        const resp = await fetch('/v1/studio/audio/share-to-lounge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: selectedStudioTrack.fileName,
+            comment: comment || `Studio Track: "${selectedStudioTrack.title}"`,
+          }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          btnShareSelectedToLounge.innerHTML = '<span>✅</span> Shared to Lounge!';
+          setTimeout(() => {
+            btnShareSelectedToLounge.innerHTML = '<span>🚀</span> Share Selected Track to #lounge';
+            btnShareSelectedToLounge.disabled = false;
+          }, 2000);
+          if (studioShareCommentInput) studioShareCommentInput.value = '';
+          if (window.showNotification) window.showNotification(`🎶 "${selectedStudioTrack.title}" shared to Lounge!`);
+        } else {
+          alert('Failed to share: ' + (data.error || 'Unknown error'));
+          btnShareSelectedToLounge.disabled = false;
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+        btnShareSelectedToLounge.disabled = false;
+      }
     });
-  }
-  if (btnStopBacking) {
-    btnStopBacking.addEventListener('click', stopBackingBeat);
   }
 
   // ==========================================================================
@@ -21588,11 +21275,15 @@ function initNexusStudio() {
       studioPlayerShareLoungeBtn.disabled = true;
       studioPlayerShareLoungeBtn.innerHTML = '<span>⏳</span> Sharing...';
       try {
-        const resp = await fetch('/v1/studio/maestro/share-to-lounge', {
+        const fileParam = currentPlayingTrack.url.includes('file=')
+          ? decodeURIComponent(currentPlayingTrack.url.split('file=')[1].split('&')[0])
+          : (currentPlayingTrack.url.includes('path=') ? decodeURIComponent(currentPlayingTrack.url.split('path=')[1].split('&')[0]) : 'track.wav');
+
+        const resp = await fetch('/v1/studio/audio/share-to-lounge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fileName: currentPlayingTrack.url.split('file=')[1] ? decodeURIComponent(currentPlayingTrack.url.split('file=')[1]) : 'track.wav',
+            fileName: fileParam,
             comment: `Listening in Studio: "${currentPlayingTrack.title}"`,
           }),
         });
@@ -21615,10 +21306,10 @@ function initNexusStudio() {
     });
   }
 
-  // URL Hash & Param Handler (invoked after all studio handlers and elements are fully ready)
+  // URL Hash & Param Handler
   function checkStudioHash() {
     if (window.location.hash === '#studio' || window.location.hash.startsWith('#studio-')) {
-      const tab = window.location.hash.replace('#studio-', '') || 'prompts';
+      const tab = window.location.hash === '#studio' ? 'music-prompts' : (window.location.hash.replace('#studio-', '') || 'music-prompts');
       openStudio(tab);
     }
   }
