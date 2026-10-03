@@ -7490,6 +7490,20 @@ body.zen-mode .zen-mode-exit-btn,
   display: block;
 }
 
+/* Bottom-Right Corner Radio Hover Hotspot */
+.nexus-radio-hotspot {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 360px;
+  height: 90px;
+  z-index: 9999996;
+  pointer-events: none;
+}
+.nexus-radio-hotspot.active {
+  pointer-events: auto;
+}
+
 /* Floating Corner Mini Player */
 .nexus-radio-mini-player {
   position: fixed;
@@ -7507,12 +7521,63 @@ body.zen-mode .zen-mode-exit-btn,
   backdrop-filter: blur(14px);
   color: #dcebfa;
   font-family: inherit;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   user-select: none;
+}
+
+.nexus-radio-mini-player.auto-hidden {
+  opacity: 0;
+  transform: translateY(22px) scale(0.96);
+  pointer-events: none;
+}
+
+.nexus-radio-mini-player.auto-hidden.hotspot-active,
+.nexus-radio-mini-player.auto-hidden:hover {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+  pointer-events: auto !important;
 }
 
 .nexus-radio-mini-player.hidden {
   display: none !important;
+}
+
+.nexus-radio-mini-player.pinned {
+  border-color: #25d0ff;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(37, 208, 255, 0.4);
+}
+
+.nexus-radio-mini-player.minimized {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.7), 0 0 18px rgba(37, 208, 255, 0.45);
+}
+
+.nexus-radio-mini-player.minimized .radio-mini-left {
+  max-width: none;
+  justify-content: center;
+}
+
+.nexus-radio-mini-player.minimized .radio-mini-info,
+.nexus-radio-mini-player.minimized .radio-mini-controls {
+  display: none !important;
+}
+
+.nexus-radio-mini-player.minimized:hover {
+  transform: scale(1.15);
+  border-color: #25d0ff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 24px rgba(37, 208, 255, 0.6);
+}
+
+.radio-mini-btn.active {
+  background: rgba(37, 208, 255, 0.35);
+  color: #ffffff;
+  border-color: #25d0ff;
+  box-shadow: 0 0 10px rgba(37, 208, 255, 0.45);
 }
 
 .radio-mini-left {

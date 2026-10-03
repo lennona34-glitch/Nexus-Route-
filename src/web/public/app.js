@@ -21323,11 +21323,14 @@ function initNexusRadio() {
   const iframe = document.getElementById('nexusRadioIframe');
 
   const miniPlayer = document.getElementById('nexusRadioMiniPlayer');
+  const radioHotspot = document.getElementById('nexusRadioHotspot');
   const miniClickTarget = document.getElementById('radioMiniClickTarget');
   const miniTitle = document.getElementById('radioMiniTitle');
   const miniSub = document.getElementById('radioMiniSub');
   const miniPlayPauseBtn = document.getElementById('radioMiniPlayPauseBtn');
   const miniNextBtn = document.getElementById('radioMiniNextBtn');
+  const miniPinBtn = document.getElementById('radioMiniPinBtn');
+  const miniMinimizeBtn = document.getElementById('radioMiniMinimizeBtn');
   const miniExpandBtn = document.getElementById('radioMiniExpandBtn');
   const miniCloseBtn = document.getElementById('radioMiniCloseBtn');
 
@@ -21344,6 +21347,96 @@ function initNexusRadio() {
     trackText: '',
     volume: 0.8
   };
+
+  let isRadioPinned = false;
+  try {
+    isRadioPinned = localStorage.getItem('nexus_radio_pinned') === '1';
+  } catch (_) {}
+  let isRadioMinimized = false;
+  let isRadioActive = false;
+  let miniRadioHideTimer = null;
+
+  function updatePinUi() {
+    if (!miniPlayer) return;
+    if (isRadioPinned) {
+      miniPlayer.classList.add('pinned');
+      if (miniPinBtn) {
+        miniPinBtn.classList.add('active');
+        miniPinBtn.title = 'Pinned (Click to Unpin / Auto-Hide)';
+      }
+      if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+      miniPlayer.classList.remove('auto-hidden');
+    } else {
+      miniPlayer.classList.remove('pinned');
+      if (miniPinBtn) {
+        miniPinBtn.classList.remove('active');
+        miniPinBtn.title = 'Pin Player (Keep Always Visible)';
+      }
+    }
+  }
+
+  function setRadioActive(active) {
+    isRadioActive = active;
+    if (radioHotspot) {
+      if (active) {
+        radioHotspot.classList.add('active');
+      } else {
+        radioHotspot.classList.remove('active');
+      }
+    }
+  }
+
+  function resetMiniRadioAutoHide(delayMs = 4500) {
+    if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+    if (!miniPlayer || miniPlayer.classList.contains('hidden')) return;
+    if (isRadioPinned || isRadioMinimized) return;
+
+    miniRadioHideTimer = setTimeout(() => {
+      if (miniPlayer && !miniPlayer.matches(':hover') && !radioHotspot?.matches(':hover')) {
+        miniPlayer.classList.add('auto-hidden');
+      }
+    }, delayMs);
+  }
+
+  function showMiniPlayer(delayMs = 4500) {
+    if (!miniPlayer) return;
+    setRadioActive(true);
+    miniPlayer.classList.remove('hidden');
+    miniPlayer.classList.remove('auto-hidden');
+    updatePinUi();
+    if (!isRadioPinned && !isRadioMinimized) {
+      resetMiniRadioAutoHide(delayMs);
+    }
+  }
+
+  // Hover Hotspot: brings mini player back up when user hovers bottom-right corner
+  if (radioHotspot) {
+    radioHotspot.addEventListener('mouseenter', () => {
+      if (isRadioActive && miniPlayer && !miniPlayer.classList.contains('hidden')) {
+        miniPlayer.classList.remove('auto-hidden');
+        if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+      }
+    });
+    radioHotspot.addEventListener('mouseleave', () => {
+      if (!isRadioPinned && !isRadioMinimized) {
+        resetMiniRadioAutoHide(3000);
+      }
+    });
+  }
+
+  if (miniPlayer) {
+    miniPlayer.addEventListener('mouseenter', () => {
+      miniPlayer.classList.remove('auto-hidden');
+      if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+    });
+    miniPlayer.addEventListener('mouseleave', () => {
+      if (!isRadioPinned && !isRadioMinimized) {
+        resetMiniRadioAutoHide(3500);
+      }
+    });
+  }
+
+  updatePinUi();
 
   function sendToRadioIframe(cmd) {
     try {
@@ -21367,43 +21460,17 @@ function initNexusRadio() {
     }
   }
 
-  let miniRadioHideTimer = null;
-  function resetMiniRadioAutoHide(delayMs = 5000) {
-    if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
-    if (!miniPlayer || miniPlayer.classList.contains('hidden')) return;
-    miniRadioHideTimer = setTimeout(() => {
-      if (miniPlayer && !miniPlayer.matches(':hover')) {
-        miniPlayer.classList.add('hidden');
-      }
-    }, delayMs);
-  }
-
-  function showMiniPlayerWithAutoHide(delayMs = 5000) {
-    if (!miniPlayer) return;
-    miniPlayer.classList.remove('hidden');
-    resetMiniRadioAutoHide(delayMs);
-  }
-
-  if (miniPlayer) {
-    miniPlayer.addEventListener('mouseenter', () => {
-      if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
-    });
-    miniPlayer.addEventListener('mouseleave', () => {
-      resetMiniRadioAutoHide(3500);
-    });
-  }
-
   function closeRadio() {
     radioModal.classList.add('hidden');
     if (currentRadioState.playing && miniPlayer) {
-      showMiniPlayerWithAutoHide(5000);
+      showMiniPlayer(4500);
     }
   }
 
   function dockToMiniPlayer() {
     radioModal.classList.add('hidden');
     if (miniPlayer) {
-      showMiniPlayerWithAutoHide(5000);
+      showMiniPlayer(4500);
     }
   }
 
@@ -21444,13 +21511,44 @@ function initNexusRadio() {
 
   if (miniClickTarget) {
     miniClickTarget.addEventListener('click', () => {
+      if (isRadioMinimized) {
+        isRadioMinimized = false;
+        miniPlayer.classList.remove('minimized');
+        resetMiniRadioAutoHide(4500);
+        return;
+      }
       openRadio();
       if (miniPlayer) miniPlayer.classList.add('hidden');
     });
   }
 
+  if (miniPinBtn) {
+    miniPinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isRadioPinned = !isRadioPinned;
+      try { localStorage.setItem('nexus_radio_pinned', isRadioPinned ? '1' : '0'); } catch (_) {}
+      updatePinUi();
+    });
+  }
+
+  if (miniMinimizeBtn) {
+    miniMinimizeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isRadioMinimized = !isRadioMinimized;
+      if (isRadioMinimized) {
+        miniPlayer.classList.add('minimized');
+        miniPlayer.classList.remove('auto-hidden');
+        if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
+      } else {
+        miniPlayer.classList.remove('minimized');
+        resetMiniRadioAutoHide(4000);
+      }
+    });
+  }
+
   if (miniExpandBtn) {
-    miniExpandBtn.addEventListener('click', () => {
+    miniExpandBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       openRadio();
       if (miniPlayer) miniPlayer.classList.add('hidden');
     });
@@ -21473,7 +21571,12 @@ function initNexusRadio() {
   if (miniCloseBtn) {
     miniCloseBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (miniPlayer) miniPlayer.classList.add('hidden');
+      setRadioActive(false);
+      if (miniPlayer) {
+        miniPlayer.classList.add('hidden');
+        miniPlayer.classList.remove('auto-hidden');
+      }
+      if (miniRadioHideTimer) clearTimeout(miniRadioHideTimer);
     });
   }
 
@@ -21527,7 +21630,7 @@ function initNexusRadio() {
       }
 
       if (playing && radioModal.classList.contains('hidden') && miniPlayer) {
-        showMiniPlayerWithAutoHide(5000);
+        showMiniPlayer(4500);
       }
     }
   });
