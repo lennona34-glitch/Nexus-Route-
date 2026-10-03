@@ -7,6 +7,7 @@ import https from 'https';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import os from 'os';
+import { WebSocketServer, WebSocket } from 'ws';
 
 import { validateAndNormalizeRequest, ValidationError } from './ir/validator.js';
 import { RoutingEngine, RouterConfig } from './router/engine.js';
@@ -5557,6 +5558,73 @@ app.get('/v1/mesh/events', async (req: FastifyRequest<{
   });
 });
 
+// --- Nexus Mesh Voice Audio Bridge (Server Relay) ---
+interface VoiceSocketClient {
+  ws: WebSocket;
+  peerId: string;
+  roomId: string;
+}
+const voiceClients = new Map<string, Set<VoiceSocketClient>>();
+const voiceBridgeWss = new WebSocketServer({ noServer: true });
+
+voiceBridgeWss.on('connection', (ws: WebSocket, req: any) => {
+  try {
+    const hostHeader = req.headers.host || 'localhost';
+    const parsedUrl = new URL(req.url || '', `http://${hostHeader}`);
+    const rawRoom = parsedUrl.searchParams.get('roomId') || 'lounge';
+    const roomId = rawRoom.toLowerCase().trim().replace(/^#/, '');
+    const peerId = parsedUrl.searchParams.get('peerId') || ('guest_' + Math.random().toString(36).substring(2, 7));
+
+    const client: VoiceSocketClient = { ws, peerId, roomId };
+    if (!voiceClients.has(roomId)) {
+      voiceClients.set(roomId, new Set());
+    }
+    voiceClients.get(roomId)!.add(client);
+    console.log(`[VoiceBridge] Peer "${peerId}" connected to voice stream in room #${roomId} (Total: ${voiceClients.get(roomId)!.size})`);
+
+    ws.on('message', (data: any, isBinary: boolean) => {
+      const roomSet = voiceClients.get(roomId);
+      if (!roomSet) return;
+      for (const c of roomSet) {
+        if (c.peerId !== peerId && c.ws.readyState === WebSocket.OPEN) {
+          c.ws.send(data, { binary: isBinary });
+        }
+      }
+    });
+
+    const cleanup = () => {
+      const roomSet = voiceClients.get(roomId);
+      if (roomSet) {
+        roomSet.delete(client);
+        if (roomSet.size === 0) voiceClients.delete(roomId);
+      }
+      console.log(`[VoiceBridge] Peer "${peerId}" left voice stream in room #${roomId}`);
+    };
+
+    ws.on('close', cleanup);
+    ws.on('error', cleanup);
+  } catch (err) {
+    console.warn('[VoiceBridge] connection error:', err);
+  }
+});
+
+function attachVoiceWebSocketBridge(serverInstance: any) {
+  if (!serverInstance || typeof serverInstance.on !== 'function') return;
+  serverInstance.on('upgrade', (request: any, socket: any, head: any) => {
+    try {
+      const hostHeader = request.headers.host || 'localhost';
+      const parsedUrl = new URL(request.url || '', `http://${hostHeader}`);
+      if (parsedUrl.pathname === '/v1/mesh/voice/stream') {
+        voiceBridgeWss.handleUpgrade(request, socket, head, (ws) => {
+          voiceBridgeWss.emit('connection', ws, request);
+        });
+      }
+    } catch {
+      socket.destroy();
+    }
+  });
+}
+
 // --- WebRTC Voice Lounge Signaling Endpoints ---
 app.get('/v1/mesh/voice/ice-servers', async () => {
   const iceServers: any[] = [
@@ -5944,6 +6012,7 @@ export async function startServer() {
     // 1b. GPU Diffusion starts cold/idle until requested by user or Creative Studio
 
     await app.listen({ port: PORT, host: HOST });
+    attachVoiceWebSocketBridge(app.server);
 
     // 2. Start Secure HTTPS Gateway for Mobile WebRTC Microphone Support
     const sslCerts = getOrGenerateCertificates();
@@ -5955,6 +6024,7 @@ export async function startServer() {
         }, (req, res) => {
           app.server.emit('request', req, res);
         });
+        attachVoiceWebSocketBridge(httpsServer);
         httpsServer.listen(HTTPS_PORT, HOST, () => {
           const primaryLan = getLocalLanIps()[0] || 'localhost';
           console.log(`🔒 HTTPS Gateway:      https://localhost:${HTTPS_PORT}`);

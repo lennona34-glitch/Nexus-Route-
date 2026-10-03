@@ -15683,9 +15683,200 @@ function initNexusMesh() {
     remoteGainNodes: new Map(), // peerId -> GainNode
     remoteAnalysers: new Map(), // peerId -> AnalyserNode
     pendingCandidates: new Map(), // peerId -> candidate[]
+    voiceBridgeWs: null,
+    micProcessor: null,
+    toneProcessor: null,
+    peerPlayheads: new Map(), // peerId -> next schedule time
     animFrameId: null,
     heartbeatInterval: null,
   };
+
+  // --- Voice Audio Bridge (Server Relay over WebSocket) ---
+  function initVoiceBridge() {
+    if (voiceState.voiceBridgeWs) {
+      try { voiceState.voiceBridgeWs.close(); } catch {}
+      voiceState.voiceBridgeWs = null;
+    }
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const targetRoom = normRoom(voiceState.roomId || 'lounge');
+    const wsUrl = `${protocol}//${location.host}/v1/mesh/voice/stream?roomId=${encodeURIComponent(targetRoom)}&peerId=${encodeURIComponent(localPeerId)}`;
+    
+    try {
+      const ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        console.log('[VoiceBridge] Connected to Server Voice Audio Relay for room:', targetRoom);
+      };
+
+      ws.onmessage = (event) => {
+        handleIncomingBridgeAudio(event.data);
+      };
+
+      ws.onclose = () => {
+        if (voiceState.isInCall) {
+          setTimeout(() => {
+            if (voiceState.isInCall && (!voiceState.voiceBridgeWs || voiceState.voiceBridgeWs.readyState === WebSocket.CLOSED)) {
+              initVoiceBridge();
+            }
+          }, 2000);
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.warn('[VoiceBridge] WebSocket error:', e);
+      };
+
+      voiceState.voiceBridgeWs = ws;
+    } catch (e) {
+      console.warn('[VoiceBridge] Failed to create WebSocket:', e);
+    }
+  }
+
+  function closeVoiceBridge() {
+    if (voiceState.voiceBridgeWs) {
+      try { voiceState.voiceBridgeWs.close(); } catch {}
+      voiceState.voiceBridgeWs = null;
+    }
+    if (voiceState.micProcessor) {
+      try { voiceState.micProcessor.disconnect(); } catch {}
+      voiceState.micProcessor = null;
+    }
+    if (voiceState.toneProcessor) {
+      try { voiceState.toneProcessor.disconnect(); } catch {}
+      voiceState.toneProcessor = null;
+    }
+    voiceState.peerPlayheads.clear();
+  }
+
+  function handleIncomingBridgeAudio(data) {
+    if (!voiceState.isInCall || voiceState.isDeafened) return;
+    if (!(data instanceof ArrayBuffer) || data.byteLength < 4) return;
+
+    try {
+      const view = new DataView(data);
+      const idLen = view.getUint8(0);
+      const senderSampleRate = view.getUint16(1);
+      if (data.byteLength < 3 + idLen) return;
+
+      const senderPeerId = new TextDecoder().decode(new Uint8Array(data, 3, idLen));
+      if (senderPeerId === localPeerId) return;
+
+      if (!voiceState.audioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) voiceState.audioContext = new AudioCtx();
+      }
+      const ctx = voiceState.audioContext;
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      const pcmInt16 = new Int16Array(data, 3 + idLen);
+      if (pcmInt16.length === 0) return;
+
+      const float32 = new Float32Array(pcmInt16.length);
+      for (let i = 0; i < pcmInt16.length; i++) {
+        float32[i] = pcmInt16[i] / 32768.0;
+      }
+
+      const buffer = ctx.createBuffer(1, float32.length, senderSampleRate || 48000);
+      buffer.copyToChannel(float32, 0);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+
+      let gain = voiceState.remoteGainNodes.get(senderPeerId);
+      let analyser = voiceState.remoteAnalysers.get(senderPeerId);
+      if (!gain || !analyser) {
+        gain = ctx.createGain();
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        analyser.smoothingTimeConstant = 0.5;
+        gain.connect(analyser);
+        analyser.connect(ctx.destination);
+        voiceState.remoteGainNodes.set(senderPeerId, gain);
+        voiceState.remoteAnalysers.set(senderPeerId, analyser);
+      }
+
+      gain.gain.setValueAtTime(voiceState.isDeafened ? 0 : 1, ctx.currentTime);
+      source.connect(gain);
+
+      const now = ctx.currentTime;
+      let nextTime = voiceState.peerPlayheads.get(senderPeerId) || now;
+      if (nextTime < now || nextTime > now + 0.35) {
+        nextTime = now + 0.025; // 25ms jitter buffer
+      }
+      source.start(nextTime);
+      voiceState.peerPlayheads.set(senderPeerId, nextTime + buffer.duration);
+    } catch (err) {
+      console.warn('[VoiceBridge] Receive audio decode error:', err);
+    }
+  }
+
+  function startMicAudioProcessor(stream) {
+    if (!voiceState.audioContext || !stream) return;
+    try {
+      if (voiceState.micProcessor) {
+        try { voiceState.micProcessor.disconnect(); } catch {}
+        voiceState.micProcessor = null;
+      }
+      const ctx = voiceState.audioContext;
+      const source = ctx.createMediaStreamSource(stream);
+      const processor = ctx.createScriptProcessor(2048, 1, 1);
+      source.connect(processor);
+
+      const silentGain = ctx.createGain();
+      silentGain.gain.setValueAtTime(0, ctx.currentTime);
+      processor.connect(silentGain);
+      silentGain.connect(ctx.destination);
+
+      processor.onaudioprocess = (e) => {
+        if (!voiceState.isInCall || voiceState.isMuted) return;
+        if (!voiceState.voiceBridgeWs || voiceState.voiceBridgeWs.readyState !== WebSocket.OPEN) return;
+
+        const input = e.inputBuffer.getChannelData(0);
+        let sum = 0;
+        for (let i = 0; i < input.length; i++) {
+          sum += input[i] * input[i];
+        }
+        const rms = Math.sqrt(sum / input.length);
+        if (rms < 0.006) return; // Silent frame suppression
+
+        const pcm = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          const s = Math.max(-1, Math.min(1, input[i]));
+          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+
+        const enc = new TextEncoder();
+        const idBytes = enc.encode(localPeerId);
+        const packet = new Uint8Array(3 + idBytes.length + pcm.byteLength);
+        const view = new DataView(packet.buffer);
+        view.setUint8(0, idBytes.length);
+        view.setUint16(1, ctx.sampleRate || 48000);
+        packet.set(idBytes, 3);
+        packet.set(new Uint8Array(pcm.buffer), 3 + idBytes.length);
+
+        try {
+          voiceState.voiceBridgeWs.send(packet.buffer);
+        } catch {}
+      };
+
+      voiceState.micProcessor = processor;
+    } catch (err) {
+      console.warn('[VoiceBridge] Mic processor error:', err);
+    }
+  }
+
+  // Auto-resume AudioContext on any user interaction for mobile Chrome/Safari
+  ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, () => {
+      if (voiceState.audioContext && voiceState.audioContext.state === 'suspended') {
+        voiceState.audioContext.resume().catch(() => {});
+      }
+    }, { passive: true });
+  });
 
   const RTC_CONFIG = {
     iceServers: [
@@ -15693,16 +15884,7 @@ function initNexusMesh() {
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun.cloudflare.com:3478' },
-      { urls: 'stun:global.stun.twilio.com:3478' },
-      {
-        urls: [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp'
-        ],
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
+      { urls: 'stun:global.stun.twilio.com:3478' }
     ],
     iceCandidatePoolSize: 4
   };
@@ -15861,6 +16043,39 @@ function initNexusMesh() {
       voiceState.isToneActive = true;
       voiceState.isMuted = false;
 
+      // Broadcast synth melody over voice bridge too
+      if (!voiceState.toneProcessor) {
+        try {
+          const toneProc = ctx.createScriptProcessor(2048, 1, 1);
+          masterGain.connect(toneProc);
+          const silent = ctx.createGain();
+          silent.gain.setValueAtTime(0, ctx.currentTime);
+          toneProc.connect(silent);
+          silent.connect(ctx.destination);
+
+          toneProc.onaudioprocess = (e) => {
+            if (!voiceState.isInCall || !voiceState.isToneActive) return;
+            if (!voiceState.voiceBridgeWs || voiceState.voiceBridgeWs.readyState !== WebSocket.OPEN) return;
+            const input = e.inputBuffer.getChannelData(0);
+            const pcm = new Int16Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+              const s = Math.max(-1, Math.min(1, input[i]));
+              pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            const enc = new TextEncoder();
+            const idBytes = enc.encode(localPeerId);
+            const packet = new Uint8Array(3 + idBytes.length + pcm.byteLength);
+            const view = new DataView(packet.buffer);
+            view.setUint8(0, idBytes.length);
+            view.setUint16(1, ctx.sampleRate || 48000);
+            packet.set(idBytes, 3);
+            packet.set(new Uint8Array(pcm.buffer), 3 + idBytes.length);
+            try { voiceState.voiceBridgeWs.send(packet.buffer); } catch {}
+          };
+          voiceState.toneProcessor = toneProc;
+        } catch {}
+      }
+
       // Swap track into all existing peer connections
       voiceState.peerConnections.forEach((pc) => {
         const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
@@ -15903,6 +16118,10 @@ function initNexusMesh() {
 
   function stopTestTone() {
     voiceState.isToneActive = false;
+    if (voiceState.toneProcessor) {
+      try { voiceState.toneProcessor.disconnect(); } catch {}
+      voiceState.toneProcessor = null;
+    }
     if (testToneTimer) {
       clearInterval(testToneTimer);
       testToneTimer = null;
@@ -16034,6 +16253,9 @@ function initNexusMesh() {
       voiceState.isMuted = isListenOnly;
       voiceState.isDeafened = false;
 
+      // Start real-time server audio bridge over WebSocket
+      initVoiceBridge();
+
       // Web Audio API volume analyser & direct speaker playback engine
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -16049,6 +16271,7 @@ function initNexusMesh() {
             voiceState.analyser = voiceState.audioContext.createAnalyser();
             voiceState.analyser.fftSize = 64;
             source.connect(voiceState.analyser);
+            startMicAudioProcessor(stream);
           }
         }
       } catch (e) {
@@ -16377,6 +16600,7 @@ function initNexusMesh() {
     }).catch(() => {});
 
     stopTestTone();
+    closeVoiceBridge();
 
     if (voiceState.localStream) {
       voiceState.localStream.getTracks().forEach(t => t.stop());
