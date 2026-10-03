@@ -20,6 +20,33 @@
 
 ---
 
+## 🚀 Quick Start (First-Time Setup)
+
+Prerequisites: [Node.js](https://nodejs.org) (v18 or higher).
+
+### Option 1: Automatic 1-Click Launch (Windows)
+Simply double-click **`Start-NexusRoute.bat`**!
+- It automatically installs npm packages on first run (`npm install`).
+- It automatically builds the high-speed production bundle (`npm run build:bundle`).
+- It launches the local gateway and opens `http://localhost:3000` in your default browser.
+
+### Option 2: Terminal / Linux / macOS
+```bash
+# 1. Clone repository
+git clone https://github.com/lennona34-glitch/Nexus-Route-.git
+cd Nexus-Route-
+
+# 2. Install dependencies & build production bundle
+npm install
+npm run build:bundle
+
+# 3. Start the gateway
+npm start
+```
+Open **`http://localhost:3000`** to access the Web UI, Creative Studio & API inspector!
+
+---
+
 ## 🌟 Key Highlights
 
 - 🖥️ **Native Windows Desktop Host (`NexusRoute.exe`)**: Starts in milliseconds, sits silently in your Windows system tray, and guarantees clean process shutdown with zero orphaned processes.

@@ -12,5 +12,10 @@ if exist "%NEXUS_DIR%\NexusRoute.exe" (
     exit /b 0
 )
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%NEXUS_DIR%\scripts\start_servers.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%NEXUS_DIR%\scripts\start_servers.ps1" %*
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [!] Launcher exited with error code %ERRORLEVEL%.
+    pause
+)
 
