@@ -5671,22 +5671,52 @@ app.get('/v1/mesh/network-info', async () => {
     port: PORT,
     primaryLanIp,
     lanIps,
-    lanUrl: `http://${primaryLanIp}:${PORT}/#mesh`,
+    lanUrl: `http://${primaryLanIp}:${PORT}/?guest=1#mesh`,
     localUrl: `http://localhost:${PORT}/#mesh`,
     tunnelUrl: activeTunnelUrl,
   };
 });
 
+function getCloudflaredBin(): string {
+  try {
+    const localBin = path.resolve(process.cwd(), 'node_modules/cloudflared/bin/cloudflared.exe');
+    if (fs.existsSync(localBin)) return localBin;
+    const localUnix = path.resolve(process.cwd(), 'node_modules/cloudflared/bin/cloudflared');
+    if (fs.existsSync(localUnix)) return localUnix;
+
+    const appData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData/Local');
+    const npxCachePattern = path.join(appData, 'npm-cache/_npx');
+    if (fs.existsSync(npxCachePattern)) {
+      const dirs = fs.readdirSync(npxCachePattern);
+      for (const d of dirs) {
+        const candidate = path.join(npxCachePattern, d, 'node_modules/cloudflared/bin/cloudflared.exe');
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+  } catch {}
+  return process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+}
+
 app.post('/v1/mesh/tunnel/start', async () => {
-  if (activeTunnelUrl) {
+  if (activeTunnelUrl && tunnelProcess && !tunnelProcess.killed) {
     return { success: true, tunnelUrl: activeTunnelUrl, cached: true };
   }
+
+  if (tunnelProcess) {
+    try {
+      tunnelProcess.kill();
+    } catch {}
+    tunnelProcess = null;
+    activeTunnelUrl = null;
+  }
+
   return new Promise((resolve) => {
     try {
-      const isWin = process.platform === 'win32';
-      const cmd = isWin ? 'npx.cmd' : 'npx';
-      // Cloudflare Quick Tunnel: completely free, robust, zero 503s, unauthenticated HTTPS edge routing
-      const proc = spawn(cmd, ['--yes', 'cloudflared', 'tunnel', '--url', `http://localhost:${PORT}`], { shell: true });
+      const bin = getCloudflaredBin();
+      console.log(`[Cloudflare Tunnel] Spawning binary: ${bin} on port ${PORT}...`);
+      const proc = spawn(bin, ['tunnel', '--url', `http://127.0.0.1:${PORT}`, '--no-autoupdate'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
       tunnelProcess = proc;
       let resolved = false;
 
@@ -5696,7 +5726,7 @@ app.post('/v1/mesh/tunnel/start', async () => {
         if (match && !resolved) {
           resolved = true;
           activeTunnelUrl = match[1].trim();
-          meshHub.postMessage('system', `🌐 Cloudflare Quick Tunnel online! Share with friends worldwide: ${activeTunnelUrl}/#mesh`);
+          meshHub.postMessage('system', `🌐 Cloudflare Quick Tunnel online! Share with friends worldwide: ${activeTunnelUrl}/?guest=1#mesh`);
           resolve({ success: true, tunnelUrl: activeTunnelUrl });
         }
       };
@@ -5704,9 +5734,13 @@ app.post('/v1/mesh/tunnel/start', async () => {
       proc.stdout?.on('data', handleOutput);
       proc.stderr?.on('data', handleOutput);
 
-      proc.on('close', () => {
+      proc.on('close', (code) => {
         activeTunnelUrl = null;
         tunnelProcess = null;
+        if (!resolved) {
+          resolved = true;
+          resolve({ success: false, error: `Cloudflare tunnel process closed (code ${code})` });
+        }
       });
 
       proc.on('error', (err) => {
@@ -5720,9 +5754,10 @@ app.post('/v1/mesh/tunnel/start', async () => {
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
+          try { proc.kill(); } catch {}
           resolve({ success: false, error: 'Tunnel generation timed out. You can still share your LAN Wi-Fi link.' });
         }
-      }, 25000);
+      }, 20000);
     } catch (e: any) {
       resolve({ success: false, error: e.message });
     }
@@ -5735,7 +5770,9 @@ app.get('/v1/mesh/tunnel/status', async () => {
 
 app.post('/v1/mesh/tunnel/stop', async () => {
   if (tunnelProcess) {
-    tunnelProcess.kill();
+    try {
+      tunnelProcess.kill();
+    } catch {}
     tunnelProcess = null;
   }
   activeTunnelUrl = null;

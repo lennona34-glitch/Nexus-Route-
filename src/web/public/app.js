@@ -15070,9 +15070,35 @@ function initNexusMesh() {
 
   if (!meshModal || !openMeshModalBtn) return;
 
+  // Notification / Toast fallback helper
+  window.showNotification = window.showNotification || function(msg, isSuccess = true) {
+    if (typeof showToast === 'function') {
+      showToast(msg, isSuccess ? 'success' : 'info');
+      return;
+    }
+    let toast = document.getElementById('nexusGlobalToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'nexusGlobalToast';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.95);border:1px solid rgba(168,85,247,0.4);color:#f1f5f9;padding:10px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,0.5);z-index:9999999;transition:opacity 0.3s, transform 0.3s;pointer-events:none;display:flex;align-items:center;gap:8px;backdrop-filter:blur(8px);';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) translateY(10px)';
+    }, 3000);
+  };
+  const showNotification = window.showNotification;
+
   // State & Guest Mode Detection
   const urlParams = new URLSearchParams(window.location.search);
-  const isGuestMode = urlParams.get('guest') === '1';
+  const isExternalHost = window.location.hostname.includes('trycloudflare.com') || 
+    (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.hostname.startsWith('192.168.') && !window.location.hostname.startsWith('10.'));
+  const isGuestMode = urlParams.get('guest') === '1' || isExternalHost;
 
   let localPeerId = isGuestMode 
     ? ('guest_' + Math.random().toString(36).substring(2, 7)) 
@@ -15082,9 +15108,22 @@ function initNexusMesh() {
   }
 
   const guestAvatars = ['🎧', '🕹️', '⚡', '🚀', '👽', '👾', '🐱', '🕶️', '🤖', '📼', '🐉', '🦊', '🎸', '🎹', '🍕', '💎', '🎩', '🎨', '🔮', '🪐'];
-  let localHandle = localStorage.getItem('nexus_mesh_handle') || (isGuestMode ? ('Guest_' + Math.floor(Math.random() * 899 + 100)) : 'NexusHost');
-  let localAvatar = localStorage.getItem('nexus_mesh_avatar') || (isGuestMode ? guestAvatars[Math.floor(Math.random() * guestAvatars.length)] : '⚡');
-  let hasCustomizedProfile = !!localStorage.getItem('nexus_mesh_handle_customized');
+  let localHandle = isGuestMode 
+    ? (sessionStorage.getItem('nexus_guest_handle') || ('Guest_' + Math.floor(Math.random() * 899 + 100))) 
+    : (localStorage.getItem('nexus_mesh_handle') || 'NexusHost');
+  if (isGuestMode && !sessionStorage.getItem('nexus_guest_handle')) {
+    sessionStorage.setItem('nexus_guest_handle', localHandle);
+  }
+
+  let localAvatar = isGuestMode 
+    ? (sessionStorage.getItem('nexus_guest_avatar') || guestAvatars[Math.floor(Math.random() * guestAvatars.length)]) 
+    : (localStorage.getItem('nexus_mesh_avatar') || '⚡');
+  if (isGuestMode && !sessionStorage.getItem('nexus_guest_avatar')) {
+    sessionStorage.setItem('nexus_guest_avatar', localAvatar);
+  }
+  let hasCustomizedProfile = isGuestMode 
+    ? !!sessionStorage.getItem('nexus_guest_customized') 
+    : !!localStorage.getItem('nexus_mesh_handle_customized');
 
   // Header Profile & Identity Setup
   const userAvatarDisplay = document.getElementById('meshUserAvatarDisplay');
@@ -15161,9 +15200,15 @@ function initNexusMesh() {
     localAvatar = pendingAvatar || localAvatar || '⚡';
     const statusMsg = (profileStatusInput?.value || '').trim();
 
-    localStorage.setItem('nexus_mesh_handle', localHandle);
-    localStorage.setItem('nexus_mesh_avatar', localAvatar);
-    localStorage.setItem('nexus_mesh_handle_customized', '1');
+    if (isGuestMode) {
+      sessionStorage.setItem('nexus_guest_handle', localHandle);
+      sessionStorage.setItem('nexus_guest_avatar', localAvatar);
+      sessionStorage.setItem('nexus_guest_customized', '1');
+    } else {
+      localStorage.setItem('nexus_mesh_handle', localHandle);
+      localStorage.setItem('nexus_mesh_avatar', localAvatar);
+      localStorage.setItem('nexus_mesh_handle_customized', '1');
+    }
     hasCustomizedProfile = true;
 
     updateUserProfileDisplay();
@@ -15425,8 +15470,13 @@ function initNexusMesh() {
     switchRoom(currentRoomId || 'lounge');
 
     // Prompt guest / new user to choose their nickname and avatar if not customized yet
-    if (!localStorage.getItem('nexus_mesh_handle_customized')) {
+    const hasCustomized = isGuestMode 
+      ? sessionStorage.getItem('nexus_guest_customized') 
+      : localStorage.getItem('nexus_mesh_handle_customized');
+    if (!hasCustomized) {
       setTimeout(() => {
+        const invModal = document.getElementById('meshInviteModal');
+        if (invModal && !invModal.classList.contains('hidden')) return;
         openProfileModal();
       }, 350);
     }
@@ -19670,18 +19720,20 @@ function initNexusMesh() {
 
   async function openInviteModal() {
     if (!inviteModal) return;
+    const profileModal = document.getElementById('meshProfileModal');
+    if (profileModal) profileModal.classList.add('hidden');
     inviteModal.classList.remove('hidden');
     try {
       const res = await fetch('/v1/mesh/network-info');
       const data = await res.json();
       if (data.lanUrl && lanUrlInput) {
-        lanUrlInput.value = data.lanUrl;
+        lanUrlInput.value = data.lanUrl.includes('?guest=1') ? data.lanUrl : data.lanUrl.replace('#mesh', '?guest=1#mesh');
       }
       if (data.lanIp && lanHttpsUrlInput) {
-        lanHttpsUrlInput.value = `https://${data.lanIp}:3001/#mesh`;
+        lanHttpsUrlInput.value = `https://${data.lanIp}:3001/?guest=1#mesh`;
       }
       if (data.tunnelUrl && tunnelUrlInput && tunnelResultBox && tunnelBadge) {
-        const fullTunnel = data.tunnelUrl + '/#mesh';
+        const fullTunnel = data.tunnelUrl + '/?guest=1#mesh';
         tunnelUrlInput.value = fullTunnel;
         tunnelResultBox.style.display = 'block';
         tunnelBadge.textContent = 'Active ⚡';
@@ -19690,6 +19742,10 @@ function initNexusMesh() {
         const qrImg = document.getElementById('meshTunnelQrImg');
         if (qrImg) {
           qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=2&data=${encodeURIComponent(fullTunnel)}`;
+        }
+        if (startTunnelBtn) {
+          startTunnelBtn.disabled = false;
+          startTunnelBtn.innerHTML = '<span>🔄</span> Restart Cloudflare Tunnel';
         }
       }
     } catch (e) {
@@ -19740,7 +19796,7 @@ function initNexusMesh() {
         const res = await fetch('/v1/mesh/tunnel/start', { method: 'POST' });
         const data = await res.json();
         if (data.success && data.tunnelUrl) {
-          const fullTunnel = data.tunnelUrl + '/#mesh';
+          const fullTunnel = data.tunnelUrl + '/?guest=1#mesh';
           if (tunnelUrlInput) tunnelUrlInput.value = fullTunnel;
           if (tunnelResultBox) tunnelResultBox.style.display = 'block';
           if (tunnelBadge) {
@@ -19752,7 +19808,11 @@ function initNexusMesh() {
           if (qrImg) {
             qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=2&data=${encodeURIComponent(fullTunnel)}`;
           }
-          startTunnelBtn.innerHTML = `<span>✅</span> Cloudflare Tunnel Live!`;
+          startTunnelBtn.disabled = false;
+          startTunnelBtn.innerHTML = `<span>🔄</span> Restart Cloudflare Tunnel`;
+          if (window.showNotification) {
+            window.showNotification('🌐 Cloudflare Tunnel is live! Share link with friends.');
+          }
         } else {
           startTunnelBtn.disabled = false;
           startTunnelBtn.innerHTML = `<span>⚠️</span> ${data.error || 'Failed to start tunnel'}`;
