@@ -15234,6 +15234,11 @@ function initNexusMesh() {
   if (openProfileBtn) openProfileBtn.addEventListener('click', openProfileModal);
   if (closeProfileBtn) closeProfileBtn.addEventListener('click', closeProfileModal);
   if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', closeProfileModal);
+  if (profileModal) {
+    profileModal.addEventListener('click', (e) => {
+      if (e.target === profileModal) closeProfileModal();
+    });
+  }
   if (submitProfileBtn) submitProfileBtn.addEventListener('click', saveProfile);
   if (profileHandleInput) {
     profileHandleInput.addEventListener('keydown', (e) => {
@@ -19043,6 +19048,11 @@ function initNexusMesh() {
   if (openCreateRoomBtn) openCreateRoomBtn.addEventListener('click', openCreateRoom);
   if (closeCreateRoomBtn) closeCreateRoomBtn.addEventListener('click', closeCreateRoom);
   if (cancelCreateRoomBtn) cancelCreateRoomBtn.addEventListener('click', closeCreateRoom);
+  if (createRoomModal) {
+    createRoomModal.addEventListener('click', (e) => {
+      if (e.target === createRoomModal) closeCreateRoom();
+    });
+  }
 
   if (submitCreateRoomBtn) {
     submitCreateRoomBtn.addEventListener('click', async () => {
@@ -19103,6 +19113,11 @@ function initNexusMesh() {
   if (openRemoteHubModalBtn) openRemoteHubModalBtn.addEventListener('click', openRemoteHub);
   if (closeRemoteHubBtn) closeRemoteHubBtn.addEventListener('click', closeRemoteHub);
   if (cancelRemoteHubBtn) cancelRemoteHubBtn.addEventListener('click', closeRemoteHub);
+  if (remoteHubModal) {
+    remoteHubModal.addEventListener('click', (e) => {
+      if (e.target === remoteHubModal) closeRemoteHub();
+    });
+  }
 
   if (submitRemoteHubBtn) {
     submitRemoteHubBtn.addEventListener('click', () => {
@@ -19384,6 +19399,11 @@ function initNexusMesh() {
   }
   if (ackMeshDownloadsInfoBtn && downloadsInfoModal) {
     ackMeshDownloadsInfoBtn.addEventListener('click', () => downloadsInfoModal.classList.add('hidden'));
+  }
+  if (downloadsInfoModal) {
+    downloadsInfoModal.addEventListener('click', (e) => {
+      if (e.target === downloadsInfoModal) downloadsInfoModal.classList.add('hidden');
+    });
   }
 
   if (openDownloadsFolderBtn) {
@@ -19990,6 +20010,21 @@ function initNexusMesh() {
   if (closeInviteModalBtn) closeInviteModalBtn.addEventListener('click', () => {
     inviteModal.classList.add('hidden');
   });
+
+  const doneInviteModalBtn = document.getElementById('doneMeshInviteModalBtn');
+  if (doneInviteModalBtn && inviteModal) {
+    doneInviteModalBtn.addEventListener('click', () => {
+      inviteModal.classList.add('hidden');
+    });
+  }
+
+  if (inviteModal) {
+    inviteModal.addEventListener('click', (e) => {
+      if (e.target === inviteModal) {
+        inviteModal.classList.add('hidden');
+      }
+    });
+  }
 
   if (launchGuestBtn) launchGuestBtn.addEventListener('click', launchGuestWindow);
   if (launchGuestWindowBtn) launchGuestWindowBtn.addEventListener('click', launchGuestWindow);
@@ -23268,7 +23303,29 @@ function initCivitaiHub() {
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (detailsModal && !detailsModal.classList.contains('hidden')) {
+      const invModal = document.getElementById('meshInviteModal');
+      const rmModal = document.getElementById('meshCreateRoomModal');
+      const rhModal = document.getElementById('meshRemoteHubModal');
+      const pfModal = document.getElementById('meshProfileModal');
+      const dlModal = document.getElementById('meshDownloadsInfoModal');
+      const cvModal = document.getElementById('meshCodeViewerModal');
+      const lbModal = document.getElementById('meshMediaLightboxModal');
+
+      if (invModal && !invModal.classList.contains('hidden')) {
+        invModal.classList.add('hidden');
+      } else if (rmModal && !rmModal.classList.contains('hidden')) {
+        rmModal.classList.add('hidden');
+      } else if (rhModal && !rhModal.classList.contains('hidden')) {
+        rhModal.classList.add('hidden');
+      } else if (pfModal && !pfModal.classList.contains('hidden')) {
+        pfModal.classList.add('hidden');
+      } else if (dlModal && !dlModal.classList.contains('hidden')) {
+        dlModal.classList.add('hidden');
+      } else if (cvModal && !cvModal.classList.contains('hidden')) {
+        cvModal.classList.add('hidden');
+      } else if (lbModal && !lbModal.classList.contains('hidden')) {
+        lbModal.classList.add('hidden');
+      } else if (detailsModal && !detailsModal.classList.contains('hidden')) {
         detailsModal.classList.add('hidden');
       } else if (vpnModal && !vpnModal.classList.contains('hidden')) {
         vpnModal.classList.add('hidden');

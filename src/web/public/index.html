@@ -4627,9 +4627,10 @@ console.log(res.choices[0].message.content);</code></pre>
     })();
   </script>
   <!-- Nexus Mesh Invite Friends Modal -->
+  <!-- Nexus Mesh Invite Modal (Share LAN IP, HTTPS & Public Tunnel) -->
   <div id="meshInviteModal" class="modal-overlay hidden" style="z-index: 1000005;">
     <div class="modal-container" style="max-width: 580px; width: 94%; background: #0f172a; border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9); padding: 24px; color: #f8fafc; display: flex; flex-direction: column; gap: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 12px;">
+      <div class="mesh-invite-header">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 24px;">🔗</span>
           <div>
@@ -4637,7 +4638,7 @@ console.log(res.choices[0].message.content);</code></pre>
             <div style="font-size: 11.5px; color: #94a3b8;">Connect from your phone, laptop, or share with friends across the web</div>
           </div>
         </div>
-        <button type="button" id="closeMeshInviteModalBtn" class="modal-close-btn" style="background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; line-height: 1;">&times;</button>
+        <button type="button" id="closeMeshInviteModalBtn" class="modal-close-btn" title="Close (Esc)" aria-label="Close">&times;</button>
       </div>
 
       <!-- Option 1: Wi-Fi / Local Network Link -->
@@ -4716,6 +4717,13 @@ console.log(res.choices[0].message.content);</code></pre>
         </div>
         <button type="button" id="meshLaunchGuestWindowBtn" class="action-tag-btn" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 8px 18px; font-size: 12.5px; font-weight: 700; border-radius: 6px; cursor: pointer;">
           🚀 Open 2nd Window as Guest (Split Screen)
+        </button>
+      </div>
+
+      <!-- Bottom Action Footer (Always Accessible) -->
+      <div class="mesh-invite-footer">
+        <button type="button" id="doneMeshInviteModalBtn" class="primary-btn" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.5); color: #4ade80; padding: 9px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 8px;">
+          <span>✓</span> Done / Close
         </button>
       </div>
     </div>
