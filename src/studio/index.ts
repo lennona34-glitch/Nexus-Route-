@@ -165,6 +165,46 @@ $synth.Dispose()
   }
 
   /**
+   * Cleans AI model raw output by removing thinking processes, chain-of-thought analysis,
+   * markdown preambles, and conversational greetings, preserving pure structured lyrics.
+   */
+  public static cleanLyricsOutput(raw: string, structureSections?: string[]): string {
+    if (!raw) return '';
+    let text = raw.trim();
+
+    // 1. Strip explicit <think>...</think> reasoning blocks
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // 2. Strip "Here's a thinking process: ..." or "Thinking Process:" or reasoning summaries
+    if (
+      /^(?:Here(?:'s| is) a thinking process|Thinking Process|\*\*Thinking Process\*\*|### Thinking Process|1\.\s*\*\*Analyze User Input)/i.test(text) ||
+      text.includes("Here's a thinking process:") ||
+      text.includes("Here is a thinking process:")
+    ) {
+      // Find where the actual song starts: look for the first section tag not preceded by bullet/dash
+      const sectionMatch = text.match(/(?:^|\n)\s*(?![-*•]\s*)(\[(?:Intro|Verse|Pre-Chorus|Chorus|Hook|Bridge|Solo|Breakdown|Drop|Buildup|Outro|Movement|Part|Track)[^\]\n]*\])/i);
+      if (sectionMatch && sectionMatch.index !== undefined) {
+        text = text.slice(sectionMatch.index).trim();
+      } else {
+        // Fallback: check for horizontal divider (--- or ***) separating analysis from lyrics
+        const dividerParts = text.split(/\n\s*---+\s*\n|\n\s*\*\*\*+\s*\n/);
+        if (dividerParts.length > 1) {
+          text = dividerParts[dividerParts.length - 1].trim();
+        }
+      }
+    }
+
+    // 3. Strip conversational intro lines if present (e.g. "Sure! Here are the lyrics:")
+    text = text.replace(/^(?:(?:Sure!?|Certainly!?|Alright!?|Here (?:are|is)|Here's)[^:\n]*:?\s*)+/i, '').trim();
+    text = text.replace(/^#+\s*(?:Song Lyrics|Lyrics)\s*\n+/i, '').trim();
+
+    // 4. Strip trailing explanation/analysis blocks (e.g. "### Breakdown:", "Explanation of rhyme scheme:", etc.)
+    text = text.replace(/\n\s*(?:###\s*(?:Explanation|Breakdown|Notes|Analysis)|(?:\*\*Notes:?\*\*|Notes:))\s*[\s\S]*$/i, '').trim();
+
+    return text;
+  }
+
+  /**
    * Procedural lyrical generator tailored to musical structure and genre
    */
   public static buildProceduralLyrics(
@@ -415,7 +455,7 @@ Fade to black.`;
       : 'Do not include parenthetical vocal cue annotations.';
 
     const systemPrompt = `You are a world-class AI lyricist and hit songwriter for modern music generators like YuE2, Suno, Udio, and ACE-Step.
-Write complete, high-impact song lyrics matching the following musical specifications:
+Write complete, authentic, high-impact song lyrics matching the following musical specifications:
 Genre: ${genre}
 Mood: ${mood}
 Vocal Style: ${vocalStyle}
@@ -423,10 +463,12 @@ Song Structure: ${structureSections.join(' -> ')}
 Rhyme Scheme: ${rhymeInstruction}
 Vocal Cues: ${vocalCueText}
 
-Rules:
+CRITICAL RULES:
 - Write full, expressive verses and choruses for each section header: ${structureSections.join(', ')}.
 - Ensure natural rhythmic cadence and catchy singable phrasing.
-- Return ONLY the lyrics with the section headers. Do not include conversational commentary.`;
+- Start IMMEDIATELY with the first section header (e.g. ${structureSections[0]}).
+- Output ONLY the formatted lyrics sheet with bracketed section headers.
+- Do NOT output any thinking process, analysis, step-by-step reasoning, preamble, or conversational commentary.`;
 
     const chosenModel = model || (provider === 'online' ? 'deepseek-chat' : 'gemma-4-e4b-uncensored-hauhaucs-aggressive-q4:latest');
 
@@ -449,8 +491,9 @@ Rules:
 
         if (chatResp.ok) {
           const data = (await chatResp.json()) as any;
-          const lyrics = data.choices?.[0]?.message?.content?.trim();
-          if (lyrics) {
+          const rawLyrics = data.choices?.[0]?.message?.content?.trim();
+          if (rawLyrics) {
+            const lyrics = NexusStudioEngine.cleanLyricsOutput(rawLyrics, structureSections);
             const structure = Array.from(lyrics.matchAll(/\[(.*?)\]/g)).map(m => (m as any)[1]);
             return {
               lyrics,
@@ -467,32 +510,64 @@ Rules:
 
     // 2. Attempt generation via local Ollama
     try {
-      const ollamaResp = await fetch('http://127.0.0.1:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: chosenModel,
-          prompt: `${systemPrompt}\n\nUser Request: ${cleanPrompt}\nVocal Timbre: ${vocalStyle}`,
-          stream: false,
-          options: {
-            temperature: 0.8,
-            top_p: 0.9,
-          },
-        }),
-      });
-
-      if (ollamaResp.ok) {
-        const data = (await ollamaResp.json()) as any;
-        if (data.response && data.response.trim()) {
-          const lyrics = data.response.trim();
-          const structure = Array.from(lyrics.matchAll(/\[(.*?)\]/g)).map(m => (m as any)[1]);
-          return {
-            lyrics,
-            modelUsed: chosenModel,
-            provider: 'offline',
-            structure: structure.length ? structure : structureSections.map(s => s.replace(/[[\]]/g, '')),
-          };
+      let rawResponse = '';
+      // Try /api/chat first (optimal for chat & reasoning models like Qwen/DeepSeek/Llama/Hermes)
+      try {
+        const chatResp = await fetch('http://127.0.0.1:11434/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: chosenModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Compose complete, authentic song lyrics about: ${cleanPrompt}. Vocal Timbre: ${vocalStyle}` },
+            ],
+            stream: false,
+            options: {
+              temperature: 0.75,
+              top_p: 0.9,
+            },
+          }),
+        });
+        if (chatResp.ok) {
+          const chatData = (await chatResp.json()) as any;
+          rawResponse = chatData.message?.content?.trim() || '';
         }
+      } catch (e: any) {
+        console.warn('[StudioEngine] Ollama /api/chat attempt failed:', e.message);
+      }
+
+      // Fallback to /api/generate if /api/chat wasn't available or empty
+      if (!rawResponse) {
+        const genResp = await fetch('http://127.0.0.1:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: chosenModel,
+            system: systemPrompt,
+            prompt: `Compose complete, authentic song lyrics about: ${cleanPrompt}. Vocal Timbre: ${vocalStyle}`,
+            stream: false,
+            options: {
+              temperature: 0.75,
+              top_p: 0.9,
+            },
+          }),
+        });
+        if (genResp.ok) {
+          const genData = (await genResp.json()) as any;
+          rawResponse = genData.response?.trim() || '';
+        }
+      }
+
+      if (rawResponse) {
+        const lyrics = NexusStudioEngine.cleanLyricsOutput(rawResponse, structureSections);
+        const structure = Array.from(lyrics.matchAll(/\[(.*?)\]/g)).map(m => (m as any)[1]);
+        return {
+          lyrics,
+          modelUsed: chosenModel,
+          provider: 'offline',
+          structure: structure.length ? structure : structureSections.map(s => s.replace(/[[\]]/g, '')),
+        };
       }
     } catch (err: any) {
       console.warn('[StudioEngine] Local Ollama lyric generation failed, using procedural fallback:', err.message);

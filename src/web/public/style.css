@@ -6792,6 +6792,7 @@ body.zen-mode .zen-mode-exit-btn,
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
 }
 
 .studio-result-header {
@@ -6827,15 +6828,59 @@ body.zen-mode .zen-mode-exit-btn,
 
 .studio-code-box {
   font-family: var(--font-mono, monospace);
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.6;
   color: #38bdf8;
   background: rgba(5, 10, 20, 0.95);
   border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px;
   resize: vertical;
   outline: none;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(56, 189, 248, 0.45) rgba(10, 15, 28, 0.7) !important;
+  box-sizing: border-box;
+}
+
+.studio-code-box::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+}
+
+.studio-code-box::-webkit-scrollbar-track {
+  background: rgba(10, 15, 28, 0.7) !important;
+  border-radius: 4px !important;
+}
+
+.studio-code-box::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.45) !important;
+  border-radius: 4px !important;
+}
+
+.studio-code-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.75) !important;
+}
+
+#studioOutputLyrics.studio-code-box {
+  scrollbar-color: rgba(236, 72, 153, 0.5) rgba(10, 15, 28, 0.7) !important;
+}
+
+#studioOutputLyrics.studio-code-box::-webkit-scrollbar-thumb {
+  background: rgba(236, 72, 153, 0.5) !important;
+}
+
+#studioOutputLyrics.studio-code-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(236, 72, 153, 0.8) !important;
+}
+
+.studio-textarea {
+  max-height: none !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
 }
 
 .studio-preset-chips {

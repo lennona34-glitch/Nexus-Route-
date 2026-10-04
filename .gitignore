@@ -124,6 +124,7 @@ scripts/test_room_switch.js
 scripts/test_service_debug.mjs
 scripts/test_studio_e2e.mjs
 scripts/test_studio_refactor.mjs
+scripts/test_lyrics_scroll.mjs
 scripts/test_tab_click.mjs
 scripts/test_ui_cdp.mjs
 scripts/test_user_fixes.js

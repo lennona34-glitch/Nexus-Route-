@@ -20566,11 +20566,36 @@ function initNexusStudio() {
 
         const data = await resp.json();
         if (data.success && data.lyrics) {
-          if (outputLyrics) outputLyrics.value = data.lyrics;
+          // Extra client-side shield: strip any thinking process if raw text slipped through
+          let cleanLyrics = data.lyrics.trim();
+          cleanLyrics = cleanLyrics.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+          if (
+            /^(?:Here(?:'s| is) a thinking process|Thinking Process|\*\*Thinking Process\*\*|### Thinking Process|1\.\s*\*\*Analyze User Input)/i.test(cleanLyrics) ||
+            cleanLyrics.includes("Here's a thinking process:") ||
+            cleanLyrics.includes("Here is a thinking process:")
+          ) {
+            const sectionMatch = cleanLyrics.match(/(?:^|\n)\s*(?![-*•]\s*)(\[(?:Intro|Verse|Pre-Chorus|Chorus|Hook|Bridge|Solo|Breakdown|Drop|Buildup|Outro|Movement|Part|Track)[^\]\n]*\])/i);
+            if (sectionMatch && sectionMatch.index !== undefined) {
+              cleanLyrics = cleanLyrics.slice(sectionMatch.index).trim();
+            } else {
+              const dividerParts = cleanLyrics.split(/\n\s*---+\s*\n|\n\s*\*\*\*+\s*\n/);
+              if (dividerParts.length > 1) {
+                cleanLyrics = dividerParts[dividerParts.length - 1].trim();
+              }
+            }
+          }
+          cleanLyrics = cleanLyrics.replace(/^(?:(?:Sure!?|Certainly!?|Alright!?|Here (?:are|is)|Here's)[^:\n]*:?\s*)+/i, '').trim();
+          cleanLyrics = cleanLyrics.replace(/\n\s*(?:###\s*(?:Explanation|Breakdown|Notes|Analysis)|(?:\*\*Notes:?\*\*|Notes:))\s*[\s\S]*$/i, '').trim();
+
+          if (outputLyrics) {
+            outputLyrics.value = cleanLyrics;
+            outputLyrics.scrollTop = 0;
+          }
           if (lyricModelBadge) lyricModelBadge.textContent = `${data.modelUsed || 'AI Lyricist'} (${data.provider || provider})`;
 
-          const lines = data.lyrics.split('\n').filter(l => l.trim().length > 0).length;
-          const sections = (data.structure || []).length;
+          const lines = cleanLyrics.split('\n').filter(l => l.trim().length > 0).length;
+          const detectedSections = Array.from(cleanLyrics.matchAll(/\[(.*?)\]/g)).map(m => m[1]);
+          const sections = (data.structure && data.structure.length) ? data.structure.length : detectedSections.length;
           if (lyricStatsBadge) lyricStatsBadge.textContent = `${sections} Sections • ${lines} Lines • Structured for YuE2 & Vocals`;
 
           if (window.showNotification) window.showNotification(`🎵 Lyrics generated with ${data.modelUsed || 'AI Lyricist'}!`);
