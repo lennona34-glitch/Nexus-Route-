@@ -39,6 +39,7 @@ __pycache__/
 env/
 venv/
 models/
+ckpts/
 bin/
 *.pt
 *.safetensors

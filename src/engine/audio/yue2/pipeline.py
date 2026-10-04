@@ -39,8 +39,8 @@ class YuE2Pipeline:
             self.transformer = YuE2Acoustic(nar_config)
             self.vae = YuE2VAE(YuE2VAEConfig(**json.loads(Path(vae_config).read_text())))
         for model, filename, precision in ((self.text_encoder, ar_weights, dtype), (self.transformer, acoustic_weights, dtype), (self.vae, vae_weights, vae_dtype)):
-            offload.load_model_data(model, filename, default_dtype=precision, writable_tensors=False)
             model.eval().requires_grad_(False)
+            offload.load_model_data(model, filename, default_dtype=precision, writable_tensors=False)
         self.text_encoder.configure_engine(lm_decoder_engine, self._abort_requested)
         self.transformer.engine = lm_decoder_engine
         self.transformer.abort_fn = self._abort_requested

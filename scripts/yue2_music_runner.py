@@ -50,7 +50,8 @@ def parse_args():
     return parser.parse_args()
 
 def try_yue2_inference(alt_prompt, lyrics, genre, bpm, key, scale, duration, seed, temperature, output_path):
-    """Attempt full PyTorch CUDA inference using copied YuE2 weights."""
+    """Attempt full PyTorch CUDA inference using native YuE2 weights and MMGP engine."""
+    prev_cwd = os.getcwd()
     try:
         emit_progress(10, "Detecting NVIDIA CUDA & RTX 4060 GPU environment...", "40s")
         import torch
@@ -61,81 +62,62 @@ def try_yue2_inference(alt_prompt, lyrics, genre, bpm, key, scale, duration, see
         vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
         emit_progress(18, f"Targeting {device_name} ({vram_gb:.1f} GB VRAM)...", "35s")
 
-        # Resolve model paths
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        models_dir = os.path.join(repo_root, "models", "audio")
-        ar_weights = os.path.join(models_dir, "YuE2_AR", "YuE2_AR_int8_convrot.safetensors")
-        acoustic_weights = os.path.join(models_dir, "YuE2_Acoustic_int8_convrot.safetensors")
-        vae_weights = os.path.join(models_dir, "yue2", "YuE2_VAE_bf16.safetensors")
-        vae_config = os.path.join(models_dir, "yue2", "vae_config.json")
-        tokenizer_path = os.path.join(models_dir, "YuE2_AR", "qwen.tiktoken")
-
-        # Check required files
-        for p in [ar_weights, acoustic_weights, vae_weights, vae_config, tokenizer_path]:
-            if not os.path.exists(p):
-                raise FileNotFoundError(f"Missing YuE2 model file: {p}")
+        output_path = os.path.abspath(output_path)
+        maestro_app_dir = r"C:\Users\adria\Desktop\Maestro AI\app"
+        if maestro_app_dir not in sys.path:
+            sys.path.insert(0, maestro_app_dir)
 
         emit_progress(30, f"Loading YuE2 AR & Acoustic int8 checkpoints for {genre}...", "25s")
+        os.chdir(maestro_app_dir)
+        _saved_argv = sys.argv[:]
+        try:
+            sys.argv = [sys.argv[0]]
+            import wgp
+        finally:
+            sys.argv = _saved_argv
 
-        # Add src/engine/audio to sys.path
-        engine_audio_dir = os.path.join(repo_root, "src", "engine", "audio")
-        if engine_audio_dir not in sys.path:
-            sys.path.insert(0, engine_audio_dir)
+        wan_model, offloadobj = wgp.load_models("yue2")
 
-        import types
-        import yue2
-        if "models" not in sys.modules:
-            sys.modules["models"] = types.ModuleType("models")
-        if "models.TTS" not in sys.modules:
-            sys.modules["models.TTS"] = types.ModuleType("models.TTS")
-        sys.modules["models.TTS.yue2"] = yue2
-
-        # Import YuE2 Pipeline from engine
-        from yue2.pipeline import YuE2Pipeline
         emit_progress(45, f"Initializing Autoregressive LM Engine ({bpm} BPM, {key} {scale})...", "20s")
 
-        pipe = YuE2Pipeline(
-            ar_weights=ar_weights,
-            acoustic_weights=acoustic_weights,
-            tokenizer_path=tokenizer_path,
-            vae_weights=vae_weights,
-            vae_config=vae_config,
-            dtype=torch.bfloat16,
-            vae_dtype=torch.bfloat16,
-            lm_decoder_engine="legacy"
-        )
-
-        emit_progress(60, "Generating Autoregressive Music Tokens...", "15s")
         formatted_prompt = lyrics.strip() if lyrics.strip() else f"[{genre}] [Tempo: {bpm} BPM] [Key: {key} {scale}]\n[Intro]\n[Verse 1]\n[Chorus]\n[Outro]"
+        style_prompt = f"{genre}, {alt_prompt}".strip(", ")
 
-        def callback_fn(step, total):
+        def callback_fn(*args, **kwargs):
+            step = kwargs.get("step_idx", args[0] if len(args) > 0 else 0)
+            total = kwargs.get("override_num_inference_steps", args[1] if len(args) > 1 else 100)
+            desc = kwargs.get("denoising_extra", "Synthesizing neural music")
             if total and total > 0:
-                p = 60 + int((step / total) * 25)
-                emit_progress(min(85, p), f"Decoding tokens: step {step}/{total}...", f"{max(1, total - step)}s")
+                p = 45 + int((step / total) * 45)
+                emit_progress(min(90, p), f"{desc}: step {step+1}/{total}...", f"{max(1, (total - step) // 3)}s")
 
-        result = pipe.generate(
+        emit_progress(50, "Generating Autoregressive Music Tokens...", "20s")
+
+        result = wan_model.generate(
             input_prompt=formatted_prompt,
-            alt_prompt=alt_prompt,
+            alt_prompt=style_prompt,
             seed=seed,
-            duration_seconds=min(duration, 60),
+            duration_seconds=min(duration, 120),
             sampling_steps=16,
-            guide_scale=1.5,
-            temperature=temperature,
+            guide_scale=1.0,
+            temperature=temperature if temperature > 0 else 0.85,
             top_k=50,
             top_p=0.9,
-            model_mode=0, # instrumental / full
-            callback=callback_fn
+            model_mode=2,
+            callback=callback_fn,
+            offloadobj=offloadobj
         )
 
         if not result or "x" not in result:
             raise RuntimeError("YuE2 returned empty audio tensor.")
 
-        emit_progress(88, "Decoding VAE latents into 48kHz stereo master...", "5s")
+        emit_progress(92, "Decoding VAE latents into 48kHz stereo master...", "5s")
         audio_tensor = result["x"] # Shape: [channels, samples] or [samples]
         sr = result.get("audio_sampling_rate", 48000)
 
         # Save to WAV
-        emit_progress(95, "Exporting 48kHz WAV audio file...", "2s")
+        emit_progress(96, "Exporting 48kHz WAV audio file...", "2s")
         import soundfile as sf
         audio_np = audio_tensor.detach().cpu().numpy()
         if audio_np.ndim == 2 and audio_np.shape[0] == 2:
@@ -151,7 +133,12 @@ def try_yue2_inference(alt_prompt, lyrics, genre, bpm, key, scale, duration, see
             "outputPath": output_path
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        print(f"[YuE2 Native Engine Error] {e}", file=sys.stderr)
         return {"success": False, "error": str(e)}
+    finally:
+        os.chdir(prev_cwd)
 
 def fallback_gpu_acoustic_synth(alt_prompt, lyrics, genre, bpm, key, scale, duration, seed, output_path):
     """
