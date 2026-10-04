@@ -20160,6 +20160,23 @@ function initNexusStudio() {
   const btnCopyStructurePrompt = document.getElementById('btnCopyStructurePrompt');
   const btnSendStructureToLyrics = document.getElementById('btnSendStructureToLyrics');
 
+  // Native GPU Music Generator Elements
+  const btnGenerateMusic = document.getElementById('btnStudioGenerateMusic');
+  const musicDurationSelect = document.getElementById('studioMusicDurationSelect');
+  const musicShareLoungeCheck = document.getElementById('studioMusicShareLoungeCheck');
+  const musicProgressBox = document.getElementById('studioMusicProgressBox');
+  const musicProgressStage = document.getElementById('studioMusicProgressStage');
+  const musicProgressPercent = document.getElementById('studioMusicProgressPercent');
+  const musicProgressBar = document.getElementById('studioMusicProgressBar');
+  const musicResultBox = document.getElementById('studioMusicResultBox');
+  const musicResultTitle = document.getElementById('studioMusicResultTitle');
+  const musicResultMeta = document.getElementById('studioMusicResultMeta');
+  const musicAudioPlayer = document.getElementById('studioMusicAudioPlayer');
+  const btnPlayMusicResult = document.getElementById('btnStudioPlayResult');
+  const btnShareMusicResultLounge = document.getElementById('btnStudioShareResultLounge');
+  const btnMusicOpenInLibrary = document.getElementById('btnStudioOpenInLibrary');
+  let lastGeneratedMusicTrack = null;
+
   // Tab 2 Elements: AI Lyrics Studio
   const lyricProviderSelect = document.getElementById('studioLyricProviderSelect');
   const lyricModelSelect = document.getElementById('studioLyricModelSelect');
@@ -20505,6 +20522,197 @@ function initNexusStudio() {
       if (moodSelect && lyricMoodContext) lyricMoodContext.value = moodSelect.value;
       switchTab('lyrics');
       if (window.showNotification) window.showNotification('✍️ Switched to AI Lyrics Studio with current musical context!');
+    });
+  }
+
+  // ==========================================================================
+  // Native 1-Click GPU Music Generation (YuE2 int8 + RTX 4060)
+  // ==========================================================================
+  if (btnGenerateMusic) {
+    btnGenerateMusic.addEventListener('click', async () => {
+      let currentAltPrompt = outputAltPrompt ? outputAltPrompt.value.trim() : '';
+      const genre = genreSelect ? genreSelect.value : '80s Synthwave / Dark Cyberpunk';
+      const bpm = parseInt(tempoSlider ? tempoSlider.value : 120, 10);
+      const key = keySelect ? keySelect.value : 'E';
+      const scale = scaleSelect ? scaleSelect.value : 'Minor';
+      const duration = parseInt(musicDurationSelect ? musicDurationSelect.value : 30, 10);
+      const shareToLounge = musicShareLoungeCheck ? musicShareLoungeCheck.checked : true;
+      const lyrics = outputStructurePrompt ? outputStructurePrompt.value.trim() : '';
+
+      if (!currentAltPrompt) {
+        const vocal = vocalTypeSelect ? vocalTypeSelect.value : 'Male mid-range baritone';
+        const instruments = instrumentsInput ? instrumentsInput.value : 'Synthesizers, driving bass';
+        const mood = moodSelect ? moodSelect.value : 'Nostalgic';
+        const prod = productionTextureSelect ? productionTextureSelect.value : 'Analog warmth';
+        const desc = sceneDescInput ? sceneDescInput.value : '';
+        currentAltPrompt = `Lead vocal: ${vocal}. Genre: ${genre}. Lead instruments: ${instruments}. Mood: ${mood}. Production: ${prod}. Description: ${desc}. Tempo: Approx. ${bpm} BPM. Key: ${key} ${scale}.`;
+        if (outputAltPrompt) outputAltPrompt.value = currentAltPrompt;
+      }
+
+      btnGenerateMusic.disabled = true;
+      btnGenerateMusic.innerHTML = '<span>⚡</span> Generating on GPU (RTX 4060)...';
+
+      if (musicProgressBox) {
+        musicProgressBox.style.display = 'block';
+        if (musicProgressBar) musicProgressBar.style.width = '5%';
+        if (musicProgressPercent) musicProgressPercent.textContent = '5%';
+        if (musicProgressStage) {
+          musicProgressStage.textContent = 'Starting PyTorch CUDA YuE2 engine...';
+          musicProgressStage.style.color = '#c084fc';
+        }
+      }
+      if (musicResultBox) musicResultBox.style.display = 'none';
+
+      try {
+        const resp = await fetch('/v1/studio/music/generate?stream=1', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+          },
+          body: JSON.stringify({
+            altPrompt: currentAltPrompt,
+            lyrics,
+            genre,
+            bpm,
+            key,
+            scale,
+            duration,
+            shareToLounge,
+          }),
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.error || `Server responded with ${resp.status}`);
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || '';
+
+          for (const part of parts) {
+            const dataMatch = part.match(/^data:\s*(.+)$/m);
+            if (!dataMatch) continue;
+            try {
+              const msg = JSON.parse(dataMatch[1]);
+              if (msg.type === 'progress') {
+                const pct = Math.max(5, Math.min(100, Math.round(msg.percent || 0)));
+                if (musicProgressBar) musicProgressBar.style.width = `${pct}%`;
+                if (musicProgressPercent) musicProgressPercent.textContent = `${pct}%`;
+                if (musicProgressStage) musicProgressStage.textContent = msg.stage || 'Synthesizing audio...';
+              } else if (msg.type === 'done' || msg.success) {
+                lastGeneratedMusicTrack = msg;
+                if (musicProgressBar) musicProgressBar.style.width = '100%';
+                if (musicProgressPercent) musicProgressPercent.textContent = '100%';
+                if (musicProgressStage) musicProgressStage.textContent = 'Complete! Track saved.';
+              } else if (msg.type === 'error' || msg.error) {
+                throw new Error(msg.error || 'GPU Generation error');
+              }
+            } catch (err) {
+              if (err.message && !err.message.includes('JSON')) throw err;
+            }
+          }
+        }
+
+        if (lastGeneratedMusicTrack) {
+          if (musicResultBox) {
+            musicResultBox.style.display = 'block';
+            if (musicResultTitle) musicResultTitle.textContent = lastGeneratedMusicTrack.title || `${genre} (${bpm} BPM)`;
+            if (musicResultMeta) {
+              musicResultMeta.textContent = `${lastGeneratedMusicTrack.duration}s • ${lastGeneratedMusicTrack.bpm} BPM • ${lastGeneratedMusicTrack.key} • ${lastGeneratedMusicTrack.engine || 'YuE2'} (${lastGeneratedMusicTrack.device || 'NVIDIA RTX 4060'})`;
+            }
+          }
+          if (musicAudioPlayer && lastGeneratedMusicTrack.streamUrl) {
+            musicAudioPlayer.src = lastGeneratedMusicTrack.streamUrl;
+            musicAudioPlayer.load();
+          }
+
+          loadTrackIntoStudioPlayer(
+            lastGeneratedMusicTrack.streamUrl,
+            lastGeneratedMusicTrack.title || `${genre} (${bpm} BPM)`,
+            `GPU YUE2 • ${lastGeneratedMusicTrack.bpm} BPM • ${lastGeneratedMusicTrack.key}`
+          );
+
+          loadStudioAudioLibrary();
+
+          if (window.showNotification) {
+            window.showNotification(`🚀 GPU Track generated: "${lastGeneratedMusicTrack.title || genre}"!`);
+          }
+        }
+      } catch (err) {
+        console.error('[Studio] GPU Music Gen Error:', err);
+        alert('GPU Music generation failed: ' + err.message);
+        if (musicProgressStage) {
+          musicProgressStage.textContent = 'Failed: ' + err.message;
+          musicProgressStage.style.color = '#ef4444';
+        }
+      } finally {
+        btnGenerateMusic.disabled = false;
+        btnGenerateMusic.innerHTML = '<span>🚀</span> Generate Music on GPU (1-Click)';
+      }
+    });
+  }
+
+  if (btnPlayMusicResult) {
+    btnPlayMusicResult.addEventListener('click', () => {
+      if (lastGeneratedMusicTrack) {
+        loadTrackIntoStudioPlayer(
+          lastGeneratedMusicTrack.streamUrl,
+          lastGeneratedMusicTrack.title || `${lastGeneratedMusicTrack.genre} (${lastGeneratedMusicTrack.bpm} BPM)`,
+          `GPU YUE2 • ${lastGeneratedMusicTrack.bpm} BPM • ${lastGeneratedMusicTrack.key}`
+        );
+        studioAudio.play().catch(() => {});
+      } else if (musicAudioPlayer && musicAudioPlayer.src) {
+        musicAudioPlayer.play().catch(() => {});
+      }
+    });
+  }
+
+  if (btnShareMusicResultLounge) {
+    btnShareMusicResultLounge.addEventListener('click', async () => {
+      if (!lastGeneratedMusicTrack) return;
+      btnShareMusicResultLounge.disabled = true;
+      btnShareMusicResultLounge.innerHTML = '<span>⏳</span> Sharing...';
+      try {
+        const resp = await fetch('/v1/studio/audio/share-to-lounge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: lastGeneratedMusicTrack.filename,
+            comment: `Fresh GPU Track: "${lastGeneratedMusicTrack.title}" (${lastGeneratedMusicTrack.bpm} BPM, ${lastGeneratedMusicTrack.key})`,
+          }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          btnShareMusicResultLounge.innerHTML = '<span>✅</span> Shared!';
+          setTimeout(() => {
+            btnShareMusicResultLounge.innerHTML = '<span>📢</span> Share';
+            btnShareMusicResultLounge.disabled = false;
+          }, 2000);
+          if (window.showNotification) window.showNotification(`🎶 Shared "${lastGeneratedMusicTrack.title}" to #lounge!`);
+        } else {
+          alert('Failed to share track: ' + data.error);
+          btnShareMusicResultLounge.disabled = false;
+        }
+      } catch (err) {
+        alert('Error sharing track: ' + err.message);
+        btnShareMusicResultLounge.disabled = false;
+      }
+    });
+  }
+
+  if (btnMusicOpenInLibrary) {
+    btnMusicOpenInLibrary.addEventListener('click', () => {
+      switchTab('export');
+      loadStudioAudioLibrary();
     });
   }
 

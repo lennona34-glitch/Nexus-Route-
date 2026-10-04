@@ -5118,7 +5118,7 @@ console.log(res.choices[0].message.content);</code></pre>
                   </div>
                   <button type="button" id="btnCopyAltPrompt" class="studio-copy-btn"><span>📋</span> Copy Prompt</button>
                 </div>
-                <textarea id="studioOutputAltPrompt" class="studio-code-box" readonly rows="4" placeholder="Click 'Craft GPU Music Prompts' to generate structured YuE2 alt_prompt..."></textarea>
+                <textarea id="studioOutputAltPrompt" class="studio-code-box" readonly style="min-height: 70px; height: 75px;" placeholder="Click 'Craft GPU Music Prompts' to generate structured YuE2 alt_prompt..."></textarea>
               </div>
 
               <!-- Suno / Udio / ACE-Step Tags Box -->
@@ -5134,7 +5134,7 @@ console.log(res.choices[0].message.content);</code></pre>
               </div>
 
               <!-- Song Arrangement Blueprint Box -->
-              <div class="studio-result-card" style="flex: 1; display: flex; flex-direction: column;">
+              <div class="studio-result-card">
                 <div class="studio-result-header">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="studio-model-tag lyrics">Song Arrangement Blueprint</span>
@@ -5145,7 +5145,71 @@ console.log(res.choices[0].message.content);</code></pre>
                     <button type="button" id="btnSendStructureToLyrics" class="studio-action-btn" title="Open AI Lyrics Studio with this style &amp; tempo"><span>✍️</span> Open in Lyrics Studio</button>
                   </div>
                 </div>
-                <textarea id="studioOutputStructurePrompt" class="studio-code-box" readonly style="flex: 1; min-height: 160px;" placeholder="Song arrangement sections and tags will appear here..."></textarea>
+                <textarea id="studioOutputStructurePrompt" class="studio-code-box" readonly style="min-height: 70px; height: 80px;" placeholder="Song arrangement sections and tags will appear here..."></textarea>
+              </div>
+
+              <!-- Native GPU Music Generation Engine Card -->
+              <div class="studio-result-card" id="studioGpuMusicGenCard" style="border: 1px solid rgba(168, 85, 247, 0.5); background: #0f1523; flex-shrink: 0; margin-top: 4px;">
+                <div class="studio-result-header" style="flex-wrap: wrap; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="studio-model-tag" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color: #fff; font-weight: 800;">🚀 NATIVE GPU MUSIC ENGINE</span>
+                    <span style="font-size: 11px; color: #c084fc; font-weight: 600;">YuE2 int8 Local &bull; NVIDIA RTX 4060 (8GB VRAM)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <label style="font-size: 11px; color: #94a3b8; font-weight: 600;">Duration:</label>
+                    <select id="studioMusicDurationSelect" class="studio-input" style="padding: 2px 8px; font-size: 11.5px; height: 28px; width: 75px;">
+                      <option value="15">15s</option>
+                      <option value="30" selected>30s</option>
+                      <option value="60">60s</option>
+                      <option value="120">120s</option>
+                    </select>
+                    <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #94a3b8; cursor: pointer; margin-left: 4px;">
+                      <input type="checkbox" id="studioMusicShareLoungeCheck" checked style="cursor: pointer;" />
+                      <span>Post to #lounge</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div style="padding: 10px 0 6px 0; display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" id="btnStudioGenerateMusic" class="studio-primary-btn" style="flex: 1; background: linear-gradient(135deg, #9333ea 0%, #ec4899 50%, #38bdf8 100%); font-weight: 800; font-size: 13.5px; padding: 10px 16px; box-shadow: 0 4px 18px rgba(147, 51, 234, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+                      <span>🚀</span> Generate Music on GPU (1-Click)
+                    </button>
+                  </div>
+
+                  <!-- Live Progress Box (Hidden when idle) -->
+                  <div id="studioMusicProgressBox" style="display: none; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; padding: 10px 12px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                      <span id="studioMusicProgressStage" style="color: #c084fc; font-weight: 600;">Initializing PyTorch GPU worker...</span>
+                      <span id="studioMusicProgressPercent" style="color: #38bdf8; font-weight: 700;">0%</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden;">
+                      <div id="studioMusicProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #a855f7, #38bdf8, #22c55e); transition: width 0.3s ease;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Generated Track Showcase Box (Hidden until generated) -->
+                  <div id="studioMusicResultBox" style="display: none; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <div>
+                        <div id="studioMusicResultTitle" style="font-weight: 700; color: #4ade80; font-size: 13px;">New Track Generated</div>
+                        <div id="studioMusicResultMeta" style="font-size: 11px; color: #94a3b8;">48kHz Stereo &bull; YuE2 int8 Engine</div>
+                      </div>
+                      <div style="display: flex; gap: 6px;">
+                        <button type="button" id="btnStudioPlayResult" class="studio-action-btn" style="color: #4ade80; border-color: rgba(34, 197, 94, 0.4); background: rgba(34, 197, 94, 0.15); font-weight: 700;">
+                          <span>▶</span> Audition
+                        </button>
+                        <button type="button" id="btnStudioShareResultLounge" class="studio-action-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">
+                          <span>📢</span> Share
+                        </button>
+                        <button type="button" id="btnStudioOpenInLibrary" class="studio-action-btn" style="color: #c084fc; border-color: rgba(192, 132, 252, 0.4);">
+                          <span>📚</span> Library
+                        </button>
+                      </div>
+                    </div>
+                    <audio id="studioMusicAudioPlayer" controls style="width: 100%; height: 32px; border-radius: 6px;"></audio>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

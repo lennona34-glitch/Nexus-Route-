@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { MeshHub } from '../mesh/hub.js';
@@ -1020,7 +1020,7 @@ CRITICAL RULES:
 
       // Invoke scripts/f5_tts_runner.py
       const runnerScript = path.resolve(process.cwd(), 'scripts', 'f5_tts_runner.py');
-      const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
+      const pythonExe = this.resolveAudioPythonExe();
 
       const args = [
         runnerScript,
@@ -1090,6 +1090,177 @@ CRITICAL RULES:
       try { if (fs.existsSync(tempRefPath)) await fs.promises.unlink(tempRefPath); } catch {}
       try { if (fs.existsSync(tempOutPath)) await fs.promises.unlink(tempOutPath); } catch {}
     }
+  }
+
+  /**
+   * Resolve local Python executable with priority given to local CUDA ML environment
+   */
+  public static resolveAudioPythonExe(): string {
+    if (process.env.AUDIO_PYTHON_EXE && fs.existsSync(process.env.AUDIO_PYTHON_EXE)) {
+      return process.env.AUDIO_PYTHON_EXE;
+    }
+    const localVenv = 'C:\\Users\\adria\\Desktop\\Maestro AI\\app\\env\\Scripts\\python.exe';
+    if (fs.existsSync(localVenv)) {
+      return localVenv;
+    }
+    return process.platform === 'win32' ? 'python' : 'python3';
+  }
+
+  /**
+   * Standalone Native GPU Music Generation (YuE2 int8 + RTX 4060)
+   * Runs local PyTorch YuE2 inference using local models/audio weights, completely independent of Maestro AI.
+   */
+  public static async generateGpuMusic(
+    options: {
+      altPrompt?: string;
+      lyrics?: string;
+      genre?: string;
+      bpm?: number;
+      key?: string;
+      scale?: string;
+      duration?: number;
+      seed?: number;
+      temperature?: number;
+      shareToLounge?: boolean;
+    },
+    meshHub?: MeshHub,
+    meshShareManager?: ShareManager,
+    onProgress?: (progress: { percent: number; stage: string; eta?: string }) => void
+  ): Promise<{
+    success: boolean;
+    filename: string;
+    filePath: string;
+    streamUrl: string;
+    downloadUrl: string;
+    url: string;
+    title: string;
+    duration: number;
+    bpm: number;
+    key: string;
+    genre: string;
+    seed: number;
+    engine: string;
+    device: string;
+    meta: any;
+  }> {
+    const runnerScript = path.resolve(process.cwd(), 'scripts', 'yue2_music_runner.py');
+    const pythonExe = this.resolveAudioPythonExe();
+
+    const genre = options.genre || '80s Synthwave';
+    const bpm = options.bpm || 120;
+    const key = options.key || 'C';
+    const scale = options.scale || 'Minor';
+    const duration = options.duration || 30;
+
+    const args: string[] = [
+      runnerScript,
+      '--genre', genre,
+      '--bpm', String(bpm),
+      '--key', key,
+      '--scale', scale,
+      '--duration', String(duration),
+    ];
+
+    if (options.altPrompt) {
+      args.push('--alt-prompt', options.altPrompt);
+    }
+    if (options.lyrics) {
+      args.push('--lyrics', options.lyrics);
+    }
+    if (options.seed !== undefined && options.seed !== null) {
+      args.push('--seed', String(options.seed));
+    }
+    if (options.temperature !== undefined && options.temperature !== null) {
+      args.push('--temperature', String(options.temperature));
+    }
+
+    return new Promise((resolve, reject) => {
+      const child = spawn(pythonExe, args, {
+        cwd: process.cwd(),
+        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      });
+
+      let stdoutBuffer = '';
+      let stderrBuffer = '';
+      let lastResult: any = null;
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdoutBuffer += chunk.toString();
+        const lines = stdoutBuffer.split('\n');
+        stdoutBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.type === 'progress') {
+              if (onProgress) {
+                onProgress({
+                  percent: parsed.percent,
+                  stage: parsed.stage,
+                  eta: parsed.eta,
+                });
+              }
+            } else if (parsed.type === 'done' || parsed.success) {
+              lastResult = parsed;
+            }
+          } catch {
+            // Ignore non-json lines
+          }
+        }
+      });
+
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderrBuffer += chunk.toString();
+      });
+
+      child.on('error', (err) => {
+        reject(new Error(`Failed to start GPU music runner (${pythonExe}): ${err.message}`));
+      });
+
+      child.on('close', async (code) => {
+        if (stdoutBuffer.trim()) {
+          try {
+            const parsed = JSON.parse(stdoutBuffer.trim());
+            if (parsed.type === 'done' || parsed.success) {
+              lastResult = parsed;
+            }
+          } catch {}
+        }
+
+        if (lastResult && (lastResult.success || lastResult.type === 'done')) {
+          // Refresh mesh shares so track appears immediately in browse and lounge
+          if (meshShareManager) {
+            try { await meshShareManager.rescan(); } catch {}
+          }
+
+          // Broadcast to #lounge Mesh chat if requested
+          if (options.shareToLounge && meshHub) {
+            try {
+              const trackTitle = lastResult.title || lastResult.filename || 'New GPU Track';
+              meshHub.postMessage(
+                'nexus_studio',
+                `🚀 **[GPU Music Engine]** New track produced: **${trackTitle}**\nGenre: ${lastResult.genre || genre} | ${lastResult.bpm || bpm} BPM | ${lastResult.key || (key + ' ' + scale)}\nEngine: ${lastResult.engine || 'YuE2'} (${lastResult.device || 'NVIDIA RTX 4060'})`,
+                'lounge',
+                undefined,
+                'Nexus GPU Studio ⚡',
+                '⚡',
+                {
+                  mediaUrl: lastResult.streamUrl,
+                  mediaType: 'audio',
+                }
+              );
+            } catch {}
+          }
+
+          resolve(lastResult);
+        } else {
+          const errMsg = stderrBuffer.trim() || `YuE2 GPU music generator exited with code ${code}`;
+          reject(new Error(errMsg));
+        }
+      });
+    });
   }
 }
 
@@ -1302,4 +1473,62 @@ export function registerStudioRoutes(
 
   app.post('/v1/studio/vocal/clone', handleVocalClone);
   app.post('/v1/studio/vocal/f5-clone', handleVocalClone);
+
+  // 10. Native GPU Music Generation (YuE2 int8 + RTX 4060)
+  app.post<{
+    Querystring: {
+      stream?: string;
+    };
+    Body: {
+      altPrompt?: string;
+      lyrics?: string;
+      genre?: string;
+      bpm?: number;
+      key?: string;
+      scale?: string;
+      duration?: number;
+      seed?: number;
+      temperature?: number;
+      shareToLounge?: boolean;
+    };
+  }>('/v1/studio/music/generate', async (req, reply) => {
+    const isStream = req.query?.stream === '1' || req.headers.accept?.includes('text/event-stream');
+
+    if (isStream) {
+      reply.hijack();
+      reply.raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+      reply.raw.setHeader('Connection', 'keep-alive');
+      reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+
+      try {
+        const result = await NexusStudioEngine.generateGpuMusic(
+          req.body || {},
+          meshHub,
+          meshShareManager,
+          (progress) => {
+            reply.raw.write(`data: ${JSON.stringify({ type: 'progress', ...progress })}\n\n`);
+          }
+        );
+        reply.raw.write(`data: ${JSON.stringify({ type: 'done', ...result })}\n\n`);
+        reply.raw.end();
+      } catch (err: any) {
+        reply.raw.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+        reply.raw.end();
+      }
+      return;
+    } else {
+      try {
+        const result = await NexusStudioEngine.generateGpuMusic(
+          req.body || {},
+          meshHub,
+          meshShareManager
+        );
+        return reply.send({ success: true, ...result });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: err.message });
+      }
+    }
+  });
 }
+
