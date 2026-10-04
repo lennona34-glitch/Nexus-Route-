@@ -21402,8 +21402,227 @@ function initNexusStudio() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
+  function generateDawWaveformBars(stemType) {
+    let barsHtml = '';
+    const numBars = 36;
+    for (let i = 0; i < numBars; i++) {
+      let h = 8;
+      if (stemType === 'drums') {
+        h = (i % 4 === 0) ? 26 : ((i % 2 === 0) ? 18 : 8);
+      } else if (stemType === 'bass') {
+        h = 10 + Math.sin(i * 0.4) * 6 + (i % 3 === 0 ? 6 : 0);
+      } else if (stemType === 'vocals') {
+        const phrase = Math.sin(i * 0.3);
+        h = phrase > 0 ? (12 + phrase * 14) : 4;
+      } else {
+        h = 10 + Math.abs(Math.sin(i * 0.6)) * 14;
+      }
+      barsHtml += `<div class="studio-daw-bar" style="height: ${Math.round(h)}px;"></div>`;
+    }
+    return barsHtml;
+  }
+
+  const studioDawEngine = {
+    currentTrack: null,
+    isPlaying: false,
+    currentTime: 0,
+    duration: 30,
+    leadStemKey: 'vocals',
+    audioElements: {},
+    mutes: { vocals: false, drums: false, bass: false, other: false },
+    solos: { vocals: false, drums: false, bass: false, other: false },
+
+    init(track, stemData) {
+      this.destroy();
+      this.currentTrack = track;
+      this.isPlaying = false;
+      this.currentTime = 0;
+      this.duration = track.durationSeconds || 30;
+      this.mutes = { vocals: false, drums: false, bass: false, other: false };
+      this.solos = { vocals: false, drums: false, bass: false, other: false };
+
+      for (const key of ['vocals', 'drums', 'bass', 'other']) {
+        const item = stemData[key];
+        if (item && (item.streamUrl || item.downloadUrl)) {
+          const audio = new Audio(item.streamUrl || item.downloadUrl);
+          audio.preload = 'auto';
+          this.audioElements[key] = audio;
+        }
+      }
+
+      this.leadStemKey = this.audioElements.vocals ? 'vocals' : (Object.keys(this.audioElements)[0] || 'vocals');
+      const lead = this.audioElements[this.leadStemKey];
+      if (lead) {
+        lead.addEventListener('loadedmetadata', () => {
+          if (lead.duration && !isNaN(lead.duration)) {
+            this.duration = lead.duration;
+            this.updateTimeDisplay();
+          }
+        });
+        lead.addEventListener('timeupdate', () => {
+          this.currentTime = lead.currentTime;
+          this.updatePlayheads();
+          this.updateTimeDisplay();
+        });
+        lead.addEventListener('ended', () => {
+          this.pause();
+          this.seek(0);
+        });
+      }
+      this.updateTimeDisplay();
+      this.updateTransportUI();
+      this.updateTrackStripUI();
+    },
+
+    play() {
+      if (this.isPlaying) return;
+      if (studioAudio && !studioAudio.paused) studioAudio.pause();
+
+      const t = this.currentTime || 0;
+      for (const key in this.audioElements) {
+        const a = this.audioElements[key];
+        try {
+          a.currentTime = t;
+          a.play().catch(() => {});
+        } catch (e) {}
+      }
+      this.isPlaying = true;
+      this.updateTransportUI();
+      this.updateVolumeAndMutes();
+
+      if (studioPlayerTrackTitle) studioPlayerTrackTitle.textContent = `${this.currentTrack?.title || 'Track'} [4-Stem DAW Multi-Track]`;
+      if (studioPlayerTrackSub) studioPlayerTrackSub.textContent = 'DAW Multi-Track Studio (Synced Stems)';
+      if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '⏸️';
+    },
+
+    pause() {
+      for (const key in this.audioElements) {
+        try { this.audioElements[key].pause(); } catch (e) {}
+      }
+      this.isPlaying = false;
+      this.updateTransportUI();
+      if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '▶️';
+    },
+
+    togglePlay() {
+      if (this.isPlaying) this.pause();
+      else this.play();
+    },
+
+    seek(seconds) {
+      this.currentTime = Math.max(0, Math.min(this.duration, seconds));
+      for (const key in this.audioElements) {
+        try { this.audioElements[key].currentTime = this.currentTime; } catch (e) {}
+      }
+      this.updatePlayheads();
+      this.updateTimeDisplay();
+    },
+
+    toggleSolo(stemKey) {
+      this.solos[stemKey] = !this.solos[stemKey];
+      this.updateVolumeAndMutes();
+      this.updateTrackStripUI();
+
+      // If not currently playing, start playing immediately with this solo!
+      if (!this.isPlaying) {
+        this.play();
+      }
+    },
+
+    toggleMute(stemKey) {
+      this.mutes[stemKey] = !this.mutes[stemKey];
+      this.updateVolumeAndMutes();
+      this.updateTrackStripUI();
+    },
+
+    resetSolosAndMutes() {
+      this.mutes = { vocals: false, drums: false, bass: false, other: false };
+      this.solos = { vocals: false, drums: false, bass: false, other: false };
+      this.updateVolumeAndMutes();
+      this.updateTrackStripUI();
+    },
+
+    updateVolumeAndMutes() {
+      const anySolo = Object.values(this.solos).some(Boolean);
+      for (const key in this.audioElements) {
+        const a = this.audioElements[key];
+        if (!a) continue;
+        if (anySolo) {
+          a.muted = !this.solos[key];
+        } else {
+          a.muted = !!this.mutes[key];
+        }
+      }
+    },
+
+    updateTransportUI() {
+      const playBtn = document.getElementById('btnDawPlayMaster');
+      if (playBtn) {
+        if (this.isPlaying) {
+          playBtn.classList.add('is-playing');
+          playBtn.innerHTML = '<span id="dawPlayMasterIcon">⏸</span> Master Pause';
+        } else {
+          playBtn.classList.remove('is-playing');
+          playBtn.innerHTML = '<span id="dawPlayMasterIcon">▶</span> Master Play';
+        }
+      }
+    },
+
+    updateTrackStripUI() {
+      const anySolo = Object.values(this.solos).some(Boolean);
+      for (const key of ['vocals', 'drums', 'bass', 'other']) {
+        const row = document.querySelector(`.studio-daw-track-row.stem-${key}`);
+        if (!row) continue;
+        const muteBtn = row.querySelector('.btn-mute');
+        const soloBtn = row.querySelector('.btn-solo');
+
+        const isSolo = !!this.solos[key];
+        const isMute = anySolo ? !isSolo : !!this.mutes[key];
+
+        if (soloBtn) soloBtn.classList.toggle('active', isSolo);
+        if (muteBtn) muteBtn.classList.toggle('active', !!this.mutes[key]);
+
+        row.classList.toggle('is-soloed', isSolo);
+        row.classList.toggle('is-muted', isMute && !isSolo);
+      }
+    },
+
+    updatePlayheads() {
+      const pct = this.duration > 0 ? (this.currentTime / this.duration) * 100 : 0;
+      document.querySelectorAll('.studio-daw-playhead-line').forEach(el => {
+        el.style.left = `${pct}%`;
+      });
+      if (studioPlayerSeekSlider) studioPlayerSeekSlider.value = pct;
+    },
+
+    updateTimeDisplay() {
+      const timeEl = document.getElementById('dawTimeDisplay');
+      if (timeEl) {
+        timeEl.textContent = `${formatTime(this.currentTime)} / ${formatTime(this.duration)}`;
+      }
+      if (studioPlayerCurrentTime) studioPlayerCurrentTime.textContent = formatTime(this.currentTime);
+      if (studioPlayerDuration) studioPlayerDuration.textContent = formatTime(this.duration);
+    },
+
+    destroy() {
+      this.pause();
+      for (const key in this.audioElements) {
+        try {
+          this.audioElements[key].pause();
+          this.audioElements[key].src = '';
+        } catch (e) {}
+      }
+      this.audioElements = {};
+      this.currentTrack = null;
+    }
+  };
+
   function renderSelectedTrackMeta(track) {
     if (!maestroActiveTrackMeta) return;
+
+    if (studioDawEngine && studioDawEngine.currentTrack && studioDawEngine.currentTrack.fileName !== track.fileName) {
+      studioDawEngine.destroy();
+    }
 
     let stemsHtml = '';
     const stems = track.stems;
@@ -21419,55 +21638,124 @@ function initNexusStudio() {
             <div class="studio-stems-title">
               <span>🎛️</span> 4-Stem Multi-Track Studio
             </div>
-            <span class="maestro-stem-pill">Phase-Locked 44.1kHz 16-Bit WAV</span>
+            <span class="maestro-stem-pill">Phase-Synchronized 44.1kHz 16-Bit WAV</span>
           </div>
 
-          <div class="studio-stems-grid">
-            <!-- Vocals -->
-            <div class="studio-stem-item stem-vocals">
-              <div class="studio-stem-top">
-                <span class="studio-stem-label">🎤 Vocals (Acapella)</span>
-                <span class="studio-stem-size">${formatStemBytes(vocals?.sizeBytes || vocals?.fileSizeBytes)}</span>
+          <!-- Transport Bar -->
+          <div class="studio-daw-transport-bar">
+            <div class="studio-daw-transport-left">
+              <button type="button" id="btnDawPlayMaster" class="studio-daw-master-play-btn" title="Play / Pause All Tracks">
+                <span id="dawPlayMasterIcon">▶</span> Master Play
+              </button>
+              <button type="button" id="btnDawResetSolos" class="studio-daw-reset-btn" title="Clear all Mutes & Solos">
+                ⟲ Reset M/S
+              </button>
+              <span class="studio-daw-time-display" id="dawTimeDisplay">0:00 / 0:30</span>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8;">
+              Click waveform to seek &bull; Solo preserves playback position
+            </div>
+          </div>
+
+          <!-- Vertical Stack of 4 DAW Tracks -->
+          <div class="studio-daw-tracks-stack">
+            <!-- TRK 01: Vocals -->
+            <div class="studio-daw-track-row stem-vocals" data-stem="vocals">
+              <div class="studio-daw-track-head">
+                <div class="studio-daw-head-top">
+                  <span class="studio-daw-trk-id">TRK 01</span>
+                  <span class="studio-daw-trk-badge">Acapella</span>
+                </div>
+                <div class="studio-daw-trk-title">
+                  <span>🎤</span> <span>Vocals</span>
+                </div>
+                <div class="studio-daw-btn-row">
+                  <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="vocals" title="Mute Vocals (M)">M</button>
+                  <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="vocals" title="Solo Vocals (S) - Continuous playback">S</button>
+                  <a href="${vocals?.downloadUrl || vocals?.streamUrl || '#'}" download="${vocals?.fileName || vocals?.filename || 'Stem_Vocals.wav'}" class="studio-daw-dl-btn" title="Download Vocals WAV">⬇</a>
+                </div>
               </div>
-              <div class="studio-stem-btns">
-                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${vocals?.streamUrl || ''}" data-title="${track.title} (Vocals)" data-stem="Vocals (Acapella)"><span>▶️</span> Solo</button>
-                <a href="${vocals?.downloadUrl || vocals?.streamUrl || '#'}" download="${vocals?.fileName || vocals?.filename || 'Stem_Vocals.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              <div class="studio-daw-waveform-lane" data-stem="vocals">
+                <div class="studio-daw-waveform-bars">
+                  ${generateDawWaveformBars('vocals')}
+                </div>
+                <div class="studio-daw-playhead-line"></div>
+                <div class="studio-daw-lane-meta">${formatStemBytes(vocals?.sizeBytes || vocals?.fileSizeBytes)}</div>
               </div>
             </div>
 
-            <!-- Drums -->
-            <div class="studio-stem-item stem-drums">
-              <div class="studio-stem-top">
-                <span class="studio-stem-label">🥁 Drums (Beats)</span>
-                <span class="studio-stem-size">${formatStemBytes(drums?.sizeBytes || drums?.fileSizeBytes)}</span>
+            <!-- TRK 02: Drums -->
+            <div class="studio-daw-track-row stem-drums" data-stem="drums">
+              <div class="studio-daw-track-head">
+                <div class="studio-daw-head-top">
+                  <span class="studio-daw-trk-id">TRK 02</span>
+                  <span class="studio-daw-trk-badge">Beats</span>
+                </div>
+                <div class="studio-daw-trk-title">
+                  <span>🥁</span> <span>Drums</span>
+                </div>
+                <div class="studio-daw-btn-row">
+                  <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="drums" title="Mute Drums (M)">M</button>
+                  <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="drums" title="Solo Drums (S) - Continuous playback">S</button>
+                  <a href="${drums?.downloadUrl || drums?.streamUrl || '#'}" download="${drums?.fileName || drums?.filename || 'Stem_Drums.wav'}" class="studio-daw-dl-btn" title="Download Drums WAV">⬇</a>
+                </div>
               </div>
-              <div class="studio-stem-btns">
-                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${drums?.streamUrl || ''}" data-title="${track.title} (Drums)" data-stem="Drums (Percussion)"><span>▶️</span> Solo</button>
-                <a href="${drums?.downloadUrl || drums?.streamUrl || '#'}" download="${drums?.fileName || drums?.filename || 'Stem_Drums.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              <div class="studio-daw-waveform-lane" data-stem="drums">
+                <div class="studio-daw-waveform-bars">
+                  ${generateDawWaveformBars('drums')}
+                </div>
+                <div class="studio-daw-playhead-line"></div>
+                <div class="studio-daw-lane-meta">${formatStemBytes(drums?.sizeBytes || drums?.fileSizeBytes)}</div>
               </div>
             </div>
 
-            <!-- Bass -->
-            <div class="studio-stem-item stem-bass">
-              <div class="studio-stem-top">
-                <span class="studio-stem-label">🎸 Bass (Bassline)</span>
-                <span class="studio-stem-size">${formatStemBytes(bass?.sizeBytes || bass?.fileSizeBytes)}</span>
+            <!-- TRK 03: Bass -->
+            <div class="studio-daw-track-row stem-bass" data-stem="bass">
+              <div class="studio-daw-track-head">
+                <div class="studio-daw-head-top">
+                  <span class="studio-daw-trk-id">TRK 03</span>
+                  <span class="studio-daw-trk-badge">Bassline</span>
+                </div>
+                <div class="studio-daw-trk-title">
+                  <span>🎸</span> <span>Bass</span>
+                </div>
+                <div class="studio-daw-btn-row">
+                  <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="bass" title="Mute Bass (M)">M</button>
+                  <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="bass" title="Solo Bass (S) - Continuous playback">S</button>
+                  <a href="${bass?.downloadUrl || bass?.streamUrl || '#'}" download="${bass?.fileName || bass?.filename || 'Stem_Bass.wav'}" class="studio-daw-dl-btn" title="Download Bass WAV">⬇</a>
+                </div>
               </div>
-              <div class="studio-stem-btns">
-                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${bass?.streamUrl || ''}" data-title="${track.title} (Bass)" data-stem="Bass (Sub & Bassline)"><span>▶️</span> Solo</button>
-                <a href="${bass?.downloadUrl || bass?.streamUrl || '#'}" download="${bass?.fileName || bass?.filename || 'Stem_Bass.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              <div class="studio-daw-waveform-lane" data-stem="bass">
+                <div class="studio-daw-waveform-bars">
+                  ${generateDawWaveformBars('bass')}
+                </div>
+                <div class="studio-daw-playhead-line"></div>
+                <div class="studio-daw-lane-meta">${formatStemBytes(bass?.sizeBytes || bass?.fileSizeBytes)}</div>
               </div>
             </div>
 
-            <!-- Other -->
-            <div class="studio-stem-item stem-other">
-              <div class="studio-stem-top">
-                <span class="studio-stem-label">🎹 Other / Melody</span>
-                <span class="studio-stem-size">${formatStemBytes(other?.sizeBytes || other?.fileSizeBytes)}</span>
+            <!-- TRK 04: Other / Melody -->
+            <div class="studio-daw-track-row stem-other" data-stem="other">
+              <div class="studio-daw-track-head">
+                <div class="studio-daw-head-top">
+                  <span class="studio-daw-trk-id">TRK 04</span>
+                  <span class="studio-daw-trk-badge">Melody & FX</span>
+                </div>
+                <div class="studio-daw-trk-title">
+                  <span>🎹</span> <span>Melody</span>
+                </div>
+                <div class="studio-daw-btn-row">
+                  <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="other" title="Mute Melody (M)">M</button>
+                  <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="other" title="Solo Melody (S) - Continuous playback">S</button>
+                  <a href="${other?.downloadUrl || other?.streamUrl || '#'}" download="${other?.fileName || other?.filename || 'Stem_Other.wav'}" class="studio-daw-dl-btn" title="Download Melody WAV">⬇</a>
+                </div>
               </div>
-              <div class="studio-stem-btns">
-                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${other?.streamUrl || ''}" data-title="${track.title} (Melody)" data-stem="Melody (Keys & Synths)"><span>▶️</span> Solo</button>
-                <a href="${other?.downloadUrl || other?.streamUrl || '#'}" download="${other?.fileName || other?.filename || 'Stem_Other.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              <div class="studio-daw-waveform-lane" data-stem="other">
+                <div class="studio-daw-waveform-bars">
+                  ${generateDawWaveformBars('other')}
+                </div>
+                <div class="studio-daw-playhead-line"></div>
+                <div class="studio-daw-lane-meta">${formatStemBytes(other?.sizeBytes || other?.fileSizeBytes)}</div>
               </div>
             </div>
           </div>
@@ -21476,7 +21764,7 @@ function initNexusStudio() {
           <div class="studio-daw-zip-box">
             <div class="studio-daw-zip-info">
               <div class="studio-daw-zip-title"><span>📦</span> Complete DAW Stem Pack (.zip)</div>
-              <div class="studio-daw-zip-sub">Includes 4 stems + DAW_README.txt &bull; Ready for Ableton, FL Studio, Logic, Reaper &bull; ${formatStemBytes(stems.zipSizeBytes)}</div>
+              <div class="studio-daw-zip-sub">Includes all 4 stems + DAW_README.txt &bull; Ready for Ableton, FL Studio, Logic, Reaper &bull; ${formatStemBytes(stems.zipSizeBytes)}</div>
             </div>
             <a href="${stems.zipDownloadUrl || stems.zipUrl || '#'}" download="${stems.zipName || 'DAW_Stems.zip'}" class="studio-daw-zip-btn">
               <span>⬇️</span> Download All Stems (.zip)
@@ -21526,19 +21814,57 @@ function initNexusStudio() {
       ${stemsHtml}
     `;
 
-    // Hook stem play / solo buttons
-    maestroActiveTrackMeta.querySelectorAll('.btn-stem-solo').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const url = btn.getAttribute('data-url');
-        const title = btn.getAttribute('data-title');
-        const stemName = btn.getAttribute('data-stem');
-        if (url) {
-          loadTrackIntoStudioPlayer(url, title, `DAW Stem • ${stemName}`);
-          if (studioAudio) studioAudio.play().catch(() => {});
-        }
+    // Initialize DAW Engine if stems present
+    if (stems && (vocals || drums || bass || other)) {
+      studioDawEngine.init(track, { vocals, drums, bass, other });
+
+      // Hook Master Play
+      const masterPlayBtn = maestroActiveTrackMeta.querySelector('#btnDawPlayMaster');
+      if (masterPlayBtn) {
+        masterPlayBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          studioDawEngine.togglePlay();
+        });
+      }
+
+      // Hook Reset Solos/Mutes
+      const resetBtn = maestroActiveTrackMeta.querySelector('#btnDawResetSolos');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          studioDawEngine.resetSolosAndMutes();
+        });
+      }
+
+      // Hook Solo buttons
+      maestroActiveTrackMeta.querySelectorAll('.studio-daw-trk-btn.btn-solo').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const stem = btn.getAttribute('data-stem');
+          if (stem) studioDawEngine.toggleSolo(stem);
+        });
       });
-    });
+
+      // Hook Mute buttons
+      maestroActiveTrackMeta.querySelectorAll('.studio-daw-trk-btn.btn-mute').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const stem = btn.getAttribute('data-stem');
+          if (stem) studioDawEngine.toggleMute(stem);
+        });
+      });
+
+      // Hook Waveform Lane Clicking for Seeking
+      maestroActiveTrackMeta.querySelectorAll('.studio-daw-waveform-lane').forEach(lane => {
+        lane.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = lane.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const pct = Math.max(0, Math.min(1, clickX / rect.width));
+          studioDawEngine.seek(pct * studioDawEngine.duration);
+        });
+      });
+    }
 
     // Hook extract stems button
     const btnExtractNow = maestroActiveTrackMeta.querySelector('#btnExtractStemsNow');
@@ -21675,18 +22001,44 @@ function initNexusStudio() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
-  function loadTrackIntoStudioPlayer(url, title, subtitle) {
+  function loadTrackIntoStudioPlayer(url, title, subtitle, preserveTime = false) {
+    if (studioDawEngine && studioDawEngine.isPlaying) {
+      studioDawEngine.pause();
+    }
+    const prevTime = preserveTime && !isNaN(studioAudio.currentTime) ? studioAudio.currentTime : 0;
+    const wasPlaying = !studioAudio.paused && !studioAudio.ended;
     currentPlayingTrack = { url, title, subtitle };
     studioAudio.src = url;
     if (studioPlayerTrackTitle) studioPlayerTrackTitle.textContent = title;
     if (studioPlayerTrackSub) studioPlayerTrackSub.textContent = subtitle || 'Nexus AI Music Studio';
-    studioAudio.play().then(() => {
-      if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '⏸️';
-    }).catch(() => {});
+
+    if (preserveTime > 0) {
+      const onMeta = () => {
+        studioAudio.removeEventListener('loadedmetadata', onMeta);
+        if (prevTime < (studioAudio.duration || Infinity)) {
+          try { studioAudio.currentTime = prevTime; } catch (e) {}
+        }
+        if (wasPlaying) {
+          studioAudio.play().then(() => {
+            if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '⏸️';
+          }).catch(() => {});
+        }
+      };
+      if (studioAudio.readyState >= 1) onMeta();
+      else studioAudio.addEventListener('loadedmetadata', onMeta);
+    } else {
+      studioAudio.play().then(() => {
+        if (studioPlayerPlayIcon) studioPlayerPlayIcon.textContent = '⏸️';
+      }).catch(() => {});
+    }
   }
 
   if (studioPlayerPlayBtn) {
     studioPlayerPlayBtn.addEventListener('click', () => {
+      if (studioDawEngine && studioDawEngine.currentTrack && Object.keys(studioDawEngine.audioElements).length > 0) {
+        studioDawEngine.togglePlay();
+        return;
+      }
       if (!studioAudio.src) return;
       if (studioAudio.paused) {
         studioAudio.play();
@@ -21713,6 +22065,10 @@ function initNexusStudio() {
 
   if (studioPlayerSeekSlider) {
     studioPlayerSeekSlider.addEventListener('input', () => {
+      if (studioDawEngine && studioDawEngine.currentTrack && studioDawEngine.duration > 0) {
+        studioDawEngine.seek((studioPlayerSeekSlider.value / 100) * studioDawEngine.duration);
+        return;
+      }
       if (!isNaN(studioAudio.duration)) {
         studioAudio.currentTime = (studioPlayerSeekSlider.value / 100) * studioAudio.duration;
       }
@@ -21721,7 +22077,13 @@ function initNexusStudio() {
 
   if (studioPlayerVolumeSlider) {
     studioPlayerVolumeSlider.addEventListener('input', () => {
-      studioAudio.volume = studioPlayerVolumeSlider.value / 100;
+      const vol = studioPlayerVolumeSlider.value / 100;
+      studioAudio.volume = vol;
+      if (studioDawEngine) {
+        for (const key in studioDawEngine.audioElements) {
+          studioDawEngine.audioElements[key].volume = vol;
+        }
+      }
     });
   }
 
