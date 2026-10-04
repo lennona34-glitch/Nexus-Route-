@@ -7246,6 +7246,250 @@ body.zen-mode .zen-mode-exit-btn,
   flex-shrink: 0;
 }
 
+.maestro-stem-pill {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ==========================================================================
+   4-Stem DAW Multi-Track Studio & Export Styles
+   ========================================================================== */
+
+.studio-stems-section {
+  margin-top: 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.studio-stems-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio-stems-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-stems-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .studio-stems-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.studio-stem-item {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.studio-stem-item:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(168, 85, 247, 0.5);
+  transform: translateY(-1px);
+}
+
+.studio-stem-item.stem-vocals {
+  border-left: 3px solid #ec4899;
+}
+.studio-stem-item.stem-drums {
+  border-left: 3px solid #38bdf8;
+}
+.studio-stem-item.stem-bass {
+  border-left: 3px solid #a855f7;
+}
+.studio-stem-item.stem-other {
+  border-left: 3px solid #eab308;
+}
+
+.studio-stem-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.studio-stem-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.studio-stem-size {
+  font-size: 10.5px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.studio-stem-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.studio-stem-play-btn,
+.studio-stem-dl-btn {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.studio-stem-play-btn {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.studio-stem-play-btn:hover {
+  background: rgba(168, 85, 247, 0.35);
+  color: #fff;
+}
+
+.studio-stem-dl-btn {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.studio-stem-dl-btn:hover {
+  background: rgba(56, 189, 248, 0.3);
+  color: #fff;
+}
+
+.studio-daw-zip-box {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.studio-daw-zip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.studio-daw-zip-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.studio-daw-zip-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.studio-daw-zip-btn {
+  background: linear-gradient(135deg, #9333ea 0%, #38bdf8 100%);
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.35);
+  transition: all 0.2s ease;
+}
+
+.studio-daw-zip-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(147, 51, 234, 0.5);
+}
+
+.studio-stem-extract-cta {
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px dashed rgba(168, 85, 247, 0.4);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-stem-extract-btn {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #fff;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4);
+  transition: all 0.2s ease;
+}
+
+.studio-stem-extract-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.6);
+}
+
+.studio-stem-extract-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* ==========================================================================
    Docked Studio Audio Player Bar
    ========================================================================== */

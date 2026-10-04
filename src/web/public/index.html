@@ -5167,6 +5167,10 @@ console.log(res.choices[0].message.content);</code></pre>
                       <input type="checkbox" id="studioMusicShareLoungeCheck" checked style="cursor: pointer;" />
                       <span>Post to #lounge</span>
                     </label>
+                    <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #c084fc; cursor: pointer; margin-left: 6px;" title="Automatically split into 4 high-precision DAW stems (Vocals, Drums, Bass, Other) &amp; package a DAW ZIP upon completion">
+                      <input type="checkbox" id="studioMusicAutoStemsCheck" checked style="cursor: pointer;" />
+                      <span>🎛️ Auto 4-Stems</span>
+                    </label>
                   </div>
                 </div>
 
@@ -5208,6 +5212,14 @@ console.log(res.choices[0].message.content);</code></pre>
                       </div>
                     </div>
                     <audio id="studioMusicAudioPlayer" controls style="width: 100%; height: 32px; border-radius: 6px;"></audio>
+                    <div id="studioMusicResultStemsBox" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 11.5px; color: #c084fc; font-weight: 700;">🎛️ 4-Stem DAW Package Ready</span>
+                        <a id="studioMusicResultZipBtn" href="#" download class="studio-action-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.5); text-decoration: none;">
+                          <span>📦</span> Download DAW ZIP
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

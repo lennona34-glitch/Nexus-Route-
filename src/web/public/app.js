@@ -20164,6 +20164,7 @@ function initNexusStudio() {
   const btnGenerateMusic = document.getElementById('btnStudioGenerateMusic');
   const musicDurationSelect = document.getElementById('studioMusicDurationSelect');
   const musicShareLoungeCheck = document.getElementById('studioMusicShareLoungeCheck');
+  const musicAutoStemsCheck = document.getElementById('studioMusicAutoStemsCheck');
   const musicProgressBox = document.getElementById('studioMusicProgressBox');
   const musicProgressStage = document.getElementById('studioMusicProgressStage');
   const musicProgressPercent = document.getElementById('studioMusicProgressPercent');
@@ -20172,6 +20173,8 @@ function initNexusStudio() {
   const musicResultTitle = document.getElementById('studioMusicResultTitle');
   const musicResultMeta = document.getElementById('studioMusicResultMeta');
   const musicAudioPlayer = document.getElementById('studioMusicAudioPlayer');
+  const musicResultStemsBox = document.getElementById('studioMusicResultStemsBox');
+  const musicResultZipBtn = document.getElementById('studioMusicResultZipBtn');
   const btnPlayMusicResult = document.getElementById('btnStudioPlayResult');
   const btnShareMusicResultLounge = document.getElementById('btnStudioShareResultLounge');
   const btnMusicOpenInLibrary = document.getElementById('btnStudioOpenInLibrary');
@@ -20537,6 +20540,7 @@ function initNexusStudio() {
       const scale = scaleSelect ? scaleSelect.value : 'Minor';
       const duration = parseInt(musicDurationSelect ? musicDurationSelect.value : 30, 10);
       const shareToLounge = musicShareLoungeCheck ? musicShareLoungeCheck.checked : true;
+      const autoExtractStems = musicAutoStemsCheck ? musicAutoStemsCheck.checked : true;
       const lyrics = outputStructurePrompt ? outputStructurePrompt.value.trim() : '';
 
       if (!currentAltPrompt) {
@@ -20562,6 +20566,7 @@ function initNexusStudio() {
         }
       }
       if (musicResultBox) musicResultBox.style.display = 'none';
+      if (musicResultStemsBox) musicResultStemsBox.style.display = 'none';
 
       try {
         const resp = await fetch('/v1/studio/music/generate?stream=1', {
@@ -20579,6 +20584,7 @@ function initNexusStudio() {
             scale,
             duration,
             shareToLounge,
+            autoExtractStems,
           }),
         });
 
@@ -20633,6 +20639,15 @@ function initNexusStudio() {
           if (musicAudioPlayer && lastGeneratedMusicTrack.streamUrl) {
             musicAudioPlayer.src = lastGeneratedMusicTrack.streamUrl;
             musicAudioPlayer.load();
+          }
+
+          if (lastGeneratedMusicTrack.stems || lastGeneratedMusicTrack.zipUrl) {
+            if (musicResultStemsBox) musicResultStemsBox.style.display = 'block';
+            if (musicResultZipBtn) {
+              musicResultZipBtn.href = lastGeneratedMusicTrack.zipDownloadUrl || lastGeneratedMusicTrack.zipUrl;
+            }
+          } else if (musicResultStemsBox) {
+            musicResultStemsBox.style.display = 'none';
           }
 
           loadTrackIntoStudioPlayer(
@@ -21303,6 +21318,7 @@ function initNexusStudio() {
             <div class="maestro-track-title">${track.title}</div>
             <div class="maestro-track-meta-row">
               <span class="maestro-model-pill">${(track.modelType || 'AUDIO').toUpperCase()}</span>
+              ${track.stems ? `<span class="maestro-stem-pill" title="4 Isolated DAW Stems Available">🎛️ 4 STEMS</span>` : ''}
               <span>${track.bpm || 120} BPM</span>
               <span>&bull;</span>
               <span>Key: ${track.key || 'C Major'}</span>
@@ -21380,8 +21396,121 @@ function initNexusStudio() {
     }
   }
 
+  function formatStemBytes(bytes) {
+    if (!bytes || isNaN(bytes)) return '';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
   function renderSelectedTrackMeta(track) {
     if (!maestroActiveTrackMeta) return;
+
+    let stemsHtml = '';
+    const stems = track.stems;
+    const vocals = stems?.items?.vocals || stems?.vocals;
+    const drums = stems?.items?.drums || stems?.drums;
+    const bass = stems?.items?.bass || stems?.bass;
+    const other = stems?.items?.other || stems?.other;
+
+    if (stems && (vocals || drums || bass || other || stems.zipUrl)) {
+      stemsHtml = `
+        <div class="studio-stems-section">
+          <div class="studio-stems-header">
+            <div class="studio-stems-title">
+              <span>🎛️</span> 4-Stem Multi-Track Studio
+            </div>
+            <span class="maestro-stem-pill">Phase-Locked 44.1kHz 16-Bit WAV</span>
+          </div>
+
+          <div class="studio-stems-grid">
+            <!-- Vocals -->
+            <div class="studio-stem-item stem-vocals">
+              <div class="studio-stem-top">
+                <span class="studio-stem-label">🎤 Vocals (Acapella)</span>
+                <span class="studio-stem-size">${formatStemBytes(vocals?.sizeBytes || vocals?.fileSizeBytes)}</span>
+              </div>
+              <div class="studio-stem-btns">
+                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${vocals?.streamUrl || ''}" data-title="${track.title} (Vocals)" data-stem="Vocals (Acapella)"><span>▶️</span> Solo</button>
+                <a href="${vocals?.downloadUrl || vocals?.streamUrl || '#'}" download="${vocals?.fileName || vocals?.filename || 'Stem_Vocals.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              </div>
+            </div>
+
+            <!-- Drums -->
+            <div class="studio-stem-item stem-drums">
+              <div class="studio-stem-top">
+                <span class="studio-stem-label">🥁 Drums (Beats)</span>
+                <span class="studio-stem-size">${formatStemBytes(drums?.sizeBytes || drums?.fileSizeBytes)}</span>
+              </div>
+              <div class="studio-stem-btns">
+                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${drums?.streamUrl || ''}" data-title="${track.title} (Drums)" data-stem="Drums (Percussion)"><span>▶️</span> Solo</button>
+                <a href="${drums?.downloadUrl || drums?.streamUrl || '#'}" download="${drums?.fileName || drums?.filename || 'Stem_Drums.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              </div>
+            </div>
+
+            <!-- Bass -->
+            <div class="studio-stem-item stem-bass">
+              <div class="studio-stem-top">
+                <span class="studio-stem-label">🎸 Bass (Bassline)</span>
+                <span class="studio-stem-size">${formatStemBytes(bass?.sizeBytes || bass?.fileSizeBytes)}</span>
+              </div>
+              <div class="studio-stem-btns">
+                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${bass?.streamUrl || ''}" data-title="${track.title} (Bass)" data-stem="Bass (Sub & Bassline)"><span>▶️</span> Solo</button>
+                <a href="${bass?.downloadUrl || bass?.streamUrl || '#'}" download="${bass?.fileName || bass?.filename || 'Stem_Bass.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              </div>
+            </div>
+
+            <!-- Other -->
+            <div class="studio-stem-item stem-other">
+              <div class="studio-stem-top">
+                <span class="studio-stem-label">🎹 Other / Melody</span>
+                <span class="studio-stem-size">${formatStemBytes(other?.sizeBytes || other?.fileSizeBytes)}</span>
+              </div>
+              <div class="studio-stem-btns">
+                <button type="button" class="studio-stem-play-btn btn-stem-solo" data-url="${other?.streamUrl || ''}" data-title="${track.title} (Melody)" data-stem="Melody (Keys & Synths)"><span>▶️</span> Solo</button>
+                <a href="${other?.downloadUrl || other?.streamUrl || '#'}" download="${other?.fileName || other?.filename || 'Stem_Other.wav'}" class="studio-stem-dl-btn"><span>⬇️</span> WAV</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- DAW ZIP Pack -->
+          <div class="studio-daw-zip-box">
+            <div class="studio-daw-zip-info">
+              <div class="studio-daw-zip-title"><span>📦</span> Complete DAW Stem Pack (.zip)</div>
+              <div class="studio-daw-zip-sub">Includes 4 stems + DAW_README.txt &bull; Ready for Ableton, FL Studio, Logic, Reaper &bull; ${formatStemBytes(stems.zipSizeBytes)}</div>
+            </div>
+            <a href="${stems.zipDownloadUrl || stems.zipUrl || '#'}" download="${stems.zipName || 'DAW_Stems.zip'}" class="studio-daw-zip-btn">
+              <span>⬇️</span> Download All Stems (.zip)
+            </a>
+          </div>
+        </div>
+      `;
+    } else {
+      stemsHtml = `
+        <div class="studio-stems-section">
+          <div class="studio-stem-extract-cta" id="stemExtractCtaWrap">
+            <div style="font-weight: 800; color: #f8fafc; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              <span>🎛️</span> 4-Stem DAW Multi-Tracks
+            </div>
+            <div style="font-size: 11.5px; color: #94a3b8; max-width: 400px; line-height: 1.4;">
+              Extract isolated <strong>Vocals</strong>, <strong>Drums</strong>, <strong>Bass</strong>, and <strong>Other</strong> stems on your local GPU with Demucs v4 Hybrid Transformer for Ableton, FL Studio, Logic, or Reaper.
+            </div>
+            <button type="button" class="studio-stem-extract-btn" id="btnExtractStemsNow">
+              <span>⚡</span> Extract 4 Stems on GPU (~8s)
+            </button>
+            <div id="stemExtractProgressWrap" style="display: none; width: 100%; max-width: 380px; margin-top: 6px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span id="stemExtractStage" style="color: #c084fc; font-weight: 600;">Separating audio on GPU...</span>
+                <span id="stemExtractPercent" style="color: #38bdf8; font-weight: 700;">0%</span>
+              </div>
+              <div style="height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                <div id="stemExtractBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #a855f7, #ec4899); transition: width 0.3s ease;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     maestroActiveTrackMeta.innerHTML = `
       <div style="font-weight: 700; color: #f8fafc; font-size: 13.5px; margin-bottom: 6px;">${track.title}</div>
       <div style="margin-bottom: 5px;"><strong>File:</strong> <code>${track.fileName}</code></div>
@@ -21394,7 +21523,104 @@ function initNexusStudio() {
           <pre style="background: rgba(0,0,0,0.6); padding: 8px; border-radius: 6px; font-size: 11px; max-height: 120px; overflow-y: auto; color: #cbd5e1; font-family: monospace;">${track.abcSnippet}</pre>
         </div>
       ` : ''}
+      ${stemsHtml}
     `;
+
+    // Hook stem play / solo buttons
+    maestroActiveTrackMeta.querySelectorAll('.btn-stem-solo').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const url = btn.getAttribute('data-url');
+        const title = btn.getAttribute('data-title');
+        const stemName = btn.getAttribute('data-stem');
+        if (url) {
+          loadTrackIntoStudioPlayer(url, title, `DAW Stem • ${stemName}`);
+          if (studioAudio) studioAudio.play().catch(() => {});
+        }
+      });
+    });
+
+    // Hook extract stems button
+    const btnExtractNow = maestroActiveTrackMeta.querySelector('#btnExtractStemsNow');
+    if (btnExtractNow) {
+      btnExtractNow.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        btnExtractNow.disabled = true;
+        btnExtractNow.innerHTML = '<span>⏳</span> Separating on GPU...';
+        const progressWrap = maestroActiveTrackMeta.querySelector('#stemExtractProgressWrap');
+        const stageEl = maestroActiveTrackMeta.querySelector('#stemExtractStage');
+        const percentEl = maestroActiveTrackMeta.querySelector('#stemExtractPercent');
+        const barEl = maestroActiveTrackMeta.querySelector('#stemExtractBar');
+
+        if (progressWrap) progressWrap.style.display = 'block';
+
+        try {
+          const resp = await fetch('/v1/studio/audio/stems/extract?stream=1', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream',
+            },
+            body: JSON.stringify({ fileName: track.fileName }),
+          });
+
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || `Server responded with ${resp.status}`);
+          }
+
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() || '';
+
+            for (const part of parts) {
+              const dataMatch = part.match(/^data:\s*(.+)$/m);
+              if (!dataMatch) continue;
+              try {
+                const msg = JSON.parse(dataMatch[1]);
+                if (msg.type === 'progress') {
+                  const pct = Math.max(5, Math.min(100, Math.round(msg.percent || 0)));
+                  if (barEl) barEl.style.width = `${pct}%`;
+                  if (percentEl) percentEl.textContent = `${pct}%`;
+                  if (stageEl) stageEl.textContent = msg.stage || 'Separating audio on GPU...';
+                } else if (msg.type === 'done' || msg.success) {
+                  track.stems = msg.stems || msg;
+                  if (msg.zipUrl) track.stems.zipUrl = msg.zipUrl;
+                  if (msg.zipDownloadUrl) track.stems.zipDownloadUrl = msg.zipDownloadUrl;
+                  if (barEl) barEl.style.width = '100%';
+                  if (percentEl) percentEl.textContent = '100%';
+                  if (stageEl) stageEl.textContent = 'Separation complete!';
+                } else if (msg.type === 'error' || msg.error) {
+                  throw new Error(msg.error || 'Stem separation failed');
+                }
+              } catch (err) {
+                if (err.message && !err.message.includes('JSON')) throw err;
+              }
+            }
+          }
+
+          if (window.showNotification) {
+            window.showNotification(`🎛️ 4-Stem DAW package ready for "${track.title}"!`);
+          }
+          renderSelectedTrackMeta(track);
+          loadStudioAudioLibrary();
+        } catch (err) {
+          console.error('[Studio] Stem separation error:', err);
+          alert('Stem separation failed: ' + err.message);
+          if (btnExtractNow) {
+            btnExtractNow.disabled = false;
+            btnExtractNow.innerHTML = '<span>⚡</span> Extract 4 Stems on GPU (~8s)';
+          }
+        }
+      });
+    }
   }
 
   if (btnRescanMaestro) {

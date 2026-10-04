@@ -32,6 +32,7 @@ export interface MaestroTrackMeta {
   bpm?: number;
   key?: string;
   streamUrl: string;
+  stems?: any;
 }
 
 export class NexusStudioEngine {
@@ -721,6 +722,7 @@ CRITICAL RULES:
         let abcSnippet: string | undefined;
         let bpm: number | undefined;
         let key: string | undefined;
+        let stems: any = undefined;
 
         if (fs.existsSync(metaFilePath)) {
           try {
@@ -733,6 +735,7 @@ CRITICAL RULES:
             seed = params.seed;
             jobElapsedTime = meta.job_elapsed_time;
             durationSeconds = params.duration_seconds || (meta.model_details?.plan?.duration_seconds);
+            stems = meta.stems;
 
             if (musicDescription && musicDescription.trim()) {
               title = musicDescription.trim();
@@ -766,6 +769,46 @@ CRITICAL RULES:
           }
         }
 
+        // If stems not in meta.json, check if disk folder exists
+        if (!stems) {
+          const trackBase = audioFile.replace(/\.(wav|mp3|flac)$/i, '');
+          const cleanTrackBase = trackBase.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const stemDir = path.join(outputsDir, 'stems', cleanTrackBase);
+          if (fs.existsSync(stemDir)) {
+            const stemFiles = fs.readdirSync(stemDir);
+            const items: Record<string, any> = {};
+            let zipUrl: string | undefined;
+            let zipDownloadUrl: string | undefined;
+            for (const sf of stemFiles) {
+              const lower = sf.toLowerCase();
+              if (lower.endsWith('.zip')) {
+                zipUrl = `/v1/studio/maestro/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}`;
+                zipDownloadUrl = `/v1/mesh/shares/download?path=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}&inline=0`;
+              } else if (lower.endsWith('.wav')) {
+                let tag = 'other';
+                if (lower.includes('vocals')) tag = 'vocals';
+                else if (lower.includes('drums')) tag = 'drums';
+                else if (lower.includes('bass')) tag = 'bass';
+                else if (lower.includes('instrumental')) tag = 'instrumental';
+                items[tag] = {
+                  tag,
+                  filename: sf,
+                  streamUrl: `/v1/studio/maestro/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}`,
+                  downloadUrl: `/v1/mesh/shares/download?path=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}&inline=1`,
+                };
+              }
+            }
+            if (Object.keys(items).length > 0) {
+              stems = {
+                folder: `stems/${cleanTrackBase}`,
+                zipUrl,
+                zipDownloadUrl,
+                items,
+              };
+            }
+          }
+        }
+
         tracks.push({
           fileName: audioFile,
           filePath: fullAudioPath,
@@ -782,6 +825,7 @@ CRITICAL RULES:
           bpm: bpm || 120,
           key: key || 'C Major',
           streamUrl: `/v1/studio/maestro/stream?file=${encodeURIComponent(audioFile)}`,
+          stems,
         });
       }
     } catch (err: any) {
@@ -797,17 +841,17 @@ CRITICAL RULES:
    */
   public static streamMaestroTrack(fileName: string, req: FastifyRequest, reply: FastifyReply) {
     const outputsDir = this.getMaestroOutputsDir();
-    const safeBase = path.basename(fileName);
-    const fullPath = path.join(outputsDir, safeBase);
+    const sanitizedRel = fileName.replace(/\\/g, '/').replace(/\.\./g, '');
+    const fullPath = path.resolve(outputsDir, sanitizedRel);
 
-    if (!fs.existsSync(fullPath)) {
-      return reply.status(404).send({ error: 'Maestro audio track not found.' });
+    if (!fullPath.startsWith(outputsDir) || !fs.existsSync(fullPath)) {
+      return reply.status(404).send({ error: 'Audio file not found.' });
     }
 
     const stat = fs.statSync(fullPath);
     const fileSize = stat.size;
-    const ext = path.extname(safeBase).toLowerCase();
-    const contentType = ext === '.mp3' ? 'audio/mpeg' : ext === '.flac' ? 'audio/flac' : 'audio/wav';
+    const ext = path.extname(fullPath).toLowerCase();
+    const contentType = ext === '.mp3' ? 'audio/mpeg' : ext === '.flac' ? 'audio/flac' : ext === '.zip' ? 'application/zip' : ext === '.txt' ? 'text/plain' : 'audio/wav';
 
     const range = req.headers.range;
 
@@ -1254,9 +1298,138 @@ CRITICAL RULES:
             } catch {}
           }
 
+          if (options.autoExtractStems && lastResult.filename) {
+            try {
+              if (onProgress) {
+                onProgress({
+                  percent: 96,
+                  stage: 'Auto-extracting 4-stem DAW pack on GPU (Vocals, Drums, Bass, Other)...',
+                  eta: '10s'
+                });
+              }
+              const stemRes = await NexusStudioEngine.extractStems(lastResult.filename, meshShareManager, (sp) => {
+                if (onProgress) {
+                  onProgress({
+                    percent: 95 + Math.round((sp.percent / 100) * 4),
+                    stage: `[DAW Stems] ${sp.stage}`,
+                    eta: sp.eta
+                  });
+                }
+              });
+              lastResult.stems = stemRes.stems;
+              lastResult.zipUrl = stemRes.zipUrl;
+              lastResult.zipDownloadUrl = stemRes.zipDownloadUrl;
+            } catch (err: any) {
+              console.warn('[StudioEngine] Auto stem separation failed:', err.message);
+            }
+          }
+
           resolve(lastResult);
         } else {
           const errMsg = stderrBuffer.trim() || `YuE2 GPU music generator exited with code ${code}`;
+          reject(new Error(errMsg));
+        }
+      });
+    });
+  }
+
+  /**
+   * 4-Stem Audio Separation (Vocals, Drums, Bass, Other) + DAW ZIP Package
+   */
+  public static async extractStems(
+    fileName: string,
+    meshShareManager?: ShareManager,
+    onProgress?: (progress: { percent: number; stage: string; eta?: string }) => void
+  ): Promise<{
+    success: boolean;
+    track: string;
+    stemsDir: string;
+    stems: Record<string, any>;
+    zipPath?: string;
+    zipUrl?: string;
+    zipDownloadUrl?: string;
+    elapsedSeconds: number;
+  }> {
+    const outputsDir = this.getMaestroOutputsDir();
+    const safeBase = path.basename(fileName);
+    const inputPath = path.join(outputsDir, safeBase);
+
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Audio track not found: ${safeBase}`);
+    }
+
+    const runnerScript = path.resolve(process.cwd(), 'scripts', 'audio_stem_separator.py');
+    const pythonExe = this.resolveAudioPythonExe();
+
+    const args: string[] = [
+      runnerScript,
+      '--input', inputPath,
+      '--create-zip',
+    ];
+
+    return new Promise((resolve, reject) => {
+      const child = spawn(pythonExe, args, {
+        cwd: process.cwd(),
+        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      });
+
+      let stdoutBuffer = '';
+      let stderrBuffer = '';
+      let lastResult: any = null;
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdoutBuffer += chunk.toString();
+        const lines = stdoutBuffer.split('\n');
+        stdoutBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.type === 'progress') {
+              if (onProgress) {
+                onProgress({
+                  percent: parsed.percent,
+                  stage: parsed.stage,
+                  eta: parsed.eta,
+                });
+              }
+            } else if (parsed.type === 'done' || parsed.success) {
+              lastResult = parsed;
+            }
+          } catch {
+            // Ignore non-json lines
+          }
+        }
+      });
+
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderrBuffer += chunk.toString();
+      });
+
+      child.on('error', (err) => {
+        reject(new Error(`Failed to start stem separator (${pythonExe}): ${err.message}`));
+      });
+
+      child.on('close', async (code) => {
+        if (stdoutBuffer.trim()) {
+          try {
+            const parsed = JSON.parse(stdoutBuffer.trim());
+            if (parsed.type === 'done' || parsed.success) {
+              lastResult = parsed;
+            }
+          } catch {}
+        }
+
+        if (meshShareManager) {
+          try { await meshShareManager.rescan(); } catch {}
+        }
+
+        if (lastResult && lastResult.success) {
+          resolve(lastResult);
+        } else {
+          const errMsg = lastResult?.error || stderrBuffer.trim() || `Stem separation process exited with code ${code}`;
           reject(new Error(errMsg));
         }
       });
@@ -1490,6 +1663,7 @@ export function registerStudioRoutes(
       seed?: number;
       temperature?: number;
       shareToLounge?: boolean;
+      autoExtractStems?: boolean;
     };
   }>('/v1/studio/music/generate', async (req, reply) => {
     const isStream = req.query?.stream === '1' || req.headers.accept?.includes('text/event-stream');
@@ -1530,5 +1704,57 @@ export function registerStudioRoutes(
       }
     }
   });
+
+  // 11. 4-Stem DAW Separation (Demucs v4 Hybrid Transformer)
+  const handleExtractStems = async (req: FastifyRequest<{
+    Querystring: {
+      stream?: string;
+    };
+    Body: {
+      fileName?: string;
+      file?: string;
+    };
+  }>, reply: FastifyReply) => {
+    const fileName = req.body?.fileName || req.body?.file;
+    if (!fileName) {
+      return reply.status(400).send({ error: 'fileName is required.' });
+    }
+
+    const isStream = req.query?.stream === '1' || req.headers.accept?.includes('text/event-stream');
+
+    if (isStream) {
+      reply.hijack();
+      reply.raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+      reply.raw.setHeader('Connection', 'keep-alive');
+      reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+
+      try {
+        const result = await NexusStudioEngine.extractStems(
+          fileName,
+          meshShareManager,
+          (progress) => {
+            reply.raw.write(`data: ${JSON.stringify({ type: 'progress', ...progress })}\n\n`);
+          }
+        );
+        reply.raw.write(`data: ${JSON.stringify({ type: 'done', ...result })}\n\n`);
+        reply.raw.end();
+      } catch (err: any) {
+        reply.raw.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+        reply.raw.end();
+      }
+      return;
+    } else {
+      try {
+        const result = await NexusStudioEngine.extractStems(fileName, meshShareManager);
+        return reply.send({ success: true, ...result });
+      } catch (err: any) {
+        return reply.status(500).send({ success: false, error: err.message });
+      }
+    }
+  };
+
+  app.post('/v1/studio/audio/stems/extract', handleExtractStems);
+  app.post('/v1/studio/maestro/stems/extract', handleExtractStems);
 }
 
