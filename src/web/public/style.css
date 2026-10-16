@@ -3347,7 +3347,7 @@ body.screen-disappearing {
   flex: 1 1 0%;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 10px 14px;
   position: relative;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
@@ -3379,32 +3379,50 @@ body.screen-disappearing {
 
 .hf-models-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 10px;
   width: 100%;
+}
+
+@media (min-width: 1080px) and (max-width: 1360px) {
+  .hf-models-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1361px) {
+  .hf-models-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 2200px) {
+  .hf-models-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
 }
 
 .hf-model-card {
   background: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 0;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   position: relative;
   overflow: hidden;
   content-visibility: auto;
-  contain-intrinsic-size: 260px 320px;
+  contain-intrinsic-size: 180px 180px;
 }
 
 .hf-model-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: rgba(245, 158, 11, 0.55);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.18);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), 0 0 14px rgba(245, 158, 11, 0.18);
 }
 
 .hf-model-card.is-installed {
@@ -3413,14 +3431,14 @@ body.screen-disappearing {
 
 .hf-model-card.is-installed:hover {
   border-color: rgba(34, 197, 94, 0.65);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6), 0 0 16px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), 0 0 14px rgba(34, 197, 94, 0.2);
 }
 
 /* Card Visual Media & Thumbnail Area */
 .hf-card-media {
   position: relative;
   width: 100%;
-  height: 170px;
+  height: 98px;
   background: #090d16;
   overflow: hidden;
   cursor: pointer;
@@ -3450,41 +3468,41 @@ body.screen-disappearing {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 14px;
+  padding: 8px;
   position: relative;
   box-sizing: border-box;
 }
 
 .hf-banner-icon {
-  font-size: 34px;
-  margin-bottom: 5px;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  font-size: 24px;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
   transition: transform 0.3s ease;
 }
 
 .hf-model-card:hover .hf-banner-icon {
-  transform: scale(1.12) rotate(3deg);
+  transform: scale(1.1) rotate(3deg);
 }
 
 .hf-banner-title {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
   color: #fff;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
-  max-width: 90%;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  max-width: 92%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .hf-banner-subtitle {
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 600;
   opacity: 0.85;
-  margin-top: 3px;
+  margin-top: 1px;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
 }
 
 /* Architecture Gradient Themes */
@@ -3516,9 +3534,9 @@ body.screen-disappearing {
 /* Badges floating over top of media */
 .hf-card-badges-top {
   position: absolute;
-  top: 7px;
-  left: 7px;
-  right: 7px;
+  top: 5px;
+  left: 5px;
+  right: 5px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -3529,7 +3547,7 @@ body.screen-disappearing {
 .hf-card-badges-left {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-wrap: wrap;
   pointer-events: auto;
 }
@@ -3542,13 +3560,17 @@ body.screen-disappearing {
 .hf-card-badges-top span,
 .hf-card-badge-bottom span {
   background: rgba(15, 23, 42, 0.9);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  font-size: 9px !important;
+  padding: 1px 5px !important;
+  border-radius: 5px !important;
+  line-height: 1.2 !important;
 }
 
 .hf-card-badge-bottom {
   position: absolute;
-  bottom: 7px;
-  left: 7px;
+  bottom: 5px;
+  left: 5px;
   z-index: 2;
   pointer-events: auto;
 }
@@ -3576,11 +3598,11 @@ body.screen-disappearing {
   border: 1px solid rgba(245, 158, 11, 0.6);
   color: #fbbf24;
   font-weight: 700;
-  font-size: 11px;
-  padding: 5px 12px;
-  border-radius: 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  transform: translateY(3px);
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transform: translateY(2px);
   transition: transform 0.2s ease;
 }
 
@@ -3590,29 +3612,30 @@ body.screen-disappearing {
 
 /* Card Body Section */
 .hf-card-body {
-  padding: 10px 12px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   flex: 1;
   justify-content: space-between;
   background: #0f172a;
 }
 
 .hf-card-author {
-  font-size: 10.5px;
+  font-size: 9.5px;
   color: var(--text-muted);
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  line-height: 1.2;
 }
 
 .hf-card-title {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 11.5px;
   color: #f8fafc;
-  line-height: 1.35;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3628,33 +3651,44 @@ body.screen-disappearing {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 9px;
   color: #94a3b8;
-  margin-top: 3px;
+  margin-top: 1px;
 }
 
 .hf-pipeline-badge {
   background: rgba(255, 255, 255, 0.06);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 9.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8.5px;
   color: var(--text-muted);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  max-width: 75px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hf-card-actions {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 8px;
-  margin-top: 4px;
+  padding-top: 4px;
+  margin-top: 3px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
+}
+
+.hf-card-actions button,
+.hf-card-actions a {
+  font-size: 9.5px !important;
+  padding: 3px 6px !important;
+  border-radius: 4px !important;
 }
 
 .hf-link-btn {
-  font-size: 11px;
-  padding: 5px 8px;
+  font-size: 9.5px;
+  padding: 3px 5px;
   color: var(--text-muted);
   text-decoration: none;
 }
@@ -3712,6 +3746,30 @@ body.screen-disappearing {
   border-color: #fbbf24 !important;
   font-weight: 800 !important;
   box-shadow: 0 0 12px rgba(245, 158, 11, 0.25) !important;
+}
+
+#hfQuickPills,
+#civitaiQuickPills {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  overflow-x: auto;
+  flex-wrap: nowrap !important;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+#hfQuickPills::-webkit-scrollbar,
+#civitaiQuickPills::-webkit-scrollbar {
+  display: none;
+}
+
+.hf-workstation-card,
+.civitai-workstation-card {
+  max-width: 1600px !important;
+  width: 98vw !important;
+  height: 95vh !important;
+  max-height: 95vh !important;
 }
 
 /* ========================================================
@@ -5718,6 +5776,7 @@ body.modal-zen-active {
 .modal-overlay.modal-maximized #hfModelGrid,
 .modal-overlay.modal-maximized #civitaiViewport,
 .modal-overlay.modal-maximized #civitaiCardsGrid,
+.modal-overlay.modal-maximized .radio-iframe-container,
 .modal-overlay.modal-maximized .mesh-code-body {
   flex: 1 1 0% !important;
   min-height: 0 !important;
@@ -7949,10 +8008,10 @@ body.zen-mode .zen-mode-exit-btn,
    ========================================================================== */
 
 .nexus-radio-modal {
-  width: 95vw;
-  max-width: 1240px;
-  height: 90vh;
-  max-height: 860px;
+  width: 98vw;
+  max-width: 1780px;
+  height: 96vh;
+  max-height: 1020px;
   display: flex;
   flex-direction: column;
   background: #0c1420;
@@ -7960,6 +8019,7 @@ body.zen-mode .zen-mode-exit-btn,
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9), 0 0 40px rgba(37, 208, 255, 0.15);
+  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), height 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.2s ease;
 }
 
 .radio-modal-header {
@@ -8109,6 +8169,124 @@ body.zen-mode .zen-mode-exit-btn,
   height: 100%;
   border: none;
   display: block;
+}
+
+/* ==========================================================================
+   Floating Mini TV Dock (Bottom-Right Corner Picture-in-Picture)
+   ========================================================================== */
+#radioModal.docked-mini-tv {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  pointer-events: none !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000010 !important;
+}
+
+#radioModal.docked-mini-tv .nexus-radio-modal {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  width: 360px !important;
+  height: 244px !important;
+  min-width: 0 !important;
+  max-width: 360px !important;
+  min-height: 0 !important;
+  max-height: 244px !important;
+  margin: 0 !important;
+  border-radius: 12px !important;
+  border: 2px solid rgba(37, 208, 255, 0.85) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.95), 0 0 28px rgba(37, 208, 255, 0.45) !important;
+  pointer-events: auto !important;
+  overflow: hidden !important;
+  background: #020617 !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+#radioModal.docked-mini-tv .nexus-radio-modal:hover {
+  transform: translateY(-2px);
+  border-color: #25d0ff !important;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.98), 0 0 36px rgba(37, 208, 255, 0.65) !important;
+}
+
+#radioModal.docked-mini-tv .radio-modal-header {
+  padding: 5px 10px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  background: #08111e !important;
+  border-bottom: 1px solid rgba(37, 208, 255, 0.3) !important;
+  cursor: pointer;
+  user-select: none;
+}
+
+#radioModal.docked-mini-tv .radio-logo-icon {
+  font-size: 16px !important;
+}
+
+#radioModal.docked-mini-tv .broadcast-deck-tabs,
+#radioModal.docked-mini-tv .radio-sub-title,
+#radioModal.docked-mini-tv .radio-now-playing-pill,
+#radioModal.docked-mini-tv #radioPopoutBtn,
+#radioModal.docked-mini-tv #radioDockMiniBtn,
+#radioModal.docked-mini-tv #radioToggleFullscreenBtn,
+#radioModal.docked-mini-tv #btnCloseRadioModal {
+  display: none !important;
+}
+
+#radioModal.docked-mini-tv #deckMainTitle {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  max-width: 140px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#radioModal.docked-mini-tv .radio-badge-live {
+  font-size: 8px !important;
+  padding: 1px 5px !important;
+}
+
+.mini-tv-controls {
+  display: none;
+  align-items: center;
+  gap: 5px;
+}
+
+#radioModal.docked-mini-tv .mini-tv-controls {
+  display: flex !important;
+}
+
+.mini-tv-btn {
+  background: rgba(19, 35, 58, 0.85);
+  border: 1px solid rgba(37, 208, 255, 0.4);
+  border-radius: 6px;
+  color: #dcebfa;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+
+.mini-tv-btn:hover {
+  background: rgba(37, 208, 255, 0.3);
+  border-color: #25d0ff;
+  color: #fff;
+}
+
+.mini-tv-btn.close:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  color: #ff8888;
+}
+
+#radioModal.docked-mini-tv .radio-iframe-container {
+  flex: 1 !important;
+  width: 100% !important;
+  height: calc(244px - 32px) !important;
+  background: #000 !important;
 }
 
 /* Bottom-Right Corner Radio Hover Hotspot */
@@ -8360,15 +8538,33 @@ body.zen-mode .zen-mode-exit-btn,
 
 .civitai-models-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 10px;
   width: 100%;
+}
+
+@media (min-width: 1080px) and (max-width: 1360px) {
+  .civitai-models-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1361px) {
+  .civitai-models-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 2200px) {
+  .civitai-models-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
 }
 
 .civitai-card {
   background: #111827;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -8377,15 +8573,15 @@ body.zen-mode .zen-mode-exit-btn,
 }
 
 .civitai-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 10px rgba(59, 130, 246, 0.15);
 }
 
 .civitai-card-media {
   position: relative;
   width: 100%;
-  height: 200px;
+  height: 98px;
   background: #090d16;
   overflow: hidden;
   cursor: pointer;
@@ -8404,9 +8600,9 @@ body.zen-mode .zen-mode-exit-btn,
 
 .civitai-card-badges-top {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
+  top: 5px;
+  left: 5px;
+  right: 5px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -8414,19 +8610,26 @@ body.zen-mode .zen-mode-exit-btn,
   z-index: 2;
 }
 
+.civitai-card-badges-top .badge {
+  font-size: 9px !important;
+  padding: 1px 5px !important;
+  border-radius: 5px !important;
+  line-height: 1.2 !important;
+}
+
 .civitai-card-body {
-  padding: 12px 14px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 8px;
+  gap: 3px;
 }
 
 .civitai-card-title {
-  font-size: 13.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #f8fafc;
-  line-height: 1.35;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8438,40 +8641,47 @@ body.zen-mode .zen-mode-exit-btn,
 }
 
 .civitai-card-author {
-  font-size: 11px;
+  font-size: 9.5px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
+  line-height: 1.2;
 }
 
 .civitai-card-stats {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 9px;
   color: var(--text-secondary);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 8px;
+  padding-top: 4px;
   margin-top: auto;
 }
 
 .civitai-card-actions {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.civitai-card-actions button {
+  font-size: 10px !important;
+  padding: 3px 6px !important;
+  border-radius: 4px !important;
 }
 
 .civitai-trigger-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
   background: rgba(59, 130, 246, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.35);
   color: #93c5fd;
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 11px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
   font-family: var(--font-mono);
   cursor: pointer;
   transition: all 0.15s ease;

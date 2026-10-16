@@ -105,8 +105,8 @@ def main():
                 except:
                     pass
 
-            rel_url = f"/v1/studio/maestro/stream?file=stems/{clean_name}/{os.path.basename(stem_path)}"
-            download_url = f"/v1/mesh/shares/download?path=stems/{clean_name}/{os.path.basename(stem_path)}&inline=1"
+            rel_url = f"/v1/studio/audio/stream?file=stems/{clean_name}/{os.path.basename(stem_path)}"
+            download_url = f"/v1/studio/audio/stream?file=stems/{clean_name}/{os.path.basename(stem_path)}&download=1"
             stems_map[tag] = {
                 "name": f"{clean_name} ({tag.capitalize()})",
                 "tag": tag,
@@ -179,8 +179,8 @@ Mastered & Stemmed with Demucs v4 Neural Hybrid Transformer on NVIDIA CUDA.
                     if os.path.exists(stem["filePath"]):
                         zf.write(stem["filePath"], os.path.basename(stem["filePath"]))
 
-            zip_rel_url = f"/v1/studio/maestro/stream?file=stems/{clean_name}/{zip_filename}"
-            zip_download_url = f"/v1/mesh/shares/download?path=stems/{clean_name}/{zip_filename}&inline=0"
+            zip_rel_url = f"/v1/studio/audio/stream?file=stems/{clean_name}/{zip_filename}"
+            zip_download_url = f"/v1/studio/audio/stream?file=stems/{clean_name}/{zip_filename}&download=1"
 
         # Update input track's companion .meta.json if present
         meta_path = os.path.splitext(input_path)[0] + ".meta.json"

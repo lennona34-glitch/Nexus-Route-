@@ -769,42 +769,106 @@ CRITICAL RULES:
           }
         }
 
+        const trackBase = audioFile.replace(/\.(wav|mp3|flac)$/i, '');
+        const cleanTrackBase = trackBase.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const stemDir = path.join(outputsDir, 'stems', cleanTrackBase);
+
         // If stems not in meta.json, check if disk folder exists
-        if (!stems) {
-          const trackBase = audioFile.replace(/\.(wav|mp3|flac)$/i, '');
-          const cleanTrackBase = trackBase.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const stemDir = path.join(outputsDir, 'stems', cleanTrackBase);
-          if (fs.existsSync(stemDir)) {
-            const stemFiles = fs.readdirSync(stemDir);
-            const items: Record<string, any> = {};
-            let zipUrl: string | undefined;
-            let zipDownloadUrl: string | undefined;
-            for (const sf of stemFiles) {
-              const lower = sf.toLowerCase();
-              if (lower.endsWith('.zip')) {
-                zipUrl = `/v1/studio/maestro/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}`;
-                zipDownloadUrl = `/v1/mesh/shares/download?path=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}&inline=0`;
-              } else if (lower.endsWith('.wav')) {
-                let tag = 'other';
-                if (lower.includes('vocals')) tag = 'vocals';
-                else if (lower.includes('drums')) tag = 'drums';
-                else if (lower.includes('bass')) tag = 'bass';
-                else if (lower.includes('instrumental')) tag = 'instrumental';
-                items[tag] = {
-                  tag,
-                  filename: sf,
-                  streamUrl: `/v1/studio/maestro/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}`,
-                  downloadUrl: `/v1/mesh/shares/download?path=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}&inline=1`,
-                };
-              }
-            }
-            if (Object.keys(items).length > 0) {
-              stems = {
-                folder: `stems/${cleanTrackBase}`,
-                zipUrl,
-                zipDownloadUrl,
-                items,
+        if (!stems && fs.existsSync(stemDir)) {
+          const stemFiles = fs.readdirSync(stemDir);
+          const items: Record<string, any> = {};
+          let zipUrl: string | undefined;
+          let zipDownloadUrl: string | undefined;
+          let zipSizeBytes = 0;
+          let zipName = `${cleanTrackBase}_DAW_Stems.zip`;
+
+          for (const sf of stemFiles) {
+            const lower = sf.toLowerCase();
+            const fullSfPath = path.join(stemDir, sf);
+            const sfStat = fs.statSync(fullSfPath);
+
+            if (lower.endsWith('.zip')) {
+              zipName = sf;
+              zipSizeBytes = sfStat.size;
+              zipUrl = `/v1/studio/audio/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}`;
+              zipDownloadUrl = `/v1/studio/audio/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}&download=1`;
+            } else if (lower.endsWith('.wav')) {
+              let tag = 'other';
+              if (lower.includes('vocals')) tag = 'vocals';
+              else if (lower.includes('drums')) tag = 'drums';
+              else if (lower.includes('bass')) tag = 'bass';
+              else if (lower.includes('instrumental')) tag = 'instrumental';
+              items[tag] = {
+                tag,
+                filename: sf,
+                fileSizeBytes: sfStat.size,
+                sizeBytes: sfStat.size,
+                streamUrl: `/v1/studio/audio/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}`,
+                downloadUrl: `/v1/studio/audio/stream?file=stems/${encodeURIComponent(cleanTrackBase)}/${encodeURIComponent(sf)}&download=1`,
               };
+            }
+          }
+          if (Object.keys(items).length > 0) {
+            stems = {
+              folder: `stems/${cleanTrackBase}`,
+              zipName,
+              zipSizeBytes,
+              zipUrl,
+              zipDownloadUrl,
+              items,
+            };
+          }
+        }
+
+        // Normalize stems URLs if present to guarantee reliable direct streaming and attachment downloading
+        if (stems) {
+          const folderClean = (stems.folder || `stems/${cleanTrackBase}`).replace(/^\/+/, '').replace(/\\/g, '/');
+          let zipName = stems.zipName;
+          if (!zipName) {
+            if (stems.zipUrl) {
+              const urlParts = stems.zipUrl.split(/[\/?#]/);
+              zipName = decodeURIComponent(urlParts[urlParts.length - 1] || '');
+            }
+            if (!zipName || !zipName.endsWith('.zip')) {
+              zipName = `${cleanTrackBase}_DAW_Stems.zip`;
+            }
+          }
+          stems.zipName = zipName;
+          stems.zipUrl = `/v1/studio/audio/stream?file=${encodeURIComponent(folderClean)}/${encodeURIComponent(zipName)}`;
+          stems.zipDownloadUrl = `/v1/studio/audio/stream?file=${encodeURIComponent(folderClean)}/${encodeURIComponent(zipName)}&download=1`;
+
+          if (fs.existsSync(stemDir)) {
+            const diskZip = path.join(stemDir, zipName);
+            if (fs.existsSync(diskZip)) {
+              stems.zipSizeBytes = fs.statSync(diskZip).size;
+            }
+          }
+
+          if (stems.items) {
+            for (const tag of Object.keys(stems.items)) {
+              const item = stems.items[tag];
+              let fn = item.filename;
+              if (!fn) {
+                if (item.streamUrl) {
+                  const urlParts = item.streamUrl.split(/[\/?#]/);
+                  fn = decodeURIComponent(urlParts[urlParts.length - 1] || '');
+                }
+                if (!fn || !fn.endsWith('.wav')) {
+                  fn = `${cleanTrackBase}_Stem_${tag.charAt(0).toUpperCase() + tag.slice(1)}.wav`;
+                }
+              }
+              item.filename = fn;
+              item.streamUrl = `/v1/studio/audio/stream?file=${encodeURIComponent(folderClean)}/${encodeURIComponent(fn)}`;
+              item.downloadUrl = `/v1/studio/audio/stream?file=${encodeURIComponent(folderClean)}/${encodeURIComponent(fn)}&download=1`;
+
+              if (fs.existsSync(stemDir)) {
+                const diskWav = path.join(stemDir, fn);
+                if (fs.existsSync(diskWav)) {
+                  const s = fs.statSync(diskWav).size;
+                  item.fileSizeBytes = s;
+                  item.sizeBytes = s;
+                }
+              }
             }
           }
         }
@@ -853,6 +917,13 @@ CRITICAL RULES:
     const ext = path.extname(fullPath).toLowerCase();
     const contentType = ext === '.mp3' ? 'audio/mpeg' : ext === '.flac' ? 'audio/flac' : ext === '.zip' ? 'application/zip' : ext === '.txt' ? 'text/plain' : 'audio/wav';
 
+    const q = req.query as any;
+    const isDownload = q?.download === '1' || q?.download === 'true' || q?.inline === '0';
+    const filename = path.basename(fullPath);
+    const disposition = isDownload
+      ? `attachment; filename="${filename}"`
+      : `inline; filename="${filename}"`;
+
     const range = req.headers.range;
 
     if (range) {
@@ -876,7 +947,8 @@ CRITICAL RULES:
         .header('Accept-Ranges', 'bytes')
         .header('Content-Length', chunkSize)
         .header('Content-Type', contentType)
-        .header('Cache-Control', 'public, max-age=3600')
+        .header('Content-Disposition', disposition)
+        .header('Cache-Control', isDownload ? 'no-cache' : 'public, max-age=3600')
         .send(fileStream);
     } else {
       const fileStream = fs.createReadStream(fullPath);
@@ -885,7 +957,8 @@ CRITICAL RULES:
         .header('Content-Length', fileSize)
         .header('Content-Type', contentType)
         .header('Accept-Ranges', 'bytes')
-        .header('Cache-Control', 'public, max-age=3600')
+        .header('Content-Disposition', disposition)
+        .header('Cache-Control', isDownload ? 'no-cache' : 'public, max-age=3600')
         .send(fileStream);
     }
   }
@@ -1166,6 +1239,7 @@ CRITICAL RULES:
       seed?: number;
       temperature?: number;
       shareToLounge?: boolean;
+      autoExtractStems?: boolean;
     },
     meshHub?: MeshHub,
     meshShareManager?: ShareManager,
@@ -1698,7 +1772,7 @@ export function registerStudioRoutes(
           meshHub,
           meshShareManager
         );
-        return reply.send({ success: true, ...result });
+        return reply.send({ ...result });
       } catch (err: any) {
         return reply.status(500).send({ success: false, error: err.message });
       }
@@ -1747,7 +1821,7 @@ export function registerStudioRoutes(
     } else {
       try {
         const result = await NexusStudioEngine.extractStems(fileName, meshShareManager);
-        return reply.send({ success: true, ...result });
+        return reply.send({ ...result });
       } catch (err: any) {
         return reply.status(500).send({ success: false, error: err.message });
       }

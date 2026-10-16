@@ -12388,31 +12388,31 @@ function initHfHub() {
       let actionButtons = '';
       if (isIncomplete) {
         actionButtons = `
-          <button type="button" class="primary-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="font-size: 11px; font-weight: 700; padding: 6px 14px; background: #dc2626; border: none; cursor: pointer; border-radius: 6px;">🗑️ Clean Up</button>
+          <button type="button" class="primary-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="font-size: 10px; font-weight: 700; padding: 3px 8px; background: #dc2626; border: none; cursor: pointer; border-radius: 4px;">🗑️ Clean</button>
         `;
       } else if (isGguf) {
         const chatModelName = m.registeredModelName || m.suggestedModelName || m.repoId;
         const mainBtn = m.isRegisteredInOllama
-          ? `<button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(chatModelName)}" style="color: #c084fc; border-color: rgba(168, 85, 247, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(168, 85, 247, 0.08); cursor: pointer;" title="Open Chat with this model">💬 Chat</button>`
-          : `<button type="button" class="action-tag-btn hf-register-gguf-action" data-repo="${escapeHtml(m.repoId)}" data-path="${escapeHtml(m.ggufFilePath || '')}" data-name="${escapeHtml(m.suggestedModelName || '')}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.5); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(245, 158, 11, 0.12); cursor: pointer;" title="1-Click register into local Ollama Chat engine">⚡ 1-Click Activate in Chat</button>`;
+          ? `<button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(chatModelName)}" style="color: #c084fc; border-color: rgba(168, 85, 247, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(168, 85, 247, 0.08); cursor: pointer;" title="Open Chat with this model">💬 Chat</button>`
+          : `<button type="button" class="action-tag-btn hf-register-gguf-action" data-repo="${escapeHtml(m.repoId)}" data-path="${escapeHtml(m.ggufFilePath || '')}" data-name="${escapeHtml(m.suggestedModelName || '')}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.5); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(245, 158, 11, 0.12); cursor: pointer;" title="1-Click register into local Ollama Chat engine">⚡ Chat</button>`;
 
         actionButtons = `
-          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; gap: 3px; align-items: center; flex: 1; min-width: 0;">
             ${mainBtn}
-            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.repoId)}" style="color: #a855f7; border-color: rgba(168, 85, 247, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="View README documentation">📖 Docs</button>
-            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="Uninstall / Delete from disk">🗑️</button>
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.repoId)}" style="color: #a855f7; border-color: rgba(168, 85, 247, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="View README documentation">📖 Docs</button>
+            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="Uninstall / Delete from disk">🗑️</button>
           </div>
         `;
       } else {
         const useBtn = isDit
-          ? `<button type="button" class="action-tag-btn hf-use-video-action" data-model="${escapeHtml(m.repoId)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Load in PromptForge Video Studio">🎬 Video Studio</button>`
-          : `<button type="button" class="action-tag-btn hf-use-art-action" data-model="${escapeHtml(m.repoId)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(245, 158, 11, 0.08); cursor: pointer;" title="Load this checkpoint in NVIDIA RTX 4060 Art Studio">🎨 Studio</button>`;
+          ? `<button type="button" class="action-tag-btn hf-use-video-action" data-model="${escapeHtml(m.repoId)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Load in PromptForge Video Studio">🎬 Video</button>`
+          : `<button type="button" class="action-tag-btn hf-use-art-action" data-model="${escapeHtml(m.repoId)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(245, 158, 11, 0.08); cursor: pointer;" title="Load this checkpoint in NVIDIA RTX 4060 Art Studio">🎨 Studio</button>`;
 
         actionButtons = `
-          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; gap: 3px; align-items: center; flex: 1; min-width: 0;">
             ${useBtn}
-            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.repoId)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="View sample output images and README in-app">📖 Previews</button>
-            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="Uninstall / Delete from disk">🗑️</button>
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.repoId)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="View sample output images and README in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.repoId)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="Uninstall / Delete from disk">🗑️</button>
           </div>
         `;
       }
@@ -12508,10 +12508,10 @@ function initHfHub() {
               </div>
             </div>
             <div class="hf-card-actions">
-              <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                <button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(rawName)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; font-weight: 700; padding: 6px 12px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Select this model for offline chat">💬 Chat</button>
-                <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(rawName)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="View documentation in-app">📖 Previews</button>
-                <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(rawName)}" data-type="gguf" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 6px 8px; cursor: pointer;" title="Delete this model from disk">🗑️</button>
+              <div style="display: flex; gap: 3px; align-items: center; flex: 1; min-width: 0;">
+                <button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(rawName)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Select this model for offline chat">💬 Chat</button>
+                <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(rawName)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="View documentation in-app">📖 Previews</button>
+                <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(rawName)}" data-type="gguf" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="Delete this model from disk">🗑️</button>
               </div>
               <a href="https://huggingface.co/models?search=${encodeURIComponent(cleanName)}" target="_blank" rel="noopener noreferrer" class="action-tag-btn hf-link-btn" title="Search on Hugging Face">↗ HF</a>
             </div>
@@ -12646,28 +12646,28 @@ function initHfHub() {
       if (m.isInstalled) {
         let useBtn = '';
         if (isGguf) {
-          useBtn = `<button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(m.id)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; font-weight: 700; padding: 5px 10px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Select this model in chat">💬 Select</button>`;
+          useBtn = `<button type="button" class="action-tag-btn hf-use-chat-action" data-model="${escapeHtml(m.id)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Select this model in chat">💬 Chat</button>`;
         } else if (isDit) {
-          useBtn = `<button type="button" class="action-tag-btn hf-use-video-action" data-model="${escapeHtml(m.id)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; font-weight: 700; padding: 5px 10px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Open in Video Studio">🎬 Video</button>`;
+          useBtn = `<button type="button" class="action-tag-btn hf-use-video-action" data-model="${escapeHtml(m.id)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(56, 189, 248, 0.08); cursor: pointer;" title="Open in Video Studio">🎬 Video</button>`;
         } else {
-          useBtn = `<button type="button" class="action-tag-btn hf-use-art-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11px; font-weight: 700; padding: 5px 10px; background: rgba(245, 158, 11, 0.08); cursor: pointer;" title="Open in RTX 4060 Art Studio">🎨 Studio</button>`;
+          useBtn = `<button type="button" class="action-tag-btn hf-use-art-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 10px; font-weight: 700; padding: 3px 6px; background: rgba(245, 158, 11, 0.08); cursor: pointer;" title="Open in RTX 4060 Art Studio">🎨 Studio</button>`;
         }
 
         actionRow = `
-          <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+          <div style="display: flex; gap: 3px; align-items: center; flex: 1; min-width: 0;">
             ${useBtn}
-            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="View sample output images and README documentation in-app">📖 Previews</button>
-            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="Inspect repository files">📂 Files</button>
-            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 11px; padding: 5px 8px; cursor: pointer;" title="Uninstall / Delete model from disk">🗑️</button>
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="View sample output images and README documentation in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="Inspect repository files">📂</button>
+            <button type="button" class="action-tag-btn hf-card-delete-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #f87171; border-color: rgba(248, 113, 113, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="Uninstall / Delete model from disk">🗑️</button>
           </div>
         `;
       } else {
         const pullText = isGguf ? '📥 Pull' : '📥 Download';
         actionRow = `
-          <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="primary-btn hf-download-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" data-safe="${m.is8GbSafe !== false}" data-gated="${!!m.gated}" style="font-size: 11px; font-weight: 700; padding: 5px 9px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; cursor: pointer; border-radius: 6px;">${pullText}</button>
-            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 11px; padding: 5px 7px; cursor: pointer;" title="View sample output images, trigger words and README in-app">📖 Previews</button>
-            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 5px 7px; cursor: pointer;" title="Inspect individual files & pick exact weights for 8GB GPU">📂 Files</button>
+          <div style="display: flex; gap: 3px; align-items: center; flex: 1; min-width: 0;">
+            <button type="button" class="primary-btn hf-download-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" data-safe="${m.is8GbSafe !== false}" data-gated="${!!m.gated}" style="font-size: 10px; font-weight: 700; padding: 3px 7px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; cursor: pointer; border-radius: 4px; white-space: nowrap;">${pullText}</button>
+            <button type="button" class="action-tag-btn hf-open-readme-action" data-model="${escapeHtml(m.id)}" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="View sample output images, trigger words and README in-app">📖 Previews</button>
+            <button type="button" class="action-tag-btn hf-inspect-files-action" data-model="${escapeHtml(m.id)}" data-type="${escapeHtml(m.type)}" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 10px; padding: 3px 5px; cursor: pointer;" title="Inspect individual files & pick exact weights for 8GB GPU">📂</button>
           </div>
         `;
       }
@@ -21631,6 +21631,34 @@ function initNexusStudio() {
     const bass = stems?.items?.bass || stems?.bass;
     const other = stems?.items?.other || stems?.other;
 
+    const resolveStemDownloadUrl = (stemItem) => {
+      if (!stemItem) return '#';
+      if (stemItem.downloadUrl && stemItem.downloadUrl.includes('/v1/studio/audio/stream')) {
+        return stemItem.downloadUrl;
+      }
+      const raw = stemItem.downloadUrl || stemItem.streamUrl || '';
+      const match = raw.match(/[?&](?:file|path)=([^&]+)/);
+      if (match) {
+        let clean = decodeURIComponent(match[1]).replace(/\\/g, '/').replace(/^shared\/audio\//, '');
+        return `/v1/studio/audio/stream?file=${encodeURIComponent(clean)}&download=1`;
+      }
+      return stemItem.downloadUrl || stemItem.streamUrl || '#';
+    };
+
+    const resolveZipDownloadUrl = (stemsObj) => {
+      if (!stemsObj) return '#';
+      if (stemsObj.zipDownloadUrl && stemsObj.zipDownloadUrl.includes('/v1/studio/audio/stream')) {
+        return stemsObj.zipDownloadUrl;
+      }
+      const raw = stemsObj.zipDownloadUrl || stemsObj.zipUrl || '';
+      const match = raw.match(/[?&](?:file|path)=([^&]+)/);
+      if (match) {
+        let clean = decodeURIComponent(match[1]).replace(/\\/g, '/').replace(/^shared\/audio\//, '');
+        return `/v1/studio/audio/stream?file=${encodeURIComponent(clean)}&download=1`;
+      }
+      return stemsObj.zipDownloadUrl || stemsObj.zipUrl || '#';
+    };
+
     if (stems && (vocals || drums || bass || other || stems.zipUrl)) {
       stemsHtml = `
         <div class="studio-stems-section">
@@ -21672,7 +21700,7 @@ function initNexusStudio() {
                 <div class="studio-daw-btn-row">
                   <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="vocals" title="Mute Vocals (M)">M</button>
                   <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="vocals" title="Solo Vocals (S) - Continuous playback">S</button>
-                  <a href="${vocals?.downloadUrl || vocals?.streamUrl || '#'}" download="${vocals?.fileName || vocals?.filename || 'Stem_Vocals.wav'}" class="studio-daw-dl-btn" title="Download Vocals WAV">⬇</a>
+                  <a href="${resolveStemDownloadUrl(vocals)}" download="${vocals?.fileName || vocals?.filename || 'Stem_Vocals.wav'}" class="studio-daw-dl-btn" title="Download Vocals WAV">⬇</a>
                 </div>
               </div>
               <div class="studio-daw-waveform-lane" data-stem="vocals">
@@ -21697,7 +21725,7 @@ function initNexusStudio() {
                 <div class="studio-daw-btn-row">
                   <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="drums" title="Mute Drums (M)">M</button>
                   <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="drums" title="Solo Drums (S) - Continuous playback">S</button>
-                  <a href="${drums?.downloadUrl || drums?.streamUrl || '#'}" download="${drums?.fileName || drums?.filename || 'Stem_Drums.wav'}" class="studio-daw-dl-btn" title="Download Drums WAV">⬇</a>
+                  <a href="${resolveStemDownloadUrl(drums)}" download="${drums?.fileName || drums?.filename || 'Stem_Drums.wav'}" class="studio-daw-dl-btn" title="Download Drums WAV">⬇</a>
                 </div>
               </div>
               <div class="studio-daw-waveform-lane" data-stem="drums">
@@ -21722,7 +21750,7 @@ function initNexusStudio() {
                 <div class="studio-daw-btn-row">
                   <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="bass" title="Mute Bass (M)">M</button>
                   <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="bass" title="Solo Bass (S) - Continuous playback">S</button>
-                  <a href="${bass?.downloadUrl || bass?.streamUrl || '#'}" download="${bass?.fileName || bass?.filename || 'Stem_Bass.wav'}" class="studio-daw-dl-btn" title="Download Bass WAV">⬇</a>
+                  <a href="${resolveStemDownloadUrl(bass)}" download="${bass?.fileName || bass?.filename || 'Stem_Bass.wav'}" class="studio-daw-dl-btn" title="Download Bass WAV">⬇</a>
                 </div>
               </div>
               <div class="studio-daw-waveform-lane" data-stem="bass">
@@ -21747,7 +21775,7 @@ function initNexusStudio() {
                 <div class="studio-daw-btn-row">
                   <button type="button" class="studio-daw-trk-btn btn-mute" data-stem="other" title="Mute Melody (M)">M</button>
                   <button type="button" class="studio-daw-trk-btn btn-solo" data-stem="other" title="Solo Melody (S) - Continuous playback">S</button>
-                  <a href="${other?.downloadUrl || other?.streamUrl || '#'}" download="${other?.fileName || other?.filename || 'Stem_Other.wav'}" class="studio-daw-dl-btn" title="Download Melody WAV">⬇</a>
+                  <a href="${resolveStemDownloadUrl(other)}" download="${other?.fileName || other?.filename || 'Stem_Other.wav'}" class="studio-daw-dl-btn" title="Download Melody WAV">⬇</a>
                 </div>
               </div>
               <div class="studio-daw-waveform-lane" data-stem="other">
@@ -21766,7 +21794,7 @@ function initNexusStudio() {
               <div class="studio-daw-zip-title"><span>📦</span> Complete DAW Stem Pack (.zip)</div>
               <div class="studio-daw-zip-sub">Includes all 4 stems + DAW_README.txt &bull; Ready for Ableton, FL Studio, Logic, Reaper &bull; ${formatStemBytes(stems.zipSizeBytes)}</div>
             </div>
-            <a href="${stems.zipDownloadUrl || stems.zipUrl || '#'}" download="${stems.zipName || 'DAW_Stems.zip'}" class="studio-daw-zip-btn">
+            <a href="${resolveZipDownloadUrl(stems)}" download="${stems.zipName || 'DAW_Stems.zip'}" class="studio-daw-zip-btn">
               <span>⬇️</span> Download All Stems (.zip)
             </a>
           </div>
@@ -22169,15 +22197,90 @@ function initNexusRadio() {
   const headerWaveBars = document.getElementById('radioHeaderWaveBars');
   const navLiveBadge = document.getElementById('radioNavLiveBadge');
 
+  const tabBtnDeckIptv = document.getElementById('tabBtnDeckIptv');
+  const tabBtnDeckRadio = document.getElementById('tabBtnDeckRadio');
+  const deckHeaderIcon = document.getElementById('deckHeaderIcon');
+  const deckMainTitle = document.getElementById('deckMainTitle');
+  const deckBadge = document.getElementById('deckBadge');
+  const deckSubTitle = document.getElementById('deckSubTitle');
+  let currentDeckTab = 'iptv';
+
   if (!radioModal || !iframe) return;
+
+  function switchDeckTab(tab) {
+    currentDeckTab = tab;
+    if (tab === 'iptv') {
+      if (tabBtnDeckIptv) {
+        tabBtnDeckIptv.classList.add('active');
+        tabBtnDeckIptv.style.background = 'linear-gradient(135deg, #0ea5e9, #38bdf8)';
+        tabBtnDeckIptv.style.color = '#041324';
+      }
+      if (tabBtnDeckRadio) {
+        tabBtnDeckRadio.classList.remove('active');
+        tabBtnDeckRadio.style.background = 'transparent';
+        tabBtnDeckRadio.style.color = '#94a3b8';
+      }
+      if (deckHeaderIcon) deckHeaderIcon.textContent = '📺';
+      if (deckMainTitle) deckMainTitle.textContent = 'Nexus Broadcast Deck';
+      if (deckBadge) deckBadge.textContent = 'IPTV AMP v3.9 • EPG • VAULT';
+      if (deckSubTitle) deckSubTitle.textContent = 'Live TV • M3U & Xtream Login • XMLTV Guide • Internet Archive Cinema • 3,000 Live Stations';
+      if (iframe && (!iframe.getAttribute('src') || !iframe.getAttribute('src').includes('iptv.html'))) {
+        iframe.setAttribute('src', 'iptv.html');
+      }
+    } else {
+      if (tabBtnDeckRadio) {
+        tabBtnDeckRadio.classList.add('active');
+        tabBtnDeckRadio.style.background = 'linear-gradient(135deg, #a855f7, #c084fc)';
+        tabBtnDeckRadio.style.color = '#041324';
+      }
+      if (tabBtnDeckIptv) {
+        tabBtnDeckIptv.classList.remove('active');
+        tabBtnDeckIptv.style.background = 'transparent';
+        tabBtnDeckIptv.style.color = '#94a3b8';
+      }
+      if (deckHeaderIcon) deckHeaderIcon.textContent = '📻';
+      if (deckMainTitle) deckMainTitle.textContent = 'Wavelength Global Radio';
+      if (deckBadge) deckBadge.textContent = 'WAVELENGTH • 3,000 STATIONS';
+      if (deckSubTitle) deckSubTitle.textContent = 'Global Shortwave & FM Streams • 190+ Countries • Lossless Ambient & Synthwave';
+      if (iframe && (!iframe.getAttribute('src') || !iframe.getAttribute('src').includes('radio.html'))) {
+        iframe.setAttribute('src', 'radio.html');
+      }
+    }
+  }
+
+  if (tabBtnDeckIptv) {
+    tabBtnDeckIptv.addEventListener('click', () => switchDeckTab('iptv'));
+  }
+  if (tabBtnDeckRadio) {
+    tabBtnDeckRadio.addEventListener('click', () => switchDeckTab('radio'));
+  }
 
   let currentRadioState = {
     playing: false,
     stationName: null,
     country: null,
     trackText: '',
-    volume: 0.8
+    volume: 0.8,
+    isAudio: false
   };
+
+  let currentIptvStatus = {
+    playing: false,
+    channel: '',
+    group: '',
+    isAudio: false
+  };
+
+  function isRadioStationPlaying() {
+    if (currentDeckTab === 'radio') return true;
+    if (currentRadioState && currentRadioState.isAudio) return true;
+    if (currentIptvStatus && currentIptvStatus.isAudio) return true;
+    const grp = ((currentIptvStatus && currentIptvStatus.group) || (currentRadioState && currentRadioState.country) || '').toLowerCase();
+    if (grp.includes('radio')) return true;
+    const ch = ((currentIptvStatus && currentIptvStatus.channel) || (currentRadioState && currentRadioState.stationName) || '').toLowerCase();
+    if (ch.includes('fm') || ch.includes('radio') || ch.includes('broadcast')) return true;
+    return false;
+  }
 
   let isRadioPinned = false;
   try {
@@ -22269,6 +22372,34 @@ function initNexusRadio() {
 
   updatePinUi();
 
+  const miniTvControls = document.getElementById('miniTvControls');
+  const miniTvExpandBtn = document.getElementById('miniTvExpandBtn');
+  const miniTvPipBtn = document.getElementById('miniTvPipBtn');
+  const miniTvCloseBtn = document.getElementById('miniTvCloseBtn');
+  const radioModalHeader = document.querySelector('.radio-modal-header');
+
+  function isMiniTvDocked() {
+    return radioModal && radioModal.classList.contains('docked-mini-tv');
+  }
+
+  function dockToMiniTv() {
+    if (!radioModal) return;
+    radioModal.classList.remove('hidden');
+    radioModal.classList.remove('modal-maximized');
+    radioModal.classList.add('docked-mini-tv');
+    if (miniPlayer) miniPlayer.classList.add('hidden');
+    sendToRadioIframe({ action: 'enterMiniTv' });
+  }
+
+  function undockMiniTv() {
+    if (!radioModal) return;
+    radioModal.classList.remove('docked-mini-tv');
+    sendToRadioIframe({ action: 'leaveMiniTv' });
+    if (currentDeckTab === 'iptv' && deckMainTitle) {
+      deckMainTitle.textContent = 'Nexus Broadcast Deck';
+    }
+  }
+
   function sendToRadioIframe(cmd) {
     try {
       if (iframe.contentWindow) {
@@ -22279,26 +22410,39 @@ function initNexusRadio() {
     }
   }
 
-  function openRadio(genre) {
-    radioModal.classList.remove('hidden');
-    if (!iframe.getAttribute('src')) {
-      iframe.setAttribute('src', 'radio.html');
+  function openRadio(targetTab = 'iptv', genre = null) {
+    if (isMiniTvDocked()) {
+      undockMiniTv();
     }
-    if (genre && typeof genre === 'string') {
-      setTimeout(() => {
-        sendToRadioIframe({ action: 'tuneGenre', genre });
-      }, 500);
+    radioModal.classList.remove('hidden');
+    if (typeof targetTab === 'string' && (targetTab === 'radio' || targetTab.startsWith('radio-') || targetTab.startsWith('genre-'))) {
+      switchDeckTab('radio');
+      const g = genre || (targetTab.startsWith('radio-') ? targetTab.replace('radio-', '') : (targetTab.startsWith('genre-') ? targetTab.replace('genre-', '') : null));
+      if (g) {
+        setTimeout(() => sendToRadioIframe({ action: 'tuneGenre', genre: g }), 500);
+      }
+    } else {
+      switchDeckTab(targetTab === 'radio' ? 'radio' : 'iptv');
+      if (genre) {
+        setTimeout(() => sendToRadioIframe({ action: 'tuneGenre', genre }), 500);
+      }
     }
   }
 
   function closeRadio() {
+    if (isMiniTvDocked()) {
+      undockMiniTv();
+    }
     radioModal.classList.add('hidden');
-    if (currentRadioState.playing && miniPlayer) {
+    if (currentRadioState.playing && miniPlayer && currentDeckTab === 'radio') {
       showMiniPlayer(4500);
     }
   }
 
   function dockToMiniPlayer() {
+    if (isMiniTvDocked()) {
+      undockMiniTv();
+    }
     radioModal.classList.add('hidden');
     if (miniPlayer) {
       showMiniPlayer(4500);
@@ -22306,11 +22450,11 @@ function initNexusRadio() {
   }
 
   if (btnOpenRadio) {
-    btnOpenRadio.addEventListener('click', () => openRadio());
+    btnOpenRadio.addEventListener('click', () => openRadio('iptv'));
   }
 
   if (studioQuickRadioBtn) {
-    studioQuickRadioBtn.addEventListener('click', () => openRadio());
+    studioQuickRadioBtn.addEventListener('click', () => openRadio('iptv'));
   }
 
   if (btnCloseRadio) {
@@ -22318,25 +22462,132 @@ function initNexusRadio() {
   }
 
   if (btnDockMini) {
-    btnDockMini.addEventListener('click', dockToMiniPlayer);
+    btnDockMini.addEventListener('click', () => {
+      if (isRadioStationPlaying()) {
+        dockToMiniPlayer();
+      } else {
+        dockToMiniTv();
+      }
+    });
+  }
+
+  if (miniTvExpandBtn) {
+    miniTvExpandBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      undockMiniTv();
+    });
+  }
+
+  if (miniTvPipBtn) {
+    miniTvPipBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendToRadioIframe({ action: 'requestPiP' });
+    });
+  }
+
+  if (miniTvCloseBtn) {
+    miniTvCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      undockMiniTv();
+      closeRadio();
+    });
+  }
+
+  if (radioModalHeader) {
+    radioModalHeader.addEventListener('click', (e) => {
+      if (isMiniTvDocked() && !e.target.closest('button')) {
+        undockMiniTv();
+      }
+    });
   }
 
   if (btnPopout) {
     btnPopout.addEventListener('click', () => {
-      window.open('/radio', 'NexusRadioPopout', 'width=1120,height=760,menubar=no,toolbar=no,location=no,status=no');
+      const url = currentDeckTab === 'iptv' ? '/iptv' : '/radio';
+      const title = currentDeckTab === 'iptv' ? 'NexusIptvPopout' : 'NexusRadioPopout';
+      window.open(url, title, 'width=1180,height=780,menubar=no,toolbar=no,location=no,status=no');
     });
+  }
+
+  function toggleMaxFullscreen() {
+    if (currentDeckTab === 'iptv') {
+      const isFs = !!(document.fullscreenElement || (iframe.contentDocument && iframe.contentDocument.fullscreenElement));
+      if (isFs) {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        if (iframe.contentDocument && iframe.contentDocument.exitFullscreen) {
+          iframe.contentDocument.exitFullscreen().catch(() => {});
+        }
+        radioModal.classList.remove('modal-maximized');
+        btnToggleFullscreen.textContent = '🗖';
+      } else {
+        try {
+          if (iframe.contentDocument && iframe.contentDocument.documentElement && iframe.contentDocument.documentElement.requestFullscreen) {
+            iframe.contentDocument.documentElement.requestFullscreen().then(() => {
+              btnToggleFullscreen.textContent = '🗗';
+            }).catch(() => {
+              if (iframe.requestFullscreen) {
+                iframe.requestFullscreen().then(() => {
+                  btnToggleFullscreen.textContent = '🗗';
+                }).catch(() => {
+                  radioModal.classList.toggle('modal-maximized');
+                  btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '🗖';
+                });
+              } else {
+                radioModal.classList.toggle('modal-maximized');
+                btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '🗖';
+              }
+            });
+          } else if (iframe.requestFullscreen) {
+            iframe.requestFullscreen().then(() => {
+              btnToggleFullscreen.textContent = '🗗';
+            }).catch(() => {
+              radioModal.classList.toggle('modal-maximized');
+              btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '🗖';
+            });
+          } else {
+            radioModal.classList.toggle('modal-maximized');
+            btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '🗖';
+          }
+        } catch (_) {
+          if (iframe.requestFullscreen) iframe.requestFullscreen().catch(() => {});
+          radioModal.classList.toggle('modal-maximized');
+          btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '🗖';
+        }
+      }
+    } else {
+      radioModal.classList.toggle('modal-maximized');
+      btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '🗖';
+    }
   }
 
   if (btnToggleFullscreen) {
-    btnToggleFullscreen.addEventListener('click', () => {
-      radioModal.classList.toggle('modal-maximized');
-      btnToggleFullscreen.textContent = radioModal.classList.contains('modal-maximized') ? '🗗' : '⛶';
-    });
+    btnToggleFullscreen.addEventListener('click', toggleMaxFullscreen);
   }
+
+  function handleFsChange() {
+    const isFs = !!(document.fullscreenElement || (iframe && iframe.contentDocument && iframe.contentDocument.fullscreenElement));
+    if (btnToggleFullscreen) {
+      btnToggleFullscreen.textContent = (isFs || radioModal.classList.contains('modal-maximized')) ? '🗗' : '🗖';
+    }
+  }
+  document.addEventListener('fullscreenchange', handleFsChange);
+  try {
+    iframe.addEventListener('load', () => {
+      try {
+        if (iframe.contentDocument) {
+          iframe.contentDocument.addEventListener('fullscreenchange', handleFsChange);
+        }
+      } catch (_) {}
+    });
+  } catch (_) {}
 
   radioModal.addEventListener('click', (e) => {
     if (e.target === radioModal) {
-      dockToMiniPlayer();
+      if (isRadioStationPlaying()) {
+        dockToMiniPlayer();
+      } else {
+        dockToMiniTv();
+      }
     }
   });
 
@@ -22413,9 +22664,37 @@ function initNexusRadio() {
 
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
-    if (e.data.type === 'nexus_radio_state') {
+    if (e.data.type === 'nexus_iptv_request_fullscreen') {
+      if (iframe.requestFullscreen) {
+        iframe.requestFullscreen().catch(() => {});
+      }
+    } else if (e.data.type === 'nexus_iptv_fullscreen_change') {
+      if (btnToggleFullscreen) {
+        btnToggleFullscreen.textContent = e.data.isFullscreen ? '🗗' : '🗖';
+      }
+    } else if (e.data.type === 'nexus_iptv_status') {
+      currentIptvStatus = { ...currentIptvStatus, ...e.data };
+      const { playing, channel, group, isAudio } = e.data;
+      if (isAudio !== undefined) {
+        currentRadioState.isAudio = !!isAudio;
+        setRadioActive(playing && isAudio);
+      }
+      if (channel) {
+        if (headerStationText) {
+          headerStationText.textContent = `${channel} • ${group || 'Live TV'}`;
+        }
+        if (isMiniTvDocked() && deckMainTitle) {
+          deckMainTitle.textContent = channel;
+        } else if (!isMiniTvDocked() && deckMainTitle && currentDeckTab === 'iptv') {
+          deckMainTitle.textContent = 'Nexus Broadcast Deck';
+        }
+      }
+    } else if (e.data.type === 'nexus_radio_state') {
       currentRadioState = { ...currentRadioState, ...e.data };
-      const { playing, stationName, country, trackText } = currentRadioState;
+      const { playing, stationName, country, trackText, isAudio } = currentRadioState;
+      if (isAudio !== undefined) {
+        setRadioActive(playing && isAudio);
+      }
 
       if (headerStationText) {
         if (stationName) {
@@ -22466,17 +22745,21 @@ function initNexusRadio() {
     }
   });
 
-  window.openNexusRadio = openRadio;
+  window.openNexusRadio = (tab = 'iptv', genre = null) => openRadio(tab, genre);
+  window.openNexusIptv = () => openRadio('iptv');
   window.tuneNexusRadio = (genre) => {
-    openRadio(genre);
+    openRadio('radio', genre);
   };
 
   function checkRadioHash() {
-    if (window.location.hash === '#radio' || window.location.hash.startsWith('#radio-')) {
-      const genre = window.location.hash.startsWith('#radio-') 
-        ? window.location.hash.replace('#radio-', '') 
+    const h = window.location.hash;
+    if (h === '#iptv' || h === '#tv') {
+      openRadio('iptv');
+    } else if (h === '#radio' || h.startsWith('#radio-')) {
+      const genre = h.startsWith('#radio-') 
+        ? h.replace('#radio-', '') 
         : null;
-      openRadio(genre);
+      openRadio('radio', genre);
     }
   }
   checkRadioHash();
@@ -23018,7 +23301,7 @@ function initCivitaiHub() {
       media.appendChild(img);
     } else {
       const placeholder = document.createElement('div');
-      placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--text-muted); background: #090d16;';
+      placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted); background: #090d16;';
       placeholder.textContent = '🖼️';
       media.appendChild(placeholder);
     }
@@ -23080,7 +23363,7 @@ function initCivitaiHub() {
     const detailsBtn = document.createElement('button');
     detailsBtn.type = 'button';
     detailsBtn.className = 'action-tag-btn';
-    detailsBtn.style.cssText = 'flex: 1; padding: 5px; font-size: 11px; text-align: center; color: #94a3b8; border-color: rgba(255,255,255,0.1);';
+    detailsBtn.style.cssText = 'flex: 1; padding: 3px 6px; font-size: 10px; text-align: center; color: #94a3b8; border-color: rgba(255,255,255,0.1);';
     detailsBtn.textContent = '🔍 Details';
     detailsBtn.onclick = () => openModelDetails(model);
 
@@ -23088,7 +23371,7 @@ function initCivitaiHub() {
     dlBtn.type = 'button';
     dlBtn.className = 'action-tag-btn civitai-card-dl-btn';
     dlBtn.dataset.modelId = String(model.id);
-    dlBtn.style.cssText = 'flex: 1; padding: 5px; font-size: 11px; text-align: center; font-weight: 700; color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);';
+    dlBtn.style.cssText = 'flex: 1; padding: 3px 6px; font-size: 10px; text-align: center; font-weight: 700; color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);';
     
     // Check if model is already installed
     const isInstalled = Array.isArray(installedModelsList) && installedModelsList.some(im => 
@@ -23145,7 +23428,7 @@ function initCivitaiHub() {
 
       const media = document.createElement('div');
       media.className = 'civitai-card-media';
-      media.style.height = '140px';
+      media.style.height = '98px';
 
       const previewUrl = item.metadata?.previewUrl || item.previewUrl;
       if (previewUrl) {
@@ -23156,7 +23439,7 @@ function initCivitaiHub() {
         media.appendChild(img);
       } else {
         const placeholder = document.createElement('div');
-        placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--text-muted); background: #090d16;';
+        placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted); background: #090d16;';
         placeholder.textContent = '💾';
         media.appendChild(placeholder);
       }
@@ -23211,7 +23494,7 @@ function initCivitaiHub() {
       const useInStudioBtn = document.createElement('button');
       useInStudioBtn.type = 'button';
       useInStudioBtn.className = 'action-tag-btn';
-      useInStudioBtn.style.cssText = 'flex: 2; padding: 6px; font-size: 11px; font-weight: 700; color: #c084fc; border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.08);';
+      useInStudioBtn.style.cssText = 'flex: 2; padding: 3px 6px; font-size: 10px; font-weight: 700; color: #c084fc; border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.08);';
       useInStudioBtn.textContent = '🎨 Use in Studio';
       useInStudioBtn.onclick = async () => {
         await syncCivitaiInstalledToStudio();
@@ -23253,7 +23536,7 @@ function initCivitaiHub() {
       const sendStudioBtn = document.createElement('button');
       sendStudioBtn.type = 'button';
       sendStudioBtn.className = 'action-tag-btn';
-      sendStudioBtn.style.cssText = 'flex: 2; padding: 6px; font-size: 11px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08);';
+      sendStudioBtn.style.cssText = 'flex: 2; padding: 3px 6px; font-size: 10px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08);';
       sendStudioBtn.textContent = '✨ Send Triggers';
       sendStudioBtn.onclick = () => {
         const words = trainedWords.join(', ');
@@ -23269,7 +23552,7 @@ function initCivitaiHub() {
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'action-tag-btn';
-      delBtn.style.cssText = 'flex: 1; padding: 6px; font-size: 11px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);';
+      delBtn.style.cssText = 'flex: 1; padding: 3px 6px; font-size: 10px; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);';
       delBtn.textContent = '🗑️ Delete';
       delBtn.onclick = async () => {
         if (!confirm(`Are you sure you want to delete ${item.filename}?`)) return;

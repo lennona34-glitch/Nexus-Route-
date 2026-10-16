@@ -112,8 +112,8 @@
           <span>🎹</span> Studio
         </button>
 
-        <button id="openRadioModalBtn" class="nav-action-btn radio-nav-btn" style="border-color: rgba(37, 208, 255, 0.4); color: #25d0ff;" title="Tune in to 3,000+ Live Global Radio Stations (Ambient, Lo-Fi, Synthwave, Jazz, Rock, News)">
-          <span>📻</span> Radio <span id="radioNavLiveBadge" class="history-count-badge" style="background: rgba(37, 208, 255, 0.2); color: #25d0ff; border-color: rgba(37, 208, 255, 0.4);">3K</span>
+        <button id="openRadioModalBtn" class="nav-action-btn radio-nav-btn" style="border-color: rgba(37, 208, 255, 0.4); color: #25d0ff;" title="Open Nexus Broadcast Deck (IPTV AMP, Live TV, Internet Archive Cinema & 3,000 Live Radio Stations)">
+          <span>📺</span> TV &amp; Radio <span id="radioNavLiveBadge" class="history-count-badge" style="background: rgba(37, 208, 255, 0.2); color: #25d0ff; border-color: rgba(37, 208, 255, 0.4);">IPTV</span>
         </button>
 
         <button id="toggleCurrencyBtn" class="nav-action-btn" title="Toggle Currency (GBP £ / USD $)">
@@ -2552,110 +2552,110 @@ console.log(res.choices[0].message.content);</code></pre>
 
   <!-- Hugging Face & GPU Model Hub Modal (Full Workstation Page) -->
   <div id="hfHubModal" class="modal-overlay hidden">
-    <div class="modal-card hf-workstation-card" style="max-width: 1420px; width: 98vw; height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0c0f19; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 14px; box-shadow: 0 16px 50px rgba(0,0,0,0.85);">
+    <div class="modal-card hf-workstation-card" style="max-width: 1600px; width: 98vw; height: 95vh; max-height: 95vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0c0f19; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; box-shadow: 0 16px 50px rgba(0,0,0,0.85);">
       
       <!-- Hub Header Bar -->
-      <div class="modal-header" style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.9); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-        <div class="modal-title" style="display: flex; align-items: center; gap: 12px;">
-          <span style="font-size: 22px;">🤗</span>
-          <span style="font-weight: 800; font-size: 17px; letter-spacing: 0.5px; background: linear-gradient(135deg, #fbbf24, #f59e0b, #ea580c); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">HUGGING FACE MODEL HUB</span>
-          <span style="color: var(--text-muted); font-size: 13px; font-weight: 500;">| GPU SDXL, LoRAs &amp; Offline AI Downloader</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="badge" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600;">🟢 NVIDIA RTX 4060 (8GB VRAM)</span>
-            <span id="hfInstalledBadge" class="badge" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600;">27+ Models Installed</span>
+      <div class="modal-header" style="padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.9); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 18px;">🤗</span>
+          <span style="font-weight: 800; font-size: 15px; letter-spacing: 0.5px; background: linear-gradient(135deg, #fbbf24, #f59e0b, #ea580c); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">HUGGING FACE MODEL HUB</span>
+          <span style="color: var(--text-muted); font-size: 12px; font-weight: 500;">| GPU SDXL, LoRAs &amp; Offline AI Downloader</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="badge" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">🟢 NVIDIA RTX 4060 (8GB VRAM)</span>
+            <span id="hfInstalledBadge" class="badge" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">27+ Models Installed</span>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <button type="button" id="hfOpenCacheFolderBtn" class="action-tag-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; padding: 5px 12px; font-weight: 600;" title="Open Hugging Face Cache folder in Windows Explorer">📂 Open Cache Folder</button>
+          <button type="button" id="hfOpenCacheFolderBtn" class="action-tag-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 600;" title="Open Hugging Face Cache folder in Windows Explorer">📂 Open Cache Folder</button>
           <button type="button" id="hfToggleFullscreenBtn" class="modal-maximize-btn" title="Toggle Fullscreen">⛶</button>
-          <button type="button" id="closeHfHubModalBtn" class="modal-close-btn" style="font-size: 24px; color: var(--text-muted); cursor: pointer; background: none; border: none;">&times;</button>
+          <button type="button" id="closeHfHubModalBtn" class="modal-close-btn" style="font-size: 20px; color: var(--text-muted); cursor: pointer; background: none; border: none;">&times;</button>
         </div>
       </div>
 
       <!-- Hub Controls & Navigation -->
-      <div style="padding: 14px 20px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+      <div style="padding: 8px 16px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
         
         <!-- Category Filter Tabs -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="hfCategoryTabs">
-            <button type="button" class="action-tag-btn hf-tab-btn active" data-category="all" style="font-size: 12px; padding: 6px 14px; font-weight: 700; color: #fbbf24; border-color: #fbbf24; background: rgba(245, 158, 11, 0.12);">🔥 All / Trending</button>
-            <button type="button" class="action-tag-btn hf-tab-btn" data-category="dit" style="font-size: 12px; padding: 6px 14px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">🎬 Video &amp; DiT Models</button>
-            <button type="button" class="action-tag-btn hf-tab-btn" data-category="sdxl" style="font-size: 12px; padding: 6px 14px; font-weight: 600;">🎨 SDXL &amp; Diffusion Art</button>
-            <button type="button" class="action-tag-btn hf-tab-btn" data-category="lora" style="font-size: 12px; padding: 6px 14px; font-weight: 600;">🎭 LoRAs &amp; Enhancers</button>
-            <button type="button" class="action-tag-btn hf-tab-btn" data-category="gguf" style="font-size: 12px; padding: 6px 14px; font-weight: 600;">🧠 Offline AI LLMs (GGUFs)</button>
-            <button type="button" class="action-tag-btn hf-tab-btn" data-category="installed" style="font-size: 12px; padding: 6px 14px; font-weight: 600; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">💾 Installed &amp; Cached (<span id="hfInstalledCountLabel">...</span>)</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+          <div style="display: flex; gap: 5px; flex-wrap: wrap;" id="hfCategoryTabs">
+            <button type="button" class="action-tag-btn hf-tab-btn active" data-category="all" style="font-size: 11px; padding: 4px 10px; font-weight: 700; color: #fbbf24; border-color: #fbbf24; background: rgba(245, 158, 11, 0.12);">🔥 All / Trending</button>
+            <button type="button" class="action-tag-btn hf-tab-btn" data-category="dit" style="font-size: 11px; padding: 4px 10px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">🎬 Video &amp; DiT Models</button>
+            <button type="button" class="action-tag-btn hf-tab-btn" data-category="sdxl" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">🎨 SDXL &amp; Diffusion Art</button>
+            <button type="button" class="action-tag-btn hf-tab-btn" data-category="lora" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">🎭 LoRAs &amp; Enhancers</button>
+            <button type="button" class="action-tag-btn hf-tab-btn" data-category="gguf" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">🧠 Offline AI LLMs (GGUFs)</button>
+            <button type="button" class="action-tag-btn hf-tab-btn" data-category="installed" style="font-size: 11px; padding: 4px 10px; font-weight: 600; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">💾 Installed &amp; Cached (<span id="hfInstalledCountLabel">...</span>)</button>
           </div>
 
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #22c55e; font-weight: 700; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.35); padding: 4px 10px; border-radius: 6px; cursor: pointer; user-select: none;" title="Hide massive models (>10GB/22B/70B) that exceed your 8GB RTX 4060 VRAM">
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #22c55e; font-weight: 700; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.35); padding: 3px 8px; border-radius: 5px; cursor: pointer; user-select: none;" title="Hide massive models (>10GB/22B/70B) that exceed your 8GB RTX 4060 VRAM">
               <input type="checkbox" id="hf8gbSafeFilter" checked style="accent-color: #22c55e; cursor: pointer;" />
               ⚡ 8GB GPU Safe Only
             </label>
-            <label style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Sort By:</label>
-            <select id="hfSortSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 10px; font-size: 11.5px;">
+            <label style="font-size: 10.5px; color: var(--text-muted); font-weight: 600;">Sort By:</label>
+            <select id="hfSortSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; padding: 3px 8px; font-size: 10.5px;">
               <option value="downloads">⬇️ Most Downloads</option>
               <option value="likes">❤️ Most Likes</option>
               <option value="trending">🔥 Trending Score</option>
               <option value="modified">🕒 Recently Updated</option>
             </select>
-            <button type="button" id="hfRefreshBtn" class="action-tag-btn" style="padding: 5px 10px; font-size: 11.5px;" title="Refresh models">🔄</button>
+            <button type="button" id="hfRefreshBtn" class="action-tag-btn" style="padding: 3px 8px; font-size: 11px;" title="Refresh models">🔄</button>
           </div>
         </div>
 
         <!-- Search Bar & Suggestions -->
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <div style="position: relative; flex: 1;">
-            <input type="text" id="hfSearchInput" placeholder="Search Hugging Face models (e.g. SDXL, Juggernaut, RealVis, Anime, LoRA, LTX-Video, Qwen)..." style="width: 100%; padding: 10px 14px 10px 38px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3); background: rgba(0, 0, 0, 0.5); color: var(--text-primary); font-size: 13px; outline: none; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);" />
-            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; opacity: 0.6;">🔍</span>
+            <input type="text" id="hfSearchInput" placeholder="Search Hugging Face models (e.g. SDXL, Juggernaut, RealVis, Anime, LoRA, LTX-Video, Qwen)..." style="width: 100%; padding: 6px 12px 6px 32px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.3); background: rgba(0, 0, 0, 0.5); color: var(--text-primary); font-size: 12px; outline: none; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);" />
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; opacity: 0.6;">🔍</span>
           </div>
-          <button type="button" id="hfSearchBtn" class="primary-btn" style="padding: 10px 22px; font-size: 13px; font-weight: 700; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; white-space: nowrap;">Search Hub</button>
+          <button type="button" id="hfSearchBtn" class="primary-btn" style="padding: 6px 16px; font-size: 12px; font-weight: 700; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; white-space: nowrap; border-radius: 6px;">Search Hub</button>
         </div>
 
         <!-- Quick Search Pill Suggestions -->
-        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;" id="hfQuickPills">
-          <span style="font-size: 11px; color: var(--text-muted); font-weight: 600; margin-right: 2px;">Popular:</span>
-          <span class="action-tag-btn hf-pill" data-query="Wan2.1-T2V" style="font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-weight: 700;">🌊 Wan 2.1 DiT</span>
-          <span class="action-tag-btn hf-pill" data-query="LTX-Video" style="font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-weight: 700;">🎬 LTX-Video (2B Distilled)</span>
-          <span class="action-tag-btn hf-pill" data-query="CogVideoX-2b" style="font-size: 11px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); font-weight: 700;">📽️ CogVideoX-2B</span>
-          <span class="action-tag-btn hf-pill" data-query="LTX-Video-gguf" style="font-size: 11px; color: #22c55e; border-color: rgba(34, 197, 94, 0.4); font-weight: 700;">⚡ LTX GGUF (1.3GB)</span>
-          <span class="action-tag-btn hf-pill" data-query="sdxl-turbo" style="font-size: 11px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4);">⚡ SDXL Turbo (1-Step)</span>
-          <span class="action-tag-btn hf-pill" data-query="stable-diffusion-xl-base-1.0" style="font-size: 11px;">🎨 SDXL Base 1.0</span>
-          <span class="action-tag-btn hf-pill" data-query="Juggernaut-XL" style="font-size: 11px;">💎 Juggernaut XL</span>
-          <span class="action-tag-btn hf-pill" data-query="RealVisXL" style="font-size: 11px;">📸 RealVisXL V5.0</span>
-          <span class="action-tag-btn hf-pill" data-query="dreamshaper-xl" style="font-size: 11px;">✨ DreamShaper XL</span>
-          <span class="action-tag-btn hf-pill" data-query="animagine-xl" style="font-size: 11px;">🌸 Animagine XL (Anime)</span>
-          <span class="action-tag-btn hf-pill" data-query="lcm-lora-sdxl" style="font-size: 11px; color: #c084fc; border-color: rgba(192, 132, 252, 0.4);">🎭 LCM-LoRA SDXL</span>
-          <span class="action-tag-btn hf-pill" data-query="FLUX.1-schnell" style="font-size: 11px;">⚡ FLUX.1 Schnell</span>
-          <span class="action-tag-btn hf-pill" data-query="Qwen2.5-Coder" style="font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">🧠 Qwen2.5-Coder GGUF</span>
-          <span class="action-tag-btn hf-pill" data-query="DeepSeek-Coder" style="font-size: 11px; color: #38bdf8;">🧠 DeepSeek-Coder GGUF</span>
-          <span class="action-tag-btn hf-pill" data-query="NousResearch/Hermes-3-Llama-3.1-8B-GGUF" style="font-size: 11px; color: #c084fc; border-color: rgba(192, 132, 252, 0.4); font-weight: 700;" title="Hermes 3 (8B) GGUF: Elite agentic reasoning &amp; tool-calling model (8GB GPU Safe)">🧠 Hermes 3 (8B Tool-Calling)</span>
+        <div style="display: flex; gap: 5px; align-items: center; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none;" id="hfQuickPills">
+          <span style="font-size: 10px; color: var(--text-muted); font-weight: 600; margin-right: 2px; flex-shrink: 0;">Popular:</span>
+          <span class="action-tag-btn hf-pill" data-query="Wan2.1-T2V" style="font-size: 10px; padding: 2px 7px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-weight: 700; flex-shrink: 0;">🌊 Wan 2.1 DiT</span>
+          <span class="action-tag-btn hf-pill" data-query="LTX-Video" style="font-size: 10px; padding: 2px 7px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-weight: 700; flex-shrink: 0;">🎬 LTX-Video</span>
+          <span class="action-tag-btn hf-pill" data-query="CogVideoX-2b" style="font-size: 10px; padding: 2px 7px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); font-weight: 700; flex-shrink: 0;">📽️ CogVideoX</span>
+          <span class="action-tag-btn hf-pill" data-query="LTX-Video-gguf" style="font-size: 10px; padding: 2px 7px; color: #22c55e; border-color: rgba(34, 197, 94, 0.4); font-weight: 700; flex-shrink: 0;">⚡ LTX GGUF</span>
+          <span class="action-tag-btn hf-pill" data-query="sdxl-turbo" style="font-size: 10px; padding: 2px 7px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); flex-shrink: 0;">⚡ SDXL Turbo</span>
+          <span class="action-tag-btn hf-pill" data-query="stable-diffusion-xl-base-1.0" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">🎨 SDXL Base</span>
+          <span class="action-tag-btn hf-pill" data-query="Juggernaut-XL" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">💎 Juggernaut XL</span>
+          <span class="action-tag-btn hf-pill" data-query="RealVisXL" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">📸 RealVisXL V5.0</span>
+          <span class="action-tag-btn hf-pill" data-query="dreamshaper-xl" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">✨ DreamShaper XL</span>
+          <span class="action-tag-btn hf-pill" data-query="animagine-xl" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">🌸 Animagine XL</span>
+          <span class="action-tag-btn hf-pill" data-query="lcm-lora-sdxl" style="font-size: 10px; padding: 2px 7px; color: #c084fc; border-color: rgba(192, 132, 252, 0.4); flex-shrink: 0;">🎭 LCM-LoRA</span>
+          <span class="action-tag-btn hf-pill" data-query="FLUX.1-schnell" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">⚡ FLUX.1 Schnell</span>
+          <span class="action-tag-btn hf-pill" data-query="Qwen2.5-Coder" style="font-size: 10px; padding: 2px 7px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); flex-shrink: 0;">🧠 Qwen2.5-Coder</span>
+          <span class="action-tag-btn hf-pill" data-query="DeepSeek-Coder" style="font-size: 10px; padding: 2px 7px; color: #38bdf8; flex-shrink: 0;">🧠 DeepSeek-Coder</span>
+          <span class="action-tag-btn hf-pill" data-query="NousResearch/Hermes-3-Llama-3.1-8B-GGUF" style="font-size: 10px; padding: 2px 7px; color: #c084fc; border-color: rgba(192, 132, 252, 0.4); font-weight: 700; flex-shrink: 0;" title="Hermes 3 (8B) GGUF: Elite agentic reasoning &amp; tool-calling model (8GB GPU Safe)">🧠 Hermes 3</span>
         </div>
       </div>
 
       <!-- Live Download Progress Banner -->
-      <div id="hfDownloadBanner" style="display: none; background: rgba(245, 158, 11, 0.1); border-bottom: 1px solid rgba(245, 158, 11, 0.3); padding: 12px 20px; flex-shrink: 0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 14px;">
-          <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1; min-width: 0;">
-            <span style="font-size: 16px; flex-shrink: 0;" id="hfDownloadSpinner">⏳</span>
-            <span id="hfDownloadRepoLabel" style="font-weight: 700; font-size: 13px; color: #fbbf24; white-space: nowrap; flex-shrink: 0;">Downloading...</span>
-            <span id="hfDownloadStatusMsg" style="font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">Initializing...</span>
+      <div id="hfDownloadBanner" style="display: none; background: rgba(245, 158, 11, 0.1); border-bottom: 1px solid rgba(245, 158, 11, 0.3); padding: 8px 16px; flex-shrink: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; flex: 1; min-width: 0;">
+            <span style="font-size: 14px; flex-shrink: 0;" id="hfDownloadSpinner">⏳</span>
+            <span id="hfDownloadRepoLabel" style="font-weight: 700; font-size: 12px; color: #fbbf24; white-space: nowrap; flex-shrink: 0;">Downloading...</span>
+            <span id="hfDownloadStatusMsg" style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">Initializing...</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
-            <span id="hfDownloadPercentLabel" style="font-weight: 800; font-size: 14px; color: var(--accent-cyan); font-family: var(--font-mono); min-width: 42px; text-align: right;">0%</span>
-            <button type="button" id="hfCancelDownloadBtn" class="action-tag-btn" style="color: #f87171; border-color: rgba(248, 113, 113, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 700; cursor: pointer;">✕ Cancel</button>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <span id="hfDownloadPercentLabel" style="font-weight: 800; font-size: 13px; color: var(--accent-cyan); font-family: var(--font-mono); min-width: 36px; text-align: right;">0%</span>
+            <button type="button" id="hfCancelDownloadBtn" class="action-tag-btn" style="color: #f87171; border-color: rgba(248, 113, 113, 0.4); font-size: 10px; padding: 3px 8px; font-weight: 700; cursor: pointer;">✕ Cancel</button>
           </div>
         </div>
-        <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+        <div style="height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
           <div id="hfDownloadProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #f59e0b, #38bdf8); transition: width 0.25s ease;"></div>
         </div>
       </div>
 
       <!-- Main Hub Content Area (Model Cards Grid) -->
       <div id="hfModelGridContainer" class="hf-grid-container">
-        <div id="hfModelLoading" style="display: none; text-align: center; padding: 60px 20px;">
-          <div style="font-size: 32px; margin-bottom: 10px;">🤗</div>
-          <div style="font-size: 15px; font-weight: 600; color: #fbbf24;">Fetching Models from Hugging Face...</div>
-          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Querying Hugging Face API &amp; inspecting local GPU cache</div>
+        <div id="hfModelLoading" style="display: none; text-align: center; padding: 40px 20px;">
+          <div style="font-size: 28px; margin-bottom: 8px;">🤗</div>
+          <div style="font-size: 14px; font-weight: 600; color: #fbbf24;">Fetching Models from Hugging Face...</div>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;">Querying Hugging Face API &amp; inspecting local GPU cache</div>
         </div>
         <div id="hfModelGrid" class="hf-models-grid">
           <!-- Dynamically populated model cards -->
@@ -2663,23 +2663,23 @@ console.log(res.choices[0].message.content);</code></pre>
       </div>
 
       <!-- Direct Repository Puller & Token Footer Bar -->
-      <div style="padding: 12px 20px; background: rgba(15, 23, 42, 0.95); border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; flex-shrink: 0;">
-        <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 800px;">
-          <span style="font-size: 12px; font-weight: 700; color: #fbbf24; white-space: nowrap;">📥 Direct Pull:</span>
-          <input type="text" id="hfDirectPullInput" placeholder="Enter any Hugging Face repo (e.g. Lykon/dreamshaper-xl-v2-turbo or GGUF repo)" style="flex: 1; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 12px;" />
-          <select id="hfDirectPullType" style="padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11.5px;">
+      <div style="padding: 6px 16px; background: rgba(15, 23, 42, 0.95); border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0;">
+        <div style="display: flex; gap: 6px; align-items: center; flex: 1; max-width: 800px;">
+          <span style="font-size: 11px; font-weight: 700; color: #fbbf24; white-space: nowrap;">📥 Direct Pull:</span>
+          <input type="text" id="hfDirectPullInput" placeholder="Enter any Hugging Face repo (e.g. Lykon/dreamshaper-xl-v2-turbo or GGUF repo)" style="flex: 1; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11.5px;" />
+          <select id="hfDirectPullType" style="padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11px;">
             <option value="auto">Auto-Detect</option>
             <option value="sdxl">🎨 SDXL Checkpoint</option>
             <option value="lora">🎭 LoRA Style</option>
             <option value="gguf">🧠 GGUF LLM</option>
           </select>
-          <button type="button" id="hfDirectPullBtn" class="primary-btn" style="padding: 7px 16px; font-size: 12px; font-weight: 700; background: linear-gradient(135deg, #f59e0b, #ea580c); border: none; white-space: nowrap;">Download</button>
+          <button type="button" id="hfDirectPullBtn" class="primary-btn" style="padding: 4px 12px; font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #f59e0b, #ea580c); border: none; white-space: nowrap; border-radius: 5px;">Download</button>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <input type="password" id="hfUserTokenInput" placeholder="HF Token (hf_... optional for gated models)" style="width: 200px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 11px;" />
-          <button type="button" id="hfSaveUserTokenBtn" class="action-tag-btn" style="font-size: 11px; padding: 6px 10px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4);">Save Token</button>
-          <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" class="action-tag-btn" style="font-size: 11px; padding: 6px 10px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Open Hugging Face Access Tokens page in new tab">🔑 Get HF Token ↗</a>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <input type="password" id="hfUserTokenInput" placeholder="HF Token (hf_... optional for gated models)" style="width: 150px; padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.4); color: var(--text-primary); font-size: 10.5px;" />
+          <button type="button" id="hfSaveUserTokenBtn" class="action-tag-btn" style="font-size: 10.5px; padding: 4px 8px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4);">Save Token</button>
+          <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" class="action-tag-btn" style="font-size: 10.5px; padding: 4px 8px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Open Hugging Face Access Tokens page in new tab">🔑 Get HF Token ↗</a>
         </div>
       </div>
 
@@ -2840,55 +2840,55 @@ console.log(res.choices[0].message.content);</code></pre>
 
   <!-- CivitAI Model Hub Modal (Full Workstation Page) -->
   <div id="civitaiHubModal" class="modal-overlay hidden" style="z-index: 99990;">
-    <div class="modal-card civitai-workstation-card" style="max-width: 1420px; width: 98vw; height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0c0f19; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 14px; box-shadow: 0 16px 50px rgba(0,0,0,0.85);">
+    <div class="modal-card civitai-workstation-card" style="max-width: 1600px; width: 98vw; height: 95vh; max-height: 95vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0c0f19; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 12px; box-shadow: 0 16px 50px rgba(0,0,0,0.85);">
       
       <!-- Hub Header Bar -->
-      <div class="modal-header" style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.9); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 12px; flex-wrap: wrap;">
-        <div class="modal-title" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <span style="font-size: 22px;">⚡</span>
-          <span style="font-weight: 800; font-size: 17px; letter-spacing: 0.5px; background: linear-gradient(135deg, #60a5fa, #3b82f6, #1d4ed8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">CIVITAI MODEL HUB</span>
-          <span style="color: var(--text-muted); font-size: 13px; font-weight: 500;">| LoRAs, Checkpoints, Pony &amp; Flux Downloader</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <button type="button" id="civitaiVpnStatusBtn" class="civitai-vpn-pill" title="Click to view NordVPN Setup &amp; Privacy Gateway">
+      <div class="modal-header" style="padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(15, 23, 42, 0.9); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 10px; flex-wrap: wrap;">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <span style="font-size: 18px;">⚡</span>
+          <span style="font-weight: 800; font-size: 15px; letter-spacing: 0.5px; background: linear-gradient(135deg, #60a5fa, #3b82f6, #1d4ed8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">CIVITAI MODEL HUB</span>
+          <span style="color: var(--text-muted); font-size: 12px; font-weight: 500;">| LoRAs, Checkpoints, Pony &amp; Flux Downloader</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" id="civitaiVpnStatusBtn" class="civitai-vpn-pill" title="Click to view NordVPN Setup &amp; Privacy Gateway" style="padding: 2px 8px; font-size: 10.5px;">
               <span id="civitaiVpnStatusDot" class="vpn-status-dot unknown"></span>
               <span id="civitaiVpnStatusText">Probing Region...</span>
             </button>
-            <span id="civitaiInstalledBadge" class="badge" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600;">0 Installed</span>
-            <div id="civitaiHeaderDownloadsIndicator" style="display: none; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 700; cursor: pointer;">
+            <span id="civitaiInstalledBadge" class="badge" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600;">0 Installed</span>
+            <div id="civitaiHeaderDownloadsIndicator" style="display: none; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; cursor: pointer;">
               <span class="civitai-spinner-anim">📥</span>
               <span id="civitaiHeaderDownloadsText">1 Downloading (0%)</span>
             </div>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <button type="button" id="civitaiOpenVpnBtn" class="action-tag-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11.5px; padding: 5px 12px; font-weight: 600; background: rgba(56, 189, 248, 0.08);" title="Configure NordVPN SOCKS5 Proxy or Desktop App">
+          <button type="button" id="civitaiOpenVpnBtn" class="action-tag-btn" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 600; background: rgba(56, 189, 248, 0.08);" title="Configure NordVPN SOCKS5 Proxy or Desktop App">
             🛡️ NordVPN Setup
           </button>
-          <button type="button" id="civitaiOpenFolderBtn" class="action-tag-btn" style="color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); font-size: 11.5px; padding: 5px 12px; font-weight: 600;" title="Open models folder in Windows Explorer">
+          <button type="button" id="civitaiOpenFolderBtn" class="action-tag-btn" style="color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 600;" title="Open models folder in Windows Explorer">
             📂 Open Models Folder
           </button>
           <button type="button" id="civitaiToggleFullscreenBtn" class="modal-maximize-btn" title="Toggle Fullscreen">⛶</button>
-          <button type="button" id="closeCivitaiHubModalBtn" class="modal-close-btn" style="font-size: 24px; color: var(--text-muted); cursor: pointer; background: none; border: none;">&times;</button>
+          <button type="button" id="closeCivitaiHubModalBtn" class="modal-close-btn" style="font-size: 20px; color: var(--text-muted); cursor: pointer; background: none; border: none;">&times;</button>
         </div>
       </div>
 
       <!-- Hub Controls & Navigation -->
-      <div style="padding: 14px 20px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+      <div style="padding: 8px 16px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
         
         <!-- Category Filter Tabs & Filter Dropdowns -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="civitaiCategoryTabs">
-            <button type="button" class="action-tag-btn civitai-tab-btn active" data-type="all" style="font-size: 12px; padding: 6px 14px; font-weight: 700; color: #60a5fa; border-color: #3b82f6; background: rgba(59, 130, 246, 0.15);">🔥 All / Trending</button>
-            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="LORA" style="font-size: 12px; padding: 6px 14px; font-weight: 600;">🎭 LoRAs</button>
-            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="Checkpoint" style="font-size: 12px; padding: 6px 14px; font-weight: 600;">🧠 Checkpoints</button>
-            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="pony" style="font-size: 12px; padding: 6px 14px; font-weight: 600; color: #ec4899; border-color: rgba(236, 72, 153, 0.4);">🦄 Pony Diffusion</button>
-            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="flux" style="font-size: 12px; padding: 6px 14px; font-weight: 600; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">⚡ FLUX.1</button>
-            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="installed" style="font-size: 12px; padding: 6px 14px; font-weight: 600; color: #22c55e; border-color: rgba(34, 197, 94, 0.4);">💾 Installed &amp; Ready (<span id="civitaiInstalledCountLabel">0</span>)</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+          <div style="display: flex; gap: 5px; flex-wrap: wrap;" id="civitaiCategoryTabs">
+            <button type="button" class="action-tag-btn civitai-tab-btn active" data-type="all" style="font-size: 11px; padding: 4px 10px; font-weight: 700; color: #60a5fa; border-color: #3b82f6; background: rgba(59, 130, 246, 0.15);">🔥 All / Trending</button>
+            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="LORA" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">🎭 LoRAs</button>
+            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="Checkpoint" style="font-size: 11px; padding: 4px 10px; font-weight: 600;">🧠 Checkpoints</button>
+            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="pony" style="font-size: 11px; padding: 4px 10px; font-weight: 600; color: #ec4899; border-color: rgba(236, 72, 153, 0.4);">🦄 Pony Diffusion</button>
+            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="flux" style="font-size: 11px; padding: 4px 10px; font-weight: 600; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">⚡ FLUX.1</button>
+            <button type="button" class="action-tag-btn civitai-tab-btn" data-type="installed" style="font-size: 11px; padding: 4px 10px; font-weight: 600; color: #22c55e; border-color: rgba(34, 197, 94, 0.4);">💾 Installed &amp; Ready (<span id="civitaiInstalledCountLabel">0</span>)</button>
           </div>
 
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <label style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Base Model:</label>
-            <select id="civitaiBaseModelSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 10px; font-size: 11.5px;">
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <label style="font-size: 10.5px; color: var(--text-muted); font-weight: 600;">Base Model:</label>
+            <select id="civitaiBaseModelSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; padding: 3px 8px; font-size: 10.5px;">
               <option value="">All Base Models</option>
               <option value="SDXL 1.0">SDXL 1.0</option>
               <option value="Pony">Pony</option>
@@ -2899,123 +2899,123 @@ console.log(res.choices[0].message.content);</code></pre>
               <option value="NoobAI">NoobAI</option>
             </select>
 
-            <label style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Sort:</label>
-            <select id="civitaiSortSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 10px; font-size: 11.5px;">
+            <label style="font-size: 10.5px; color: var(--text-muted); font-weight: 600;">Sort:</label>
+            <select id="civitaiSortSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; padding: 3px 8px; font-size: 10.5px;">
               <option value="Highest Rated">⭐ Highest Rated</option>
               <option value="Most Downloaded" selected>⬇️ Most Downloaded</option>
               <option value="Newest">🕒 Newest</option>
             </select>
 
-            <select id="civitaiPeriodSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 10px; font-size: 11.5px;">
+            <select id="civitaiPeriodSelect" style="background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; padding: 3px 8px; font-size: 10.5px;">
               <option value="AllTime" selected>All Time</option>
               <option value="Month">Past Month</option>
               <option value="Week">Past Week</option>
               <option value="Day">Past 24h</option>
             </select>
 
-            <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: #f87171; font-weight: 600; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 8px; border-radius: 6px; cursor: pointer; user-select: none;" title="Include 18+ Mature / NSFW tagged models">
+            <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: #f87171; font-weight: 600; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 7px; border-radius: 5px; cursor: pointer; user-select: none;" title="Include 18+ Mature / NSFW tagged models">
               <input type="checkbox" id="civitaiNsfwToggle" style="accent-color: #ef4444; cursor: pointer;" />
               🔞 NSFW
             </label>
 
-            <button type="button" id="civitaiRefreshBtn" class="action-tag-btn" style="padding: 5px 10px; font-size: 11.5px;" title="Refresh models">🔄</button>
+            <button type="button" id="civitaiRefreshBtn" class="action-tag-btn" style="padding: 3px 8px; font-size: 11px;" title="Refresh models">🔄</button>
           </div>
         </div>
 
         <!-- Search Bar -->
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <div style="position: relative; flex: 1;">
-            <input type="text" id="civitaiSearchInput" placeholder="Search CivitAI models, LoRAs, concepts (e.g. detailer, anime, cinematic, slider, pony, flux)..." style="width: 100%; padding: 10px 14px 10px 38px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.35); background: rgba(0, 0, 0, 0.5); color: var(--text-primary); font-size: 13px; outline: none; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);" />
-            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; opacity: 0.6;">🔍</span>
+            <input type="text" id="civitaiSearchInput" placeholder="Search CivitAI models, LoRAs, concepts (e.g. detailer, anime, cinematic, slider, pony, flux)..." style="width: 100%; padding: 6px 12px 6px 32px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.35); background: rgba(0, 0, 0, 0.5); color: var(--text-primary); font-size: 12px; outline: none; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);" />
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; opacity: 0.6;">🔍</span>
           </div>
-          <button type="button" id="civitaiSearchBtn" class="primary-btn" style="padding: 10px 22px; font-size: 13px; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; white-space: nowrap;">Search CivitAI</button>
+          <button type="button" id="civitaiSearchBtn" class="primary-btn" style="padding: 6px 16px; font-size: 12px; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; white-space: nowrap; border-radius: 6px;">Search CivitAI</button>
         </div>
 
         <!-- Popular Search Pills -->
-        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;" id="civitaiQuickPills">
-          <span style="font-size: 11px; color: var(--text-muted); font-weight: 600; margin-right: 2px;">Popular Tags:</span>
-          <span class="action-tag-btn civitai-pill" data-query="detailer" style="font-size: 11px; color: #60a5fa; border-color: rgba(96, 165, 250, 0.4);">✨ Detailer</span>
-          <span class="action-tag-btn civitai-pill" data-query="slider" style="font-size: 11px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">🎛️ Sliders</span>
-          <span class="action-tag-btn civitai-pill" data-query="realism" style="font-size: 11px; color: #22c55e; border-color: rgba(34, 197, 94, 0.4);">📸 Photorealism</span>
-          <span class="action-tag-btn civitai-pill" data-query="anime" style="font-size: 11px; color: #ec4899; border-color: rgba(236, 72, 153, 0.4);">🌸 Anime &amp; Manga</span>
-          <span class="action-tag-btn civitai-pill" data-query="lighting" style="font-size: 11px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4);">💡 Cinematic Lighting</span>
-          <span class="action-tag-btn civitai-pill" data-query="pony realism" style="font-size: 11px; color: #ec4899; border-color: rgba(236, 72, 153, 0.4);">🦄 Pony Realism</span>
-          <span class="action-tag-btn civitai-pill" data-query="flux cinematic" style="font-size: 11px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">⚡ Flux Cinematic</span>
-          <span class="action-tag-btn civitai-pill" data-query="cyberpunk" style="font-size: 11px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">🏙️ Cyberpunk</span>
-          <span class="action-tag-btn civitai-pill" data-query="face fix" style="font-size: 11px;">🎭 Face Enhancer</span>
+        <div style="display: flex; gap: 5px; align-items: center; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none;" id="civitaiQuickPills">
+          <span style="font-size: 10px; color: var(--text-muted); font-weight: 600; margin-right: 2px; flex-shrink: 0;">Popular Tags:</span>
+          <span class="action-tag-btn civitai-pill" data-query="detailer" style="font-size: 10px; padding: 2px 7px; color: #60a5fa; border-color: rgba(96, 165, 250, 0.4); flex-shrink: 0;">✨ Detailer</span>
+          <span class="action-tag-btn civitai-pill" data-query="slider" style="font-size: 10px; padding: 2px 7px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); flex-shrink: 0;">🎛️ Sliders</span>
+          <span class="action-tag-btn civitai-pill" data-query="realism" style="font-size: 10px; padding: 2px 7px; color: #22c55e; border-color: rgba(34, 197, 94, 0.4); flex-shrink: 0;">📸 Photorealism</span>
+          <span class="action-tag-btn civitai-pill" data-query="anime" style="font-size: 10px; padding: 2px 7px; color: #ec4899; border-color: rgba(236, 72, 153, 0.4); flex-shrink: 0;">🌸 Anime &amp; Manga</span>
+          <span class="action-tag-btn civitai-pill" data-query="lighting" style="font-size: 10px; padding: 2px 7px; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); flex-shrink: 0;">💡 Cinematic</span>
+          <span class="action-tag-btn civitai-pill" data-query="pony realism" style="font-size: 10px; padding: 2px 7px; color: #ec4899; border-color: rgba(236, 72, 153, 0.4); flex-shrink: 0;">🦄 Pony Realism</span>
+          <span class="action-tag-btn civitai-pill" data-query="flux cinematic" style="font-size: 10px; padding: 2px 7px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4); flex-shrink: 0;">⚡ Flux Cinematic</span>
+          <span class="action-tag-btn civitai-pill" data-query="cyberpunk" style="font-size: 10px; padding: 2px 7px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); flex-shrink: 0;">🏙️ Cyberpunk</span>
+          <span class="action-tag-btn civitai-pill" data-query="face fix" style="font-size: 10px; padding: 2px 7px; flex-shrink: 0;">🎭 Face Enhancer</span>
         </div>
       </div>
 
       <!-- Active Downloads Bar -->
-      <div id="civitaiDownloadsBar" style="display: none; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(59, 130, 246, 0.35); padding: 12px 20px; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 14px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 12px; overflow: hidden; flex: 1; min-width: 260px;">
-            <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+      <div id="civitaiDownloadsBar" style="display: none; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(59, 130, 246, 0.35); padding: 8px 16px; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1; min-width: 240px;">
+            <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;">
               <span id="civitaiDownloadIcon" class="civitai-spinner-anim">📥</span>
             </div>
             <div style="overflow: hidden; flex: 1; min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="civitaiDownloadName" style="font-weight: 700; font-size: 13.5px; color: #60a5fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px;">Downloading...</span>
-                <span id="civitaiDownloadTypeBadge" class="badge" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; font-size: 10px; padding: 1px 6px;">LoRA</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span id="civitaiDownloadName" style="font-weight: 700; font-size: 12.5px; color: #60a5fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px;">Downloading...</span>
+                <span id="civitaiDownloadTypeBadge" class="badge" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; font-size: 9px; padding: 1px 5px;">LoRA</span>
               </div>
-              <div id="civitaiDownloadStatusMsg" style="font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px;">Connecting to download server...</div>
+              <div id="civitaiDownloadStatusMsg" style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px;">Connecting to download server...</div>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
             <div style="text-align: right;">
-              <div id="civitaiDownloadProgressPercent" style="font-weight: 800; font-size: 14px; color: #60a5fa;">0%</div>
-              <div id="civitaiDownloadSpeedRate" style="font-size: 11px; color: #38bdf8; font-family: var(--font-mono);">0 MB/s</div>
+              <div id="civitaiDownloadProgressPercent" style="font-weight: 800; font-size: 13px; color: #60a5fa;">0%</div>
+              <div id="civitaiDownloadSpeedRate" style="font-size: 10.5px; color: #38bdf8; font-family: var(--font-mono);">0 MB/s</div>
             </div>
-            <button type="button" id="civitaiCancelDownloadBtn" class="action-tag-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4); font-size: 11.5px; padding: 5px 12px; font-weight: 600;">✕ Cancel</button>
-            <button type="button" id="civitaiShowFolderDownloadBtn" class="action-tag-btn" style="display: none; color: #22c55e; border-color: rgba(34, 197, 94, 0.4); font-size: 11.5px; padding: 5px 12px; font-weight: 600;">📂 Open Folder</button>
-            <button type="button" id="civitaiRetryDownloadBtn" class="action-tag-btn" style="display: none; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11.5px; padding: 5px 12px; font-weight: 600;">🔄 Retry</button>
+            <button type="button" id="civitaiCancelDownloadBtn" class="action-tag-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 600;">✕ Cancel</button>
+            <button type="button" id="civitaiShowFolderDownloadBtn" class="action-tag-btn" style="display: none; color: #22c55e; border-color: rgba(34, 197, 94, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 600;">📂 Open Folder</button>
+            <button type="button" id="civitaiRetryDownloadBtn" class="action-tag-btn" style="display: none; color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); font-size: 11px; padding: 4px 10px; font-weight: 600;">🔄 Retry</button>
           </div>
         </div>
-        <div style="height: 7px; background: rgba(0,0,0,0.6); border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06);">
-          <div id="civitaiDownloadProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #2563eb, #38bdf8, #60a5fa); transition: width 0.25s ease; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);"></div>
+        <div style="height: 5px; background: rgba(0,0,0,0.6); border-radius: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06);">
+          <div id="civitaiDownloadProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #2563eb, #38bdf8, #60a5fa); transition: width 0.25s ease; box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);"></div>
         </div>
       </div>
 
       <!-- Regional Block Alert Banner (HTTP 451 UK) -->
-      <div id="civitaiBlockedBanner" style="display: none; background: linear-gradient(90deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15)); border-bottom: 1px solid rgba(239, 68, 68, 0.4); padding: 12px 20px; flex-shrink: 0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 20px;">⚠️</span>
+      <div id="civitaiBlockedBanner" style="display: none; background: linear-gradient(90deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15)); border-bottom: 1px solid rgba(239, 68, 68, 0.4); padding: 8px 16px; flex-shrink: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 16px;">⚠️</span>
             <div>
-              <div style="font-size: 13px; font-weight: 700; color: #fca5a5;">CivitAI Region Block Detected (HTTP 451: REGION_BLOCKED)</div>
-              <div style="font-size: 11.5px; color: #f87171; opacity: 0.9;">CivitAI blocks direct UK IP connections due to regional compliance. Route via NordVPN or activate the built-in SOCKS5 Proxy to unlock downloads and search.</div>
+              <div style="font-size: 12px; font-weight: 700; color: #fca5a5;">CivitAI Region Block Detected (HTTP 451: REGION_BLOCKED)</div>
+              <div style="font-size: 11px; color: #f87171; opacity: 0.9;">CivitAI blocks direct UK IP connections due to regional compliance. Route via NordVPN or activate the built-in SOCKS5 Proxy to unlock downloads and search.</div>
             </div>
           </div>
-          <button type="button" id="civitaiConfigureVpnFromBannerBtn" class="action-tag-btn" style="background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #38bdf8; font-weight: 700; font-size: 12px; padding: 6px 14px;">
+          <button type="button" id="civitaiConfigureVpnFromBannerBtn" class="action-tag-btn" style="background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #38bdf8; font-weight: 700; font-size: 11px; padding: 4px 12px;">
             🛡️ Configure NordVPN SOCKS5 Proxy
           </button>
         </div>
       </div>
 
       <!-- Main Cards Grid Viewport -->
-      <div id="civitaiViewport" style="flex: 1; overflow-y: auto; padding: 20px; position: relative;">
+      <div id="civitaiViewport" style="flex: 1; overflow-y: auto; padding: 10px 14px; position: relative;">
         <!-- Loading Spinner -->
-        <div id="civitaiLoadingSpinner" style="display: none; position: absolute; inset: 0; background: rgba(12, 15, 25, 0.7); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;">
+        <div id="civitaiLoadingSpinner" style="display: none; position: absolute; inset: 0; background: rgba(12, 15, 25, 0.7); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
           <div class="civitai-spinner"></div>
-          <div style="font-size: 13px; color: #60a5fa; font-weight: 600;">Contacting CivitAI API...</div>
+          <div style="font-size: 12px; color: #60a5fa; font-weight: 600;">Contacting CivitAI API...</div>
         </div>
 
         <!-- Empty State -->
-        <div id="civitaiEmptyState" style="display: none; padding: 60px 20px; text-align: center; color: var(--text-muted);">
-          <div style="font-size: 42px; margin-bottom: 12px;">🔍</div>
-          <div style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">No CivitAI Models Found</div>
-          <div style="font-size: 13px; max-width: 480px; margin: 0 auto;">Try clearing search filters, adjusting the base model, or testing your NordVPN connection if CivitAI is blocking queries.</div>
+        <div id="civitaiEmptyState" style="display: none; padding: 40px 20px; text-align: center; color: var(--text-muted);">
+          <div style="font-size: 36px; margin-bottom: 8px;">🔍</div>
+          <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">No CivitAI Models Found</div>
+          <div style="font-size: 12px; max-width: 440px; margin: 0 auto;">Try clearing search filters, adjusting the base model, or testing your NordVPN connection if CivitAI is blocking queries.</div>
         </div>
 
         <!-- Models Grid -->
         <div id="civitaiCardsGrid" class="civitai-models-grid"></div>
 
         <!-- Pagination / Load More Bar -->
-        <div id="civitaiPaginationContainer" style="display: none; margin-top: 24px; text-align: center; padding: 12px;">
-          <button type="button" id="civitaiLoadMoreBtn" class="action-tag-btn" style="padding: 10px 28px; font-size: 13px; font-weight: 700; color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);">
+        <div id="civitaiPaginationContainer" style="display: none; margin-top: 16px; text-align: center; padding: 8px;">
+          <button type="button" id="civitaiLoadMoreBtn" class="action-tag-btn" style="padding: 6px 20px; font-size: 12px; font-weight: 700; color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);">
             Load More Models
           </button>
-          <div id="civitaiPageIndicator" style="font-size: 11px; color: var(--text-muted); margin-top: 8px;"></div>
+          <div id="civitaiPageIndicator" style="font-size: 10.5px; color: var(--text-muted); margin-top: 6px;"></div>
         </div>
       </div>
 
@@ -4959,8 +4959,8 @@ console.log(res.choices[0].message.content);</code></pre>
           </div>
         </div>
         <div class="studio-header-right">
-          <button type="button" id="studioQuickRadioBtn" class="action-tag-btn" style="color: #25d0ff; border-color: rgba(37, 208, 255, 0.4); background: rgba(37, 208, 255, 0.1); padding: 4px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; border-radius: 8px;" title="Listen to 3,000 Live Global Radio Stations for Inspiration">
-            <span>📻</span> Radio (3K)
+          <button type="button" id="studioQuickRadioBtn" class="action-tag-btn" style="color: #25d0ff; border-color: rgba(37, 208, 255, 0.4); background: rgba(37, 208, 255, 0.1); padding: 4px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; border-radius: 8px;" title="Open Broadcast Deck: Live TV, Internet Archive Cinema & 3,000 Radio Stations">
+            <span>📺</span> TV &amp; Radio
           </button>
           <div class="studio-status-chip" id="studioEngineStatusChip">
             <span class="status-dot active"></span>
@@ -5579,35 +5579,52 @@ console.log(res.choices[0].message.content);</code></pre>
     </button>
   </div>
 
-  <!-- Nexus Global Radio Modal (3,000 Live Worldwide Stations) -->
+  <!-- Nexus Broadcast Deck: TV & Radio (IPTV AMP v3.9 & Global Radio) -->
   <div id="radioModal" class="modal-overlay hidden" style="z-index: 10000007;">
     <div class="modal-container nexus-radio-modal">
       <div class="radio-modal-header">
         <div class="radio-header-left">
-          <span class="radio-logo-icon">📻</span>
+          <span class="radio-logo-icon" id="deckHeaderIcon">📺</span>
           <div class="radio-title-block">
             <div class="radio-main-title">
-              Nexus Global Radio
-              <span class="radio-badge-live">3,000+ STATIONS &bull; LIVE WORLDWIDE</span>
+              <span id="deckMainTitle">Nexus Broadcast Deck</span>
+              <span class="radio-badge-live" id="deckBadge">IPTV AMP v3.9 &bull; EPG &bull; VAULT</span>
             </div>
-            <div class="radio-sub-title">
-              BBC &bull; NPR &bull; KEXP &bull; Synthwave &bull; Ambient &bull; Lo-Fi &bull; Classical &bull; Rock &bull; News
+            <div class="radio-sub-title" id="deckSubTitle">
+              Live TV &bull; M3U &amp; Xtream Login &bull; XMLTV Guide &bull; Internet Archive Cinema &bull; 3,000 Live Stations
             </div>
           </div>
         </div>
+
+        <!-- Center Deck Switcher Tabs -->
+        <div class="broadcast-deck-tabs" style="display: flex; gap: 4px; background: rgba(10, 16, 26, 0.7); padding: 3px 5px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, 0.12);">
+          <button type="button" id="tabBtnDeckIptv" class="broadcast-tab-btn active" style="padding: 5px 13px; font-size: 11.5px; font-weight: 700; border-radius: 7px; cursor: pointer; background: linear-gradient(135deg, #0ea5e9, #38bdf8); color: #041324; border: none; transition: all .15s ease;">
+            📺 IPTV AMP (TV &amp; Vault)
+          </button>
+          <button type="button" id="tabBtnDeckRadio" class="broadcast-tab-btn" style="padding: 5px 13px; font-size: 11.5px; font-weight: 700; border-radius: 7px; cursor: pointer; background: transparent; color: #94a3b8; border: none; transition: all .15s ease;">
+            📻 Global Radio (3K)
+          </button>
+        </div>
+
         <div class="radio-header-right">
           <div class="radio-now-playing-pill" id="radioHeaderNowPlaying" title="Currently Tuned Station">
             <span class="radio-wave-bars paused" id="radioHeaderWaveBars"><i></i><i></i><i></i></span>
-            <span id="radioHeaderStationText">Wavelength &bull; Standby</span>
+            <span id="radioHeaderStationText">Broadcast Deck &bull; Standby</span>
           </div>
           <button type="button" id="radioPopoutBtn" class="radio-tool-btn" title="Open in dedicated browser window">↗ Pop Out</button>
           <button type="button" id="radioDockMiniBtn" class="radio-tool-btn" title="Minimize to Corner Floating Mini Player">🗕 Mini Player</button>
-          <button type="button" id="radioToggleFullscreenBtn" class="modal-maximize-btn" title="Toggle Fullscreen">⛶</button>
+          <button type="button" id="radioToggleFullscreenBtn" class="modal-maximize-btn" title="Fullscreen the App (MAX)">🗖</button>
           <button type="button" id="btnCloseRadioModal" class="modal-close-btn" style="background: none; border: none; font-size: 26px; color: #94a3b8; cursor: pointer; line-height: 1; padding: 2px 8px;">&times;</button>
+          <!-- Mini TV Corner Controls (Active when docked as Mini TV) -->
+          <div class="mini-tv-controls" id="miniTvControls">
+            <button type="button" id="miniTvExpandBtn" class="mini-tv-btn" title="Expand to Full Broadcast Deck">⛶ Expand</button>
+            <button type="button" id="miniTvPipBtn" class="mini-tv-btn" title="Picture-in-Picture (Float Over Windows)">🗗 PiP</button>
+            <button type="button" id="miniTvCloseBtn" class="mini-tv-btn close" title="Close Mini TV">&times;</button>
+          </div>
         </div>
       </div>
       <div class="radio-iframe-container">
-        <iframe id="nexusRadioIframe" src="radio.html" title="Nexus Global Radio Player" allow="autoplay"></iframe>
+        <iframe id="nexusRadioIframe" src="iptv.html" title="Nexus Broadcast Deck (IPTV AMP & Global Radio)" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen="true"></iframe>
       </div>
     </div>
   </div>

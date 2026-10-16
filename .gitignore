@@ -94,10 +94,12 @@ scripts/capture_*
 scripts/debug_*
 scripts/diagnose_*
 scripts/inspect_*
-scripts/test_add_folder.js
-scripts/test_android_workspace.js
-scripts/test_auto_payload.cjs
-scripts/test_autonomous_agent.mjs
+scripts/test_*
+scripts/verify_*
+scripts/trigger_ls.cs
+scripts/extracted_iptv_amp_3.9.html
+*.mp4
+*.pdb
 scripts/test_bar.png
 scripts/test_browser_eval.mjs
 scripts/test_chat_build.cjs

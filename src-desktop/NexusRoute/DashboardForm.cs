@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -38,8 +38,8 @@ public sealed class DashboardForm : Form
     public DashboardForm(bool startMinimized = false)
     {
         Text = Program.DashboardTitle;
-        Size = new Size(1100, 750);
-        MinimumSize = new Size(900, 600);
+        Size = new Size(1180, 780);
+        MinimumSize = new Size(960, 650);
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = Color.FromArgb(11, 15, 25); // Slate 950

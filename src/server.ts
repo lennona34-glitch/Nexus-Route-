@@ -47,6 +47,7 @@ import { MeshHub } from './mesh/hub.js';
 import { getRetroSystem, RETRO_SYSTEMS } from './mesh/retro_knowledge.js';
 import { SovereignAgentRunner } from './mesh/agent_runner.js';
 import { registerStudioRoutes } from './studio/index.js';
+import { registerIptvRoutes } from './iptv/index.js';
 import { CivitaiService } from './civitai/civitai-service.js';
 import { registerCivitaiRoutes } from './civitai/routes.js';
 
@@ -5925,6 +5926,9 @@ app.post('/v1/mesh/agent/execute', async (req: FastifyRequest<{ Body: { task?: s
 
 // Register Nexus AI Music & Vocal Studio Routes
 registerStudioRoutes(app, meshHub, meshShareManager);
+
+// Register IPTV AMP Media, EPG & Broadcast Deck Routes
+registerIptvRoutes(app);
 
 // Register CivitAI Hub & NordVPN Proxy Routes
 registerCivitaiRoutes(app, civitaiService);

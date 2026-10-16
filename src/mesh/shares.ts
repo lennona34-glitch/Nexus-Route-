@@ -382,6 +382,18 @@ export class ShareManager {
       }
     }
 
+    // 2b. Check if relative to audio/ subdirectory inside shared directories (e.g. stems/...)
+    if (!fullTarget) {
+      for (const base of this.sharedDirs) {
+        const candidateAudio = path.resolve(base, 'audio', normalized.replace(/\//g, path.sep));
+        if (isInsideDir(candidateAudio, base) && fs.existsSync(candidateAudio) && !fs.statSync(candidateAudio).isDirectory()) {
+          matchedBase = base;
+          fullTarget = candidateAudio;
+          break;
+        }
+      }
+    }
+
     // 3. Fallback to default if still null
     if (!fullTarget) {
       if (matchedBase) {
