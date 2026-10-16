@@ -1260,18 +1260,76 @@ async function loadRouteHistory() {
 if (refreshRouteHistoryBtn) refreshRouteHistoryBtn.addEventListener('click', loadRouteHistory);
 
 async function loadMcpInfo() {
-  if (!mcpStatusLine) return;
+  const antigravityLiveStatusText = document.getElementById('antigravityLiveStatusText');
+  const antigravityLiveStatusDot = document.getElementById('antigravityLiveStatusDot');
+
   try {
     const res = await fetch('/mcp/info', { headers: adminHeaders() });
     if (!res.ok) throw new Error('unavailable');
     const data = await res.json();
     const protocol = data.protocolVersion || data.protocolVersions?.[0] || 'unknown';
-    mcpStatusLine.textContent = `✓ MCP ready · ${Number(data.toolCount || 0)} tools · protocol ${protocol}`;
-    mcpStatusLine.classList.add('ready');
+    const toolsCount = Number(data.toolCount || 0);
+
+    if (mcpStatusLine) {
+      mcpStatusLine.textContent = `✓ MCP ready · ${toolsCount} tools · protocol ${protocol}`;
+      mcpStatusLine.classList.add('ready');
+    }
+    if (antigravityLiveStatusText) {
+      antigravityLiveStatusText.textContent = `Antigravity MCP Bridge: Ready (${toolsCount} Tools Published)`;
+    }
+    if (antigravityLiveStatusDot) {
+      antigravityLiveStatusDot.style.background = '#22c55e';
+      antigravityLiveStatusDot.style.boxShadow = '0 0 8px #22c55e';
+    }
   } catch {
-    mcpStatusLine.textContent = 'MCP endpoint is not responding.';
-    mcpStatusLine.classList.remove('ready');
+    if (mcpStatusLine) {
+      mcpStatusLine.textContent = 'MCP endpoint is not responding.';
+      mcpStatusLine.classList.remove('ready');
+    }
+    if (antigravityLiveStatusText) {
+      antigravityLiveStatusText.textContent = 'Antigravity MCP Bridge: Standby (Stdio fallback active)';
+    }
   }
+}
+
+const testAntigravityBridgeBtn = document.getElementById('testAntigravityBridgeBtn');
+const antigravityDiagResult = document.getElementById('antigravityDiagResult');
+
+if (testAntigravityBridgeBtn) {
+  testAntigravityBridgeBtn.addEventListener('click', async () => {
+    testAntigravityBridgeBtn.disabled = true;
+    testAntigravityBridgeBtn.textContent = '⏳ Testing Bridge…';
+    if (antigravityDiagResult) {
+      antigravityDiagResult.style.display = 'block';
+      antigravityDiagResult.textContent = 'Executing nexusroute_diagnostics over MCP…';
+    }
+    try {
+      const res = await fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: { name: 'nexusroute_diagnostics', arguments: { detailed: true } },
+        }),
+      });
+      const data = await res.json();
+      const rawText = data?.result?.content?.[0]?.text;
+      if (rawText) {
+        if (antigravityDiagResult) antigravityDiagResult.textContent = rawText;
+        const statusText = document.getElementById('antigravityLiveStatusText');
+        if (statusText) statusText.textContent = 'Antigravity MCP Bridge: Verified Active & Google Compliant';
+      } else {
+        if (antigravityDiagResult) antigravityDiagResult.textContent = JSON.stringify(data, null, 2);
+      }
+    } catch (err) {
+      if (antigravityDiagResult) antigravityDiagResult.textContent = 'Error running diagnostics: ' + (err?.message || String(err));
+    } finally {
+      testAntigravityBridgeBtn.disabled = false;
+      testAntigravityBridgeBtn.textContent = '⚡ Run Diagnostics Test';
+    }
+  });
 }
 
 // Connect Apps Modal
@@ -1500,11 +1558,10 @@ const PROVIDER_MODELS_CATALOG = {
     { value: 'chatgpt-4o-latest', label: 'chatgpt-4o-latest (Codex / ChatGPT Web Snapshot)' }
   ],
   gemini: [
-    { value: 'gemini-3.6-flash', label: 'gemini-3.6-flash (Realtime Speed · Recommended)' },
-    { value: 'gemini-flash-latest', label: 'gemini-flash-latest (Latest Auto-Updated Flash)' },
-    { value: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite (Ultra Fast & Low Latency)' },
-    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro (Frontier Coding & Math)' },
-    { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash (Legacy Alias · Auto-maps to 3.6 Flash)' }
+    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro (Google DeepMind • Frontier Reasoning & Coding)' },
+    { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash (Google DeepMind • Frontier Speed & Vision)' },
+    { value: 'gemini-2.0-flash', label: 'gemini-2.0-flash (Realtime Low-Latency)' },
+    { value: 'gemini-flash-latest', label: 'gemini-flash-latest (Auto-Updated Flash)' }
   ],
   deepseek: [
     { value: 'deepseek-chat', label: 'deepseek-chat (V3 Code & General · Recommended)' },

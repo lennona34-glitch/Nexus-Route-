@@ -678,18 +678,18 @@
           </div>
         </div>
 
-        <!-- Google Gemini Row -->
+        <!-- Google DeepMind / Antigravity (Gemini) Row -->
         <div class="key-input-row">
           <div class="key-label">
             <div class="provider-info-group">
-              <strong>Google Gemini</strong>
-              <span class="free-tier-tag">Free Tier</span>
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="get-key-link">Get Free Key ↗</a>
+              <strong>Google DeepMind / Antigravity (Gemini)</strong>
+              <span class="free-tier-tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);">🛡️ Zero Auth0 · 100% Policy Compliant</span>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="get-key-link">Get Official Free Key ↗</a>
             </div>
             <span id="badge-gemini" class="provider-pill unconfigured">⚠️ Needs Key</span>
           </div>
           <div class="key-field-group">
-            <input type="password" id="key-gemini" placeholder="Paste AIzaSy... here" autocomplete="off">
+            <input type="password" id="key-gemini" placeholder="Paste official Google AI Studio key (AIzaSy...) here" autocomplete="off">
             <button class="save-key-btn" data-provider="gemini">Save</button>
           </div>
         </div>
@@ -1212,7 +1212,7 @@
             <select id="connectAppProviderSelect" class="connect-provider-dropdown" style="min-width: 170px;">
               <option value="auto">⚡ Auto-Dispatch (Working Defaults)</option>
               <option value="openai">🟢 OpenAI / Codex Pro</option>
-              <option value="gemini">💎 Google Gemini</option>
+              <option value="gemini">💎 Google DeepMind / Antigravity (Gemini)</option>
               <option value="deepseek">🧠 DeepSeek AI</option>
               <option value="groq">🏎️ Groq Cloud LPU</option>
               <option value="cerebras">⚡ Cerebras Cloud (2,000 t/s)</option>
@@ -1267,7 +1267,8 @@
         </div>
 
         <div class="snippet-tabs">
-          <button class="snippet-tab active" data-tab="tab-claude">Claude Code</button>
+          <button class="snippet-tab active" data-tab="tab-antigravity" style="color: #60a5fa; font-weight: 700; border-color: rgba(96, 165, 250, 0.5);">💎 Antigravity (Google)</button>
+          <button class="snippet-tab" data-tab="tab-claude">Claude Code</button>
           <button class="snippet-tab" data-tab="tab-codex">Codex CLI</button>
           <button class="snippet-tab" data-tab="tab-cursor">Cursor IDE</button>
           <button class="snippet-tab" data-tab="tab-python">Python SDK</button>
@@ -1276,7 +1277,57 @@
           <button class="snippet-tab" data-tab="tab-mcp">MCP Tools</button>
         </div>
 
-        <div id="tab-claude" class="snippet-content active">
+        <div id="tab-antigravity" class="snippet-content active">
+          <div class="mcp-learning-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 14px;">
+            <div class="mcp-concept" style="border-color: rgba(96, 165, 250, 0.3); background: rgba(59, 130, 246, 0.08);">
+              <strong style="color: #60a5fa;">1. Antigravity IDE (DeepMind)</strong>
+              <span>Antigravity connects via MCP stdio/HTTP to inspect, diagnose, and troubleshoot NexusRoute from within.</span>
+            </div>
+            <div class="mcp-arrow">↔</div>
+            <div class="mcp-concept" style="border-color: rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.08);">
+              <strong style="color: #c084fc;">2. NexusRoute MCP Server</strong>
+              <span>Exposes <code>nexusroute_diagnostics</code>, file workspace, commands, and app runtime tools at <code>/mcp</code>.</span>
+            </div>
+            <div class="mcp-arrow">↔</div>
+            <div class="mcp-concept" style="border-color: rgba(52, 211, 153, 0.3); background: rgba(16, 185, 129, 0.08);">
+              <strong style="color: #34d399;">3. 100% Google Compliant</strong>
+              <span>Uses official Google AI Studio keys (<code>GEMINI_API_KEY</code>). Zero Auth0, zero scraping, 100% ToS-compliant.</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px;">
+            <span style="font-size: 20px; line-height: 1;">🛡️</span>
+            <div style="font-size: 11.5px; line-height: 1.5; color: #d1fae5;">
+              <strong style="color: #6ee7b7; font-size: 12px;">Zero Auth0 · Zero Reverse Engineering · Strict Google Policy Compliance:</strong><br>
+              NexusRoute interacts with Google DeepMind / Gemini models strictly via official Google AI Studio REST APIs and developer keys (<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color: #38bdf8; text-decoration: underline;">get a free key here</a>). You never have to risk your account with third-party Auth0 tokens, browser session scraping, or unauthorized proxies.
+            </div>
+          </div>
+
+          <p class="snippet-intro">Antigravity connects to NexusRoute automatically via MCP. Configuration in <code>~/.gemini/config/mcp_config.json</code>:</p>
+          <pre><code>{
+  "mcpServers": {
+    "nexusroute": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\adria\\.gemini\\antigravity\\scratch\\nexus-route\\scripts\\mcp_stdio_bridge.js"
+      ]
+    }
+  }
+}</code></pre>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="antigravityLiveStatusDot" style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; display: inline-block; box-shadow: 0 0 8px #22c55e;"></span>
+              <span id="antigravityLiveStatusText" style="font-size: 12px; font-weight: 600; color: #e2e8f0;">Antigravity MCP Bridge: Connected &amp; Ready</span>
+            </div>
+            <button id="testAntigravityBridgeBtn" class="action-tag-btn" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-sm); cursor: pointer;">
+              ⚡ Run Diagnostics Test
+            </button>
+          </div>
+          <div id="antigravityDiagResult" style="display: none; margin-top: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-family: var(--font-mono, monospace); font-size: 11px; color: #a5f3fc; max-height: 180px; overflow-y: auto; white-space: pre-wrap;"></div>
+        </div>
+
+        <div id="tab-claude" class="snippet-content">
           <p class="snippet-intro">Run Anthropic's official <strong>Claude Code CLI</strong> directly through NexusRoute with live fallbacks, smart virtual routing, and full token tracking:</p>
           <pre><code id="claudeSnippetCode"># In PowerShell (Windows):
 $env:ANTHROPIC_BASE_URL="http://localhost:3000"

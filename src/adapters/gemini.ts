@@ -188,10 +188,10 @@ export class GeminiAdapter implements ProviderAdapter {
 
   private resolveModelName(targetModel: string): string {
     const m = targetModel.replace(/^gemini::/, '').replace(/^gemini\//, '').trim();
-    if (m === 'gemini-flash' || m === 'gemini-2.5-flash' || m === 'gemini-2.0-flash') return 'gemini-3.6-flash';
-    if (m === 'gemini-pro' || m === 'gemini-2.5-pro') return 'gemini-pro-latest';
-    if (m === 'gemini-flash-lite' || m === 'gemini-2.5-flash-lite') return 'gemini-3.1-flash-lite';
-    return m || 'gemini-3.6-flash';
+    if (m === 'gemini-flash' || m === 'gemini-flash-latest' || m === 'gemini-3.6-flash') return 'gemini-2.5-flash';
+    if (m === 'gemini-pro' || m === 'gemini-pro-latest') return 'gemini-2.5-pro';
+    if (m === 'gemini-flash-lite' || m === 'gemini-3.1-flash-lite') return 'gemini-2.0-flash-lite-preview-02-05';
+    return m || 'gemini-2.5-flash';
   }
 
   private getHeaders(): Record<string, string> {
